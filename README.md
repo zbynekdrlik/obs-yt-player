@@ -58,18 +58,24 @@ Each instance maintains its own playlist, cache, and settings.
 
 This project follows a phased development approach. See the `docs/` directory for detailed implementation specifications and the `phases/` directory for step-by-step development guides.
 
-## Development
+## Development Phases
 
-The project is organized into implementation phases:
+The project is organized into logical implementation phases:
 
-1. **Phase 01**: Scaffolding & Project Skeleton
-2. **Phase 02**: Dependency Setup & Tool Management
-3. **Phase 03**: Playlist Sync Thread
-4. **Phase 04**: Caching & File Management
-5. **Phase 05**: Audio Normalization Thread
-6. **Phase 06**: Playback Control & Scene Integration
-7. **Phase 07**: Metadata Retrieval
-8. **Phase 08**: Final Review & Polish
+### Foundation
+1. **Phase 01**: Scaffolding - Basic script structure and OBS integration
+2. **Phase 02**: Tool Management - Download and verify yt-dlp, FFmpeg, fpcalc
+3. **Phase 03**: Playlist Sync - Fetch playlist, queue videos, manage cache
+
+### Processing Pipeline
+4. **Phase 04**: Video Download - Download videos with yt-dlp
+5. **Phase 05**: Metadata Extraction - AcoustID fingerprinting + YouTube title fallback
+6. **Phase 06**: Audio Normalization - FFmpeg loudnorm to -14 LUFS
+
+### Playback & Control
+7. **Phase 07**: Playback Control - Random playback, media source control
+8. **Phase 08**: Scene Management - Handle scene transitions, stop on exit
+9. **Phase 09**: Final Polish - Testing, optimization, documentation
 
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
