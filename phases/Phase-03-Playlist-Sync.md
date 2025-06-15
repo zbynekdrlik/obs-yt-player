@@ -1,61 +1,93 @@
-# Phase 03 – Playlist Sync & Core Functions
+# Phase 03 – Playlist Sync & Queue Management
 
 ## Goal
-Implement playlist synchronization that fetches video IDs and core functions for metadata retrieval and file management. This phase creates the foundation for the serial processing pipeline.
+Implement playlist synchronization that fetches video IDs and queues them for processing. This phase creates the foundation for the video processing pipeline.
+
+## Version Increment
+**This phase adds new features** → Increment MINOR version (e.g., `1.1.0` → `1.2.0`)
+
+## Requirements Reference
+This phase implements playlist synchronization from `02-requirements.md`:
+- Trigger **only** at startup and via *Sync Playlist Now* button
+- **NO PERIODIC SYNC** - Script runs on slow LTE internet
+- Process videos **one-by-one** (queue for serial processing)
+- Remove local files whose IDs left the playlist
 
 ## Components to Implement
 
 ### 1. Playlist Sync Worker
-- Fetches YouTube playlist data via **yt‑dlp**
-- Extracts video IDs and basic info (title, duration)
-- Queues video info for serial processing
-- Runs **only** at startup and on *Sync Now* button click
-- **NO PERIODIC SYNC** - Due to slow LTE internet
+```python
+def playlist_sync_worker():
+    # Wait for sync_event signal
+    # Check tools_ready before proceeding
+    # Fetch playlist with yt-dlp
+    # Queue new videos for processing
+    # Clean up old videos
+```
 
-### 2. Metadata Functions
-- Primary method: AcoustID fingerprinting (API key: `M6o6ia3dKu`)
-- Fallback: Parse YouTube title for artist and song information
-- Log transformations in format: *"YT: 'Original Title' → Song: 'Song Name', Artist: 'Artist Name'"*
-- These functions will be called during video processing
+Key features:
+- Triggered by `sync_event.set()`
+- Fetches playlist data via yt-dlp
+- Extracts video IDs and titles
+- Queues videos not already cached
+- NO automatic periodic sync
 
-### 3. File Management Functions
-- Filename sanitization to remove invalid filesystem characters
-- Cache directory scanning to list existing normalized files
-- Cleanup function to remove duplicates and temporary files
-- All operations must be thread-safe
+### 2. Playlist Fetching
+```python
+def fetch_playlist_with_ytdlp(playlist_url):
+    # Use yt-dlp --flat-playlist
+    # Return list of video info dicts
+    # Handle errors gracefully
+```
 
-## Requirements Reference
-This phase implements the "Playlist Synchronisation" section from `02-requirements.md`.
+### 3. Cache Management
+```python
+def get_cached_videos():
+    # Scan cache directory
+    # Return dict of cached videos
+    
+def cleanup_old_videos():
+    # Remove videos no longer in playlist
+    # Skip currently playing video
+```
 
-**IMPORTANT**: NO PERIODIC SYNC - Due to slow LTE internet, sync only happens:
-- Once at script startup (triggered after tools are ready)
-- When user clicks "Sync Now" button
+### 4. Queue Management
+- Use `queue.Queue()` for thread-safe operations
+- Queue video info objects (id, title, duration)
+- Process videos serially in later phases
 
 ## Key Implementation Points
-- Use threading.Event for sync signaling
-- Queue contains video info, not actual video files
-- Implement robust error handling for network issues
-- Must check `tools_ready` flag before using yt-dlp
-- Clean up old videos not in current playlist (skip currently playing)
+- Use `threading.Event` for sync signaling
+- Queue contains video info, not video files
+- Implement robust error handling
+- Check `tools_ready` before using yt-dlp
+- Thread-safe cache operations
 
-## OBS API Constraints
-Per `03-obs_api.md`:
-- Heavy work (fetching playlist) must run in background thread
-- Any OBS API calls must use `obs.timer_add` to run on main thread
+## Implementation Checklist
+- [ ] Update `SCRIPT_VERSION` constant
+- [ ] Implement playlist_sync_worker thread
+- [ ] Add sync_event for manual trigger
+- [ ] Implement fetch_playlist_with_ytdlp
+- [ ] Add get_cached_videos function
+- [ ] Add cleanup_old_videos function
+- [ ] Wire up "Sync Now" button callback
+- [ ] Add startup sync trigger
+- [ ] Test queue operations
 
 ## Testing Before Commit
 1. Test playlist fetching with valid URL
-2. Verify sync runs once at startup after tools are ready
-3. Test "Sync Now" button triggers sync correctly
-4. **Verify NO periodic sync occurs** - wait and ensure no automatic resync
-5. Test metadata extraction with sample audio files
-6. Test filename sanitization with special characters
-7. Verify cache cleanup removes old files correctly
-8. Test with invalid playlist URL - should log error gracefully
-9. Ensure OBS remains responsive during sync
+2. Verify sync runs once at startup after tools ready
+3. Test "Sync Now" button triggers sync
+4. **Verify NO periodic sync** - wait 10+ minutes
+5. Test with empty playlist
+6. Test with invalid playlist URL
+7. Verify old video cleanup works
+8. Check queue fills correctly
+9. Ensure OBS stays responsive
+10. **Verify version was incremented**
 
 ## Commit
 After successful testing, commit with message:  
-> *"Add playlist sync and core functions for serial processing"*
+> *"Add playlist sync and queue management"*
 
-*After verification, proceed to Phase 04.*
+*After verification, proceed to Phase 04 - Video Download.*
