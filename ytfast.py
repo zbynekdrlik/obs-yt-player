@@ -23,6 +23,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
+SCRIPT_VERSION = "1.0.0"
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -667,7 +668,7 @@ def script_load(settings):
     global stop_threads
     stop_threads = False
     
-    log("Script loading...")
+    log(f"Script version {SCRIPT_VERSION} loaded")
     
     # Apply initial settings
     script_update(settings)
