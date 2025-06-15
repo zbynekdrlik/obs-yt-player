@@ -16,6 +16,10 @@ This phase sets up the foundation for all requirements in `02-requirements.md`.
 - Follow output rules from `04-guidelines.md` (single Python file, ≤400 char docstring)
 - Respect OBS constraints from `03-obs_api.md` (main thread awareness)
 - Set up proper threading infrastructure with locks and queues
+- **Dynamic naming**: Scene name and cache directory based on script filename
+  - `SCRIPT_NAME = os.path.splitext(os.path.basename(__file__))[0]`
+  - `DEFAULT_CACHE_DIR = os.path.join(script_dir, f"{SCRIPT_NAME}-cache")`
+  - `SCENE_NAME = SCRIPT_NAME`
 
 ## Testing Before Commit
 1. Load script in OBS Scripts menu
@@ -23,7 +27,9 @@ This phase sets up the foundation for all requirements in `02-requirements.md`.
 3. Check that script loads without errors
 4. Verify scene check runs after 3 seconds
 5. Ensure default values are set correctly
-6. Check log output shows proper timestamps and levels
+6. Check default cache directory is `<script_location>/<scriptname>-cache`
+7. Verify scene name matches script filename without extension
+8. Check log output shows proper timestamps and levels
 
 ## Commit
 After successful testing, commit with message:  
