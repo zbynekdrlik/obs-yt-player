@@ -38,6 +38,10 @@ It is authoritative; later Phase prompts reference this spec.
 ## Logging
 - Two levels: DEBUG (default 1) & NORMAL; timestamp each entry.
 
+## Default Configuration
+- **Default Playlist URL**: `https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U`
+- Users can change this in OBS script properties to any valid YouTube playlist
+
 Refer back here from every Phase prompt to ensure no requirement is missed.  
 See **03‑OBS_API.md** for environment constraints and **04‑Guidelines.md** for coding style.
 
