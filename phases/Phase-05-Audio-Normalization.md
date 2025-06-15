@@ -1,32 +1,50 @@
-# Phase 05 – Audio Normalization Thread
+# Phase 05 – Audio Normalization Implementation
 
 ## Goal
-Create a worker that:
-
-- Monitors `normalize_queue` for downloaded videos.
-- Runs FFmpeg loudnorm (−14 LUFS).
-- Replaces temp files atomically.
-- Adds normalized videos to `ready_videos` list.
+Implement the two-pass FFmpeg loudnorm filter for consistent audio levels at -14 LUFS. This function will be called as part of the serial processing pipeline.
 
 ## Requirements Reference
 This phase implements audio normalization as specified in `02-requirements.md` (loudness-normalise to -14 LUFS).
 
-## Notes
-- Use two‑pass loudnorm for accuracy.
-- Handle subprocess errors and log them.
-- Must check `tools_ready` before using FFmpeg.
-- Follow `03-obs_api.md` constraints (subprocess with CREATE_NO_WINDOW on Windows).
+## Implementation Details
+
+### Two-Pass Loudnorm Process
+1. **First Pass - Analysis**
+   - Run FFmpeg with loudnorm filter to analyze audio
+   - Extract loudness statistics (input levels, true peak, etc.)
+   - Parse the JSON output from FFmpeg
+
+2. **Second Pass - Normalization**
+   - Apply loudnorm filter with measured values from first pass
+   - Target: -14 LUFS (standard for streaming platforms)
+   - Copy video stream without re-encoding
+   - Re-encode audio with AAC codec at 192k bitrate
+
+### Key Considerations
+- Use temporary file for normalized output
+- Atomic file operations to prevent corruption
+- Handle subprocess errors and log them appropriately
+- Must check `tools_ready` before using FFmpeg
+- Follow `03-obs_api.md` constraints (subprocess with CREATE_NO_WINDOW on Windows)
+
+### Error Handling
+- Gracefully handle corrupt or problematic audio streams
+- Return None on failure to allow pipeline to continue
+- Clean up temporary files on error
+- Log specific FFmpeg errors for debugging
 
 ## Testing Before Commit
-1. Queue a test video for normalization
-2. Verify FFmpeg runs with correct parameters
-3. Check output is normalized to -14 LUFS
-4. Test atomic file replacement
-5. Verify error handling for corrupt files
-6. Ensure Windows doesn't show console windows
+1. Process a video with quiet audio - verify it gets louder
+2. Process a video with loud audio - verify it gets quieter  
+3. Check output is at -14 LUFS using FFmpeg or audio analysis tool
+4. Verify video stream is copied (not re-encoded) - check file info
+5. Test error handling with corrupt files
+6. Ensure Windows console stays hidden during processing
+7. Verify temporary files are cleaned up
+8. Test with various audio formats (mono, stereo, surround)
 
 ## Commit
 After successful testing, commit with message:  
-> *"Add audio normalization with FFmpeg loudnorm."*
+> *"Add two-pass audio normalization with FFmpeg loudnorm"*
 
 *After verification, proceed to Phase 06.*
