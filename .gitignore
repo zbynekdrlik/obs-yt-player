@@ -38,19 +38,32 @@ PIPFILE.lock
 ehthumbs.db
 Thumbs.db
 
-# Project specific
+# Project specific - cache directories
+*-cache/
 cache/
 tools/
+
+# Video and temp files
+*.mp4
 *.part
+*.ytdl
 *.tmp
+*_temp.mp4
+*_normalized_temp.mp4
 
 # Logs
 *.log
 logs/
 
-# OBS Studio cache (if any)
+# OBS Studio
 *.obs
 
 # Temporary files
 temp/
 tmp/
+
+# Test scripts (renamed instances)
+music*.py
+bgm*.py
+stream*.py
+test*.py
