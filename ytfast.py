@@ -16,9 +16,14 @@ import platform
 import stat
 import json
 import sys
+import re
+import random
+import shutil
+import unicodedata
+import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLrAl6rYJWZ7J5XKz9nZQ9J8Z9J8Z9J8Z9"
+DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_PATH)
@@ -35,6 +40,7 @@ PLAYBACK_CHECK_INTERVAL = 1000  # 1 second in milliseconds
 SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
 MAX_RESOLUTION = "1440"
 TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
+ACOUSTID_API_KEY = "M6o6ia3dKu"  # AcoustID API key for metadata
 
 # URLs for tool downloads
 YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
@@ -51,15 +57,12 @@ FFMPEG_URLS = {
 # Threading infrastructure
 tools_thread = None
 playlist_sync_thread = None
-download_worker_thread = None
-normalization_worker_thread = None
-metadata_worker_thread = None
+process_videos_thread = None  # Changed from multiple workers to single serial processor
 
 # Synchronization primitives
 state_lock = threading.Lock()
-download_queue = queue.Queue()
-normalization_queue = queue.Queue()
-metadata_queue = queue.Queue()
+video_queue = queue.Queue()  # Queue for videos to process
+sync_event = threading.Event()  # Signal for manual sync
 
 # State flags
 tools_ready = False
@@ -357,7 +360,249 @@ def trigger_startup_sync():
         sync_on_startup_done = True
     
     log("Starting one-time playlist sync on startup", "NORMAL")
-    # TODO: Signal playlist sync thread to run once
+    sync_event.set()  # Signal playlist sync thread to run
+
+# ===== PLAYLIST SYNC FUNCTIONS =====
+def fetch_playlist_with_ytdlp(playlist_url):
+    """Fetch playlist information using yt-dlp."""
+    try:
+        ytdlp_path = get_ytdlp_path()
+        
+        # Prepare command
+        cmd = [
+            ytdlp_path,
+            '--flat-playlist',
+            '--dump-json',
+            '--no-warnings',
+            playlist_url
+        ]
+        
+        # Run command with hidden window on Windows
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            startupinfo=startupinfo,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            log(f"yt-dlp failed: {result.stderr}", "NORMAL")
+            return []
+        
+        # Parse JSON output (one JSON object per line)
+        videos = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                try:
+                    video_data = json.loads(line)
+                    videos.append({
+                        'id': video_data.get('id', ''),
+                        'title': video_data.get('title', 'Unknown'),
+                        'duration': video_data.get('duration', 0)
+                    })
+                except json.JSONDecodeError:
+                    continue
+        
+        log(f"Fetched {len(videos)} videos from playlist", "NORMAL")
+        return videos
+        
+    except Exception as e:
+        log(f"Error fetching playlist: {e}", "NORMAL")
+        return []
+
+def cleanup_old_videos():
+    """Remove videos no longer in playlist (except currently playing)."""
+    try:
+        with state_lock:
+            current_ids = playlist_video_ids.copy()
+            cached_ids = set(cached_videos.keys())
+            playing = current_video_path
+        
+        # Find videos to remove
+        to_remove = cached_ids - current_ids
+        
+        for video_id in to_remove:
+            video_info = cached_videos.get(video_id)
+            if video_info and video_info['path'] != playing:
+                try:
+                    if os.path.exists(video_info['path']):
+                        os.remove(video_info['path'])
+                        log(f"Removed old video: {video_info['path']}", "DEBUG")
+                    
+                    with state_lock:
+                        del cached_videos[video_id]
+                except Exception as e:
+                    log(f"Error removing old video: {e}", "DEBUG")
+                    
+    except Exception as e:
+        log(f"Error in cleanup_old_videos: {e}", "DEBUG")
+
+# ===== METADATA FUNCTIONS =====
+def get_metadata(filepath, yt_title):
+    """Get song and artist metadata using AcoustID or YouTube title."""
+    # Try AcoustID first
+    try:
+        song, artist = get_acoustid_metadata(filepath)
+        if song and artist:
+            log(f"YT: '{yt_title}' → Song: '{song}', Artist: '{artist}'")
+            return song, artist
+    except Exception as e:
+        log(f"AcoustID failed: {e}", "DEBUG")
+    
+    # Fallback to parsing YouTube title
+    song, artist = parse_youtube_title(yt_title)
+    log(f"YT: '{yt_title}' → Song: '{song}', Artist: '{artist}'")
+    return song, artist
+
+def get_acoustid_metadata(filepath):
+    """Query AcoustID for metadata using audio fingerprint."""
+    try:
+        # Use fpcalc (comes with AcoustID) to generate fingerprint
+        # For now, returning None to use fallback
+        # Full implementation would require fpcalc binary
+        return None, None
+    except Exception:
+        return None, None
+
+def parse_youtube_title(title):
+    """Parse YouTube title to extract artist and song."""
+    # Common patterns in YouTube titles
+    patterns = [
+        (r'^(.*?)\s*-\s*(.*)$', 'hyphen'),  # Artist - Song
+        (r'^(.*?)\s*\|\s*(.*)$', 'pipe'),   # Artist | Song
+        (r'^(.*?)\s*:\s*(.*)$', 'colon'),   # Artist : Song
+    ]
+    
+    for pattern, name in patterns:
+        match = re.match(pattern, title)
+        if match:
+            artist = match.group(1).strip()
+            song = match.group(2).strip()
+            
+            # Clean up common suffixes
+            song = re.sub(r'\s*\([^)]*\)$', '', song)  # Remove (Official Video) etc
+            song = re.sub(r'\s*\[[^\]]*\]$', '', song)  # Remove [HD] etc
+            
+            return song, artist
+    
+    # If no pattern matches, use title as song name
+    return title, "Unknown Artist"
+
+# ===== FILE MANAGEMENT FUNCTIONS =====
+def sanitize_filename(song, artist, video_id):
+    """Create safe filename from metadata."""
+    def clean_string(s):
+        # Remove non-ASCII characters
+        s = unicodedata.normalize('NFKD', s)
+        s = s.encode('ASCII', 'ignore').decode('ASCII')
+        
+        # Replace problematic characters
+        invalid_chars = '<>:"/\\|?*'
+        for char in invalid_chars:
+            s = s.replace(char, '_')
+        
+        # Remove multiple underscores and trim
+        s = re.sub(r'_+', '_', s)
+        s = s.strip('_. ')
+        
+        # Limit length
+        return s[:50] if s else "unknown"
+    
+    clean_song = clean_string(song)
+    clean_artist = clean_string(artist)
+    
+    return f"{clean_song}_{clean_artist}_{video_id}_normalized.mp4"
+
+def get_cached_videos():
+    """Scan cache directory for normalized videos."""
+    videos = {}
+    
+    try:
+        cache_path = Path(cache_dir)
+        if not cache_path.exists():
+            return videos
+        
+        # Look for normalized mp4 files
+        for file_path in cache_path.glob("*_normalized.mp4"):
+            # Extract video ID from filename
+            match = re.search(r'_([a-zA-Z0-9_-]{11})_normalized\.mp4$', file_path.name)
+            if match:
+                video_id = match.group(1)
+                
+                # Extract metadata from filename
+                parts = file_path.stem.replace('_normalized', '').split('_')
+                if len(parts) >= 3:
+                    song = parts[0]
+                    artist = parts[1]
+                    
+                    videos[video_id] = {
+                        "path": str(file_path),
+                        "song": song,
+                        "artist": artist,
+                        "normalized": True
+                    }
+        
+        log(f"Found {len(videos)} cached videos", "DEBUG")
+        
+    except Exception as e:
+        log(f"Error scanning cache: {e}", "DEBUG")
+    
+    return videos
+
+def cleanup_cache():
+    """Remove duplicates and temporary files."""
+    try:
+        cache_path = Path(cache_dir)
+        if not cache_path.exists():
+            return
+        
+        # Remove .part files
+        for part_file in cache_path.glob("*.part"):
+            try:
+                part_file.unlink()
+                log(f"Removed partial file: {part_file.name}", "DEBUG")
+            except Exception:
+                pass
+        
+        # Remove temporary files
+        for temp_file in cache_path.glob("*_temp.mp4"):
+            try:
+                temp_file.unlink()
+                log(f"Removed temp file: {temp_file.name}", "DEBUG")
+            except Exception:
+                pass
+                
+        # Find and remove duplicates (keep newest)
+        video_groups = {}
+        for file_path in cache_path.glob("*_normalized.mp4"):
+            match = re.search(r'_([a-zA-Z0-9_-]{11})_normalized\.mp4$', file_path.name)
+            if match:
+                video_id = match.group(1)
+                if video_id not in video_groups:
+                    video_groups[video_id] = []
+                video_groups[video_id].append(file_path)
+        
+        # Remove older duplicates
+        for video_id, paths in video_groups.items():
+            if len(paths) > 1:
+                # Sort by modification time, keep newest
+                paths.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                for old_path in paths[1:]:
+                    try:
+                        old_path.unlink()
+                        log(f"Removed duplicate: {old_path.name}", "DEBUG")
+                    except Exception:
+                        pass
+                        
+    except Exception as e:
+        log(f"Error in cleanup_cache: {e}", "DEBUG")
 
 # ===== OBS SCRIPT INTERFACE =====
 def script_description():
@@ -427,6 +672,9 @@ def script_load(settings):
     # Apply initial settings
     script_update(settings)
     
+    # Clean up cache on startup
+    cleanup_cache()
+    
     # Schedule scene verification after 3 seconds
     obs.timer_add(verify_scene_setup, SCENE_CHECK_DELAY)
     
@@ -467,8 +715,8 @@ def sync_now_callback(props, prop):
             log("Cannot sync - tools not ready yet", "NORMAL")
             return True
     
-    # TODO: Trigger playlist sync
-    log("Triggering manual playlist sync", "DEBUG")
+    # Trigger playlist sync
+    sync_event.set()
     return True
 
 def on_frontend_event(event):
@@ -520,8 +768,7 @@ def playback_controller():
 # ===== WORKER THREAD STARTERS =====
 def start_worker_threads():
     """Start all background worker threads."""
-    global tools_thread, playlist_sync_thread, download_worker_thread
-    global normalization_worker_thread, metadata_worker_thread
+    global tools_thread, playlist_sync_thread, process_videos_thread
     
     log("Starting worker threads...")
     
@@ -529,78 +776,102 @@ def start_worker_threads():
     tools_thread = threading.Thread(target=tools_setup_worker, daemon=True)
     tools_thread.start()
     
-    # TODO: Start other worker threads
-    # playlist_sync_thread = threading.Thread(target=playlist_sync_worker, daemon=True)
-    # download_worker_thread = threading.Thread(target=download_worker, daemon=True)
-    # normalization_worker_thread = threading.Thread(target=normalization_worker, daemon=True)
-    # metadata_worker_thread = threading.Thread(target=metadata_worker, daemon=True)
+    # Start playlist sync thread
+    playlist_sync_thread = threading.Thread(target=playlist_sync_worker, daemon=True)
+    playlist_sync_thread.start()
+    
+    # Start video processing thread (will be implemented in Phase 4)
+    # process_videos_thread = threading.Thread(target=process_videos_worker, daemon=True)
+    # process_videos_thread.start()
     
     log("Worker threads started", "DEBUG")
 
 def stop_worker_threads():
     """Stop all background worker threads."""
-    global tools_thread
+    global tools_thread, playlist_sync_thread
     
     log("Stopping worker threads...")
+    
+    # Signal threads to stop
+    sync_event.set()  # Wake up sync thread
     
     # Wait for threads to finish (with timeout)
     if tools_thread and tools_thread.is_alive():
         tools_thread.join(timeout=5)
     
+    if playlist_sync_thread and playlist_sync_thread.is_alive():
+        playlist_sync_thread.join(timeout=5)
+    
     log("Worker threads stopped", "DEBUG")
 
-# ===== WORKER THREAD PLACEHOLDERS =====
+# ===== WORKER THREADS =====
 def playlist_sync_worker():
     """Background thread for playlist synchronization - NO PERIODIC SYNC."""
     global stop_threads
     
     while not stop_threads:
+        # Wait for sync signal or timeout
+        if not sync_event.wait(timeout=1):
+            continue
+        
+        # Clear the event
+        sync_event.clear()
+        
+        # Check if we should exit
+        if stop_threads:
+            break
+            
         # Wait for tools to be ready
         with state_lock:
             if not tools_ready:
-                time.sleep(1)
+                log("Sync requested but tools not ready", "DEBUG")
                 continue
         
-        # TODO: Implement in Phase 3
-        # This will wait for signals to sync (startup or manual)
-        # NO periodic timer-based sync
-        time.sleep(1)
-
-def download_worker():
-    """Background thread for video downloads."""
-    global stop_threads
-    
-    while not stop_threads:
-        # Wait for tools to be ready
-        with state_lock:
-            if not tools_ready:
-                time.sleep(1)
-                continue
+        log("Starting playlist synchronization", "NORMAL")
         
-        # TODO: Implement in Phase 3
-        time.sleep(1)
-
-def normalization_worker():
-    """Background thread for audio normalization."""
-    global stop_threads
-    
-    while not stop_threads:
-        # Wait for tools to be ready
-        with state_lock:
-            if not tools_ready:
-                time.sleep(1)
+        try:
+            # Clean up cache first
+            cleanup_cache()
+            
+            # Scan for existing videos
+            with state_lock:
+                cached_videos.clear()
+                cached_videos.update(get_cached_videos())
+            
+            # Fetch playlist
+            videos = fetch_playlist_with_ytdlp(playlist_url)
+            
+            if not videos:
+                log("No videos found in playlist or fetch failed", "NORMAL")
                 continue
-        
-        # TODO: Implement in Phase 5
-        time.sleep(1)
-
-def metadata_worker():
-    """Background thread for metadata retrieval."""
-    global stop_threads
+            
+            # Update playlist video IDs
+            with state_lock:
+                playlist_video_ids.clear()
+                playlist_video_ids.update(video['id'] for video in videos)
+            
+            # Queue videos for processing (skip already cached)
+            queued_count = 0
+            for video in videos:
+                with state_lock:
+                    if video['id'] not in cached_videos:
+                        video_queue.put(video)
+                        queued_count += 1
+            
+            log(f"Queued {queued_count} new videos for processing", "NORMAL")
+            
+            # Clean up old videos
+            cleanup_old_videos()
+            
+        except Exception as e:
+            log(f"Error in playlist sync: {e}", "NORMAL")
     
-    while not stop_threads:
-        # TODO: Implement in Phase 7
-        time.sleep(1)
+    log("Playlist sync thread exiting", "DEBUG")
+
+def process_videos_worker():
+    """Process videos serially - download, metadata, normalize."""
+    # TODO: Implement in Phase 4
+    pass
 
 # ===== UTILITY FUNCTIONS =====
 def ensure_cache_directory():
