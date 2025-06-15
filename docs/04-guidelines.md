@@ -20,4 +20,4 @@ After each Phase implementation and **successful testing**, use a concise but in
 
 Always reconcile implementations with **02‑Requirements.md** and respect environment rules in **03‑OBS_API.md**.
 
-*Prev → 03‑OBS_API.md | Next → Phase‑01‑Scaffolding.md*
+*Prev → 03‑OBS_API.md | Next → ../phases/Phase-01-Scaffolding.md*
