@@ -27,25 +27,13 @@ Implement the dependency management system that downloads and maintains yt-dlp a
 - Log errors with retry information
 
 ### Download Progress Implementation
-```python
-# Use a set to track logged percentages
-logged_percentages = set()
-
-# Log only at milestone percentages
-if percent >= 100 and 100 not in logged_percentages:
-    milestone = 100
-elif percent >= 75 and 75 not in logged_percentages:
-    milestone = 75
-# ... etc for 50%, 25%, 0%
-
-if milestone is not None:
-    log(f"Downloading {description}: {milestone}%", "DEBUG")
-    logged_percentages.add(milestone)
-```
+- Use a set to track logged percentages
+- Log only at milestone percentages (0%, 25%, 50%, 75%, 100%)
+- This prevents log spam while still providing progress feedback
 
 ## Integration Notes
 - The `tools_thread` must start in `script_load()`
-- All worker threads (sync, normalize, etc.) must check `tools_ready` before proceeding
+- All worker threads (sync, process, etc.) must check `tools_ready` before proceeding
 - Use `CREATE_NO_WINDOW` flag on Windows for subprocess calls
 
 ## Testing Before Commit
