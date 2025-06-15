@@ -16,13 +16,8 @@ This phase sets up the foundation for all requirements in `02-requirements.md`.
 - Follow output rules from `04-guidelines.md` (single Python file, ≤400 char docstring)
 - Respect OBS constraints from `03-obs_api.md` (main thread awareness)
 - Set up proper threading infrastructure with locks and queues
-- **Dynamic naming**: Scene name and cache directory based on script filename
-  - `SCRIPT_NAME = os.path.splitext(os.path.basename(__file__))[0]`
-  - `DEFAULT_CACHE_DIR = os.path.join(script_dir, f"{SCRIPT_NAME}-cache")`
-  - `SCENE_NAME = SCRIPT_NAME`
-- **Cache directory property**: Use text field for full editability
-  - `obs.obs_properties_add_text(props, "cache_dir", "Cache Directory", obs.OBS_TEXT_DEFAULT)`
-  - Allows users to easily modify paths and add custom suffixes
+- **Dynamic naming**: Scene name and cache directory based on script filename without extension
+- **Cache directory property**: Use text field for full editability to allow users to easily modify paths and add custom suffixes
 
 ## Testing Before Commit
 1. Load script in OBS Scripts menu
