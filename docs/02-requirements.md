@@ -14,10 +14,11 @@ It is authoritative; later Phase prompts reference this spec.
 4. Remove local files whose IDs left the playlist (skip currently playing).
 
 ## Caching & File Management
-- Store videos in user‑configurable cache dir.  
+- Store videos in user‑configurable cache dir (editable text field).  
 - **Default cache location**: `<script_directory>/<scriptname>-cache/`
   - Example: `ytfast.py` → `./ytfast-cache/`
   - Allows multiple script instances with separate caches
+  - Users can easily modify path in text field
 - Sanitise filenames: `<song>_<artist>_<id>_normalized.mp4`.  
 - Retain only newest duplicate; clean temp `.part` files.
 
