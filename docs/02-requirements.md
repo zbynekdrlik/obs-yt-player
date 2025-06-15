@@ -37,6 +37,16 @@ It is authoritative; later Phase prompts reference this spec.
 
 ## Logging
 - Two levels: DEBUG (default 1) & NORMAL; timestamp each entry.
+- Log script version on startup in format: "Script version X.Y.Z loaded"
+- Version format: MAJOR.MINOR.PATCH (e.g., 1.0.0)
+
+## Versioning
+- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.0.0"`)
+- Increment version with each development iteration:
+  - PATCH: Bug fixes, minor changes
+  - MINOR: New features, non-breaking changes
+  - MAJOR: Breaking changes, major refactors
+- Log version on script startup
 
 ## Default Configuration
 - **Default Playlist URL**: `https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U`
