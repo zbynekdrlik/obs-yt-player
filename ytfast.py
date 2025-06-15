@@ -11,6 +11,11 @@ import time
 import logging
 import subprocess
 from pathlib import Path
+import urllib.request
+import platform
+import stat
+import json
+import sys
 
 # ===== MODULE-LEVEL CONSTANTS =====
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLrAl6rYJWZ7J5XKz9nZQ9J8Z9J8Z9J8Z9"
@@ -25,9 +30,22 @@ SYNC_INTERVAL = 3600  # 1 hour in seconds
 PLAYBACK_CHECK_INTERVAL = 1000  # 1 second in milliseconds
 SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
 MAX_RESOLUTION = "1440"
+TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
+
+# URLs for tool downloads
+YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+
+# FFmpeg URLs by platform
+FFMPEG_URLS = {
+    "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+    "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
+    "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+}
 
 # ===== GLOBAL VARIABLES =====
 # Threading infrastructure
+tools_thread = None
 playlist_sync_thread = None
 download_worker_thread = None
 normalization_worker_thread = None
@@ -41,9 +59,11 @@ metadata_queue = queue.Queue()
 
 # State flags
 tools_ready = False
+tools_logged_waiting = False
 scene_active = False
 is_playing = False
 current_video_path = None
+stop_threads = False
 
 # Data structures
 cached_videos = {}  # {video_id: {"path": str, "song": str, "artist": str, "normalized": bool}}
@@ -68,6 +88,239 @@ def log(message, level="NORMAL"):
         print(f"[ytfast DEBUG] {formatted_message}")
     else:
         print(f"[ytfast] {formatted_message}")
+
+# ===== TOOL MANAGEMENT FUNCTIONS =====
+def download_file(url, destination, description="file"):
+    """Download a file from URL to destination."""
+    try:
+        log(f"Downloading {description} from {url}", "DEBUG")
+        
+        # Create parent directory if needed
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        
+        # Download with progress
+        def download_progress(block_num, block_size, total_size):
+            if total_size > 0:
+                downloaded = block_num * block_size
+                percent = min(100, (downloaded / total_size) * 100)
+                if block_num % 100 == 0:  # Log every 100 blocks
+                    log(f"Downloading {description}: {percent:.1f}%", "DEBUG")
+        
+        urllib.request.urlretrieve(url, destination, reporthook=download_progress)
+        log(f"Successfully downloaded {description}", "DEBUG")
+        return True
+        
+    except Exception as e:
+        log(f"Failed to download {description}: {e}", "NORMAL")
+        return False
+
+def extract_ffmpeg(archive_path, tools_dir):
+    """Extract FFmpeg from downloaded archive."""
+    system = platform.system().lower()
+    
+    try:
+        if system == "windows":
+            # Windows: Extract from zip
+            import zipfile
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                # Find ffmpeg.exe in the archive
+                for file_info in zip_ref.filelist:
+                    if file_info.filename.endswith('ffmpeg.exe'):
+                        # Extract to tools directory
+                        target_path = os.path.join(tools_dir, FFMPEG_FILENAME)
+                        with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
+                            target.write(source.read())
+                        log("Extracted ffmpeg.exe from archive", "DEBUG")
+                        return True
+                        
+        elif system == "darwin":
+            # macOS: Extract from zip
+            import zipfile
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                # Extract ffmpeg binary
+                zip_ref.extract('ffmpeg', tools_dir)
+                
+        elif system == "linux":
+            # Linux: Extract from tar.xz
+            import tarfile
+            with tarfile.open(archive_path, 'r:xz') as tar_ref:
+                # Find ffmpeg in the archive
+                for member in tar_ref.getmembers():
+                    if member.name.endswith('ffmpeg') and member.isfile():
+                        # Extract to tools directory
+                        member.name = FFMPEG_FILENAME
+                        tar_ref.extract(member, tools_dir)
+                        log("Extracted ffmpeg from archive", "DEBUG")
+                        return True
+                        
+        # Make executable on Unix-like systems
+        if system in ["darwin", "linux"]:
+            ffmpeg_path = os.path.join(tools_dir, FFMPEG_FILENAME)
+            os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)
+            
+        return True
+        
+    except Exception as e:
+        log(f"Failed to extract FFmpeg: {e}", "NORMAL")
+        return False
+
+def download_ytdlp(tools_dir):
+    """Download yt-dlp executable."""
+    ytdlp_path = os.path.join(tools_dir, YTDLP_FILENAME)
+    
+    # Skip if already exists and works
+    if os.path.exists(ytdlp_path) and verify_tool(ytdlp_path, ["--version"]):
+        log("yt-dlp already exists and works", "DEBUG")
+        return True
+    
+    # Download appropriate version
+    url = YTDLP_URL_WIN if os.name == 'nt' else YTDLP_URL
+    
+    if download_file(url, ytdlp_path, "yt-dlp"):
+        # Make executable on Unix-like systems
+        if os.name != 'nt':
+            os.chmod(ytdlp_path, os.stat(ytdlp_path).st_mode | stat.S_IEXEC)
+        return True
+    
+    return False
+
+def download_ffmpeg(tools_dir):
+    """Download FFmpeg executable."""
+    ffmpeg_path = os.path.join(tools_dir, FFMPEG_FILENAME)
+    
+    # Skip if already exists and works
+    if os.path.exists(ffmpeg_path) and verify_tool(ffmpeg_path, ["-version"]):
+        log("FFmpeg already exists and works", "DEBUG")
+        return True
+    
+    # Get platform-specific URL
+    system = platform.system().lower()
+    if system == "windows":
+        system = "win32"
+    elif system == "darwin":
+        system = "darwin"
+    else:
+        system = "linux"
+    
+    if system not in FFMPEG_URLS:
+        log(f"Unsupported platform for FFmpeg: {system}", "NORMAL")
+        return False
+    
+    # Download archive
+    archive_ext = ".zip" if system in ["win32", "darwin"] else ".tar.xz"
+    archive_path = os.path.join(tools_dir, f"ffmpeg_temp{archive_ext}")
+    
+    if download_file(FFMPEG_URLS[system], archive_path, "FFmpeg"):
+        # Extract FFmpeg
+        if extract_ffmpeg(archive_path, tools_dir):
+            # Clean up archive
+            try:
+                os.remove(archive_path)
+            except:
+                pass
+            return True
+    
+    return False
+
+def verify_tool(tool_path, test_args):
+    """Verify that a tool works by running it with test arguments."""
+    try:
+        # Prepare subprocess arguments
+        startupinfo = None
+        if os.name == 'nt':
+            # Hide console window on Windows
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        # Run tool with test arguments
+        result = subprocess.run(
+            [tool_path] + test_args,
+            capture_output=True,
+            startupinfo=startupinfo,
+            timeout=5
+        )
+        
+        success = result.returncode == 0
+        if success:
+            log(f"Tool verified: {os.path.basename(tool_path)}", "DEBUG")
+        else:
+            log(f"Tool verification failed: {os.path.basename(tool_path)}", "DEBUG")
+            
+        return success
+        
+    except Exception as e:
+        log(f"Tool verification error for {tool_path}: {e}", "DEBUG")
+        return False
+
+def setup_tools():
+    """Download and verify required tools."""
+    global tools_ready, tools_logged_waiting
+    
+    # Log waiting message only once
+    if not tools_logged_waiting:
+        log("Waiting for tools to be ready. Please be patient, downloading FFmpeg may take several minutes.")
+        tools_logged_waiting = True
+    
+    # Ensure tools directory exists
+    tools_dir = get_tools_path()
+    os.makedirs(tools_dir, exist_ok=True)
+    
+    # Download yt-dlp
+    ytdlp_success = download_ytdlp(tools_dir)
+    if not ytdlp_success:
+        log("Failed to setup yt-dlp, will retry in 60 seconds", "DEBUG")
+        return False
+    
+    # Download FFmpeg
+    ffmpeg_success = download_ffmpeg(tools_dir)
+    if not ffmpeg_success:
+        log("Failed to setup FFmpeg, will retry in 60 seconds", "DEBUG")
+        return False
+    
+    # Verify both tools work
+    ytdlp_path = get_ytdlp_path()
+    ffmpeg_path = get_ffmpeg_path()
+    
+    if verify_tool(ytdlp_path, ["--version"]) and verify_tool(ffmpeg_path, ["-version"]):
+        with state_lock:
+            tools_ready = True
+        log("All tools are ready and verified!", "NORMAL")
+        return True
+    else:
+        log("Tool verification failed, will retry in 60 seconds", "DEBUG")
+        return False
+
+def tools_setup_worker():
+    """Background thread for setting up tools."""
+    global stop_threads
+    
+    while not stop_threads:
+        try:
+            # Ensure cache directory exists
+            if not ensure_cache_directory():
+                time.sleep(TOOLS_CHECK_INTERVAL)
+                continue
+            
+            # Try to setup tools
+            if setup_tools():
+                # Tools are ready, exit loop
+                break
+            
+            # Wait before retry
+            log(f"Retrying tool setup in {TOOLS_CHECK_INTERVAL} seconds...", "DEBUG")
+            
+            # Sleep in small increments to check stop_threads
+            for _ in range(TOOLS_CHECK_INTERVAL):
+                if stop_threads:
+                    break
+                time.sleep(1)
+                
+        except Exception as e:
+            log(f"Error in tools setup: {e}", "NORMAL")
+            time.sleep(TOOLS_CHECK_INTERVAL)
+    
+    log("Tools setup thread exiting", "DEBUG")
 
 # ===== OBS SCRIPT INTERFACE =====
 def script_description():
@@ -131,6 +384,9 @@ def script_update(settings):
 
 def script_load(settings):
     """Called when script is loaded."""
+    global stop_threads
+    stop_threads = False
+    
     log("Script loading...")
     
     # Apply initial settings
@@ -149,7 +405,12 @@ def script_load(settings):
 
 def script_unload():
     """Called when script is unloaded."""
+    global stop_threads
+    
     log("Script unloading...")
+    
+    # Signal threads to stop
+    stop_threads = True
     
     # Stop all worker threads
     stop_worker_threads()
@@ -164,6 +425,13 @@ def script_unload():
 def sync_now_callback(props, prop):
     """Callback for Sync Now button."""
     log("Manual sync requested")
+    
+    # Check if tools are ready
+    with state_lock:
+        if not tools_ready:
+            log("Cannot sync - tools not ready yet", "NORMAL")
+            return True
+    
     # TODO: Trigger playlist sync
     return True
 
@@ -216,46 +484,85 @@ def playback_controller():
 # ===== WORKER THREAD STARTERS =====
 def start_worker_threads():
     """Start all background worker threads."""
-    global playlist_sync_thread, download_worker_thread
+    global tools_thread, playlist_sync_thread, download_worker_thread
     global normalization_worker_thread, metadata_worker_thread
     
     log("Starting worker threads...")
     
-    # TODO: Start actual worker threads
+    # Start tools setup thread first
+    tools_thread = threading.Thread(target=tools_setup_worker, daemon=True)
+    tools_thread.start()
+    
+    # TODO: Start other worker threads
     # playlist_sync_thread = threading.Thread(target=playlist_sync_worker, daemon=True)
     # download_worker_thread = threading.Thread(target=download_worker, daemon=True)
     # normalization_worker_thread = threading.Thread(target=normalization_worker, daemon=True)
     # metadata_worker_thread = threading.Thread(target=metadata_worker, daemon=True)
     
-    # For now, just log placeholders
-    log("Worker thread starters ready (placeholders)", "DEBUG")
+    log("Worker threads started", "DEBUG")
 
 def stop_worker_threads():
     """Stop all background worker threads."""
+    global tools_thread
+    
     log("Stopping worker threads...")
-    # TODO: Implement proper thread stopping
+    
+    # Wait for threads to finish (with timeout)
+    if tools_thread and tools_thread.is_alive():
+        tools_thread.join(timeout=5)
+    
     log("Worker threads stopped", "DEBUG")
 
 # ===== WORKER THREAD PLACEHOLDERS =====
 def playlist_sync_worker():
     """Background thread for playlist synchronization."""
-    # TODO: Implement in Phase 2
-    pass
+    global stop_threads
+    
+    while not stop_threads:
+        # Wait for tools to be ready
+        with state_lock:
+            if not tools_ready:
+                time.sleep(1)
+                continue
+        
+        # TODO: Implement in Phase 3
+        time.sleep(1)
 
 def download_worker():
     """Background thread for video downloads."""
-    # TODO: Implement in Phase 3
-    pass
+    global stop_threads
+    
+    while not stop_threads:
+        # Wait for tools to be ready
+        with state_lock:
+            if not tools_ready:
+                time.sleep(1)
+                continue
+        
+        # TODO: Implement in Phase 3
+        time.sleep(1)
 
 def normalization_worker():
     """Background thread for audio normalization."""
-    # TODO: Implement in Phase 4
-    pass
+    global stop_threads
+    
+    while not stop_threads:
+        # Wait for tools to be ready
+        with state_lock:
+            if not tools_ready:
+                time.sleep(1)
+                continue
+        
+        # TODO: Implement in Phase 5
+        time.sleep(1)
 
 def metadata_worker():
     """Background thread for metadata retrieval."""
-    # TODO: Implement in Phase 6
-    pass
+    global stop_threads
+    
+    while not stop_threads:
+        # TODO: Implement in Phase 7
+        time.sleep(1)
 
 # ===== UTILITY FUNCTIONS =====
 def ensure_cache_directory():
