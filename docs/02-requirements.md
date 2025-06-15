@@ -9,8 +9,9 @@ It is authoritative; later Phase prompts reference this spec.
 
 ## Playlist Synchronisation
 1. Trigger at startup and via *Sync Playlist Now* button.  
-2. Process videos **one‑by‑one**: download → fingerprint → normalise → rename.  
-3. Remove local files whose IDs left the playlist (skip currently playing).
+2. Run periodically (every 60 minutes by default).
+3. Process videos **one‑by‑one**: download → fingerprint → normalise → rename.  
+4. Remove local files whose IDs left the playlist (skip currently playing).
 
 ## Caching & File Management
 - Store videos in user‑configurable cache dir.  
