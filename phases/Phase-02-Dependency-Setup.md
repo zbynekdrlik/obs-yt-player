@@ -1,23 +1,67 @@
 # Phase 02 – Dependency Setup & Tool Management
 
 ## Goal
-Implement the dependency management system that downloads and maintains yt-dlp and FFmpeg. This phase ensures all required tools are available before any media processing begins.
+Implement the dependency management system that downloads and maintains yt-dlp, FFmpeg, and fpcalc (for AcoustID). This phase ensures all required tools are available before any media processing begins.
+
+## Version Increment
+**This phase adds new features** → Increment MINOR version (e.g., `1.0.0` → `1.1.0`)
+
+## Requirements Reference
+This phase implements the dependency setup from `02-requirements.md`:
+- Auto-download & update tools into `<cache_dir>/tools`
+- Retry on failure; set `tools_ready` flag when verified
 
 ### Implementation Requirements
 - Create a dedicated `tools_thread` that starts at script load
-- Download/update **yt-dlp** and **FFmpeg** into `<cache_dir>/tools/`
-- Set `tools_ready` flag only after both tools are verified working
+- Download/update **yt-dlp**, **FFmpeg**, and **fpcalc** into `<cache_dir>/tools/`
+- Set `tools_ready` flag only after all tools are verified working
 - Implement retry mechanism (every 60 seconds on failure)
 - **Non-blocking**: OBS must remain responsive during downloads
 - Worker threads must check `tools_ready` and re-queue tasks if tools aren't ready
 
 ### Key Components to Add:
-1. Tool download functions for yt-dlp and FFmpeg
-2. Platform-specific FFmpeg binary selection (Windows/Mac/Linux)
-3. Tool verification (check if executables work)
-4. Thread-safe `tools_ready` flag with proper locking
-5. Retry logic with exponential backoff
-6. Progress logging without spam
+
+#### 1. Tool URLs
+```python
+# yt-dlp
+YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+
+# FFmpeg
+FFMPEG_URLS = {
+    "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+    "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
+    "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+}
+
+# fpcalc (Chromaprint)
+FPCALC_URLS = {
+    "win32": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip",
+    "darwin": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-macos-x86_64.tar.gz",
+    "linux": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-linux-x86_64.tar.gz"
+}
+```
+
+#### 2. Tool Download Functions
+- `download_ytdlp()` - Simple executable download
+- `download_ffmpeg()` - Extract from archive
+- `download_fpcalc()` - Extract fpcalc from archive
+
+#### 3. Tool Verification
+```python
+def verify_tool(tool_path, test_args):
+    # Run tool with test arguments
+    # Return True if successful
+```
+
+Test arguments:
+- yt-dlp: `["--version"]`
+- FFmpeg: `["-version"]`
+- fpcalc: `["-version"]`
+
+#### 4. Thread-Safe State
+- Use `state_lock` for `tools_ready` flag
+- Check all three tools before setting flag
 
 ### Logging Requirements
 - Log once when starting tool setup:
@@ -31,23 +75,32 @@ Implement the dependency management system that downloads and maintains yt-dlp a
 - Log only at milestone percentages (0%, 25%, 50%, 75%, 100%)
 - This prevents log spam while still providing progress feedback
 
-## Integration Notes
-- The `tools_thread` must start in `script_load()`
-- All worker threads (sync, process, etc.) must check `tools_ready` before proceeding
-- Use `CREATE_NO_WINDOW` flag on Windows for subprocess calls
+## Implementation Checklist
+- [ ] Update `SCRIPT_VERSION` constant
+- [ ] Add fpcalc URLs and constants
+- [ ] Implement download_fpcalc function
+- [ ] Update setup_tools to include fpcalc
+- [ ] Add fpcalc to tool verification
+- [ ] Test all three tools download correctly
+- [ ] Verify extraction works on all platforms
+- [ ] Ensure thread safety
 
 ## Testing Before Commit
 1. Load the script in OBS
 2. Verify tools download to `<cache_dir>/tools/`
-3. Check that both yt-dlp and FFmpeg executables are present
+3. Check that yt-dlp, FFmpeg, and fpcalc executables are present
 4. Verify console shows appropriate log messages (5 progress entries max per download)
-5. Test that tools work by running them manually from the tools directory
+5. Test that all tools work by running them manually:
+   - `yt-dlp --version`
+   - `ffmpeg -version`
+   - `fpcalc -version`
 6. Ensure OBS remains responsive during download
 7. Verify no log spam (should see only milestone percentages)
+8. Test on fresh system with no existing tools
+9. **Verify version was incremented**
 
 ## Commit
 After successful testing, commit with message:
-> *"Add dependency management: auto-download yt-dlp and FFmpeg"*
+> *"Add dependency management for yt-dlp, FFmpeg, and fpcalc"*
 
 *After verification, proceed to Phase 03.*
-Remember to check **03-OBS_API.md** for threading constraints and **04-Guidelines.md** for style rules.
