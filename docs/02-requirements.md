@@ -15,6 +15,9 @@ It is authoritative; later Phase prompts reference this spec.
 
 ## Caching & File Management
 - Store videos in user‑configurable cache dir.  
+- **Default cache location**: `<script_directory>/<scriptname>-cache/`
+  - Example: `ytfast.py` → `./ytfast-cache/`
+  - Allows multiple script instances with separate caches
 - Sanitise filenames: `<song>_<artist>_<id>_normalized.mp4`.  
 - Retain only newest duplicate; clean temp `.part` files.
 
@@ -23,7 +26,7 @@ It is authoritative; later Phase prompts reference this spec.
 - Fallback: parse YouTube title; log transformation.
 
 ## Playback Logic
-- Scene name == script filename (e.g. `ytfast`).  
+- Scene name == script filename without extension (e.g. `ytfast.py` → scene `ytfast`).  
 - Media Source `video`, Text Source `title`.  
 - Random no‑repeat playback; handle stop button & scene transitions.
 
