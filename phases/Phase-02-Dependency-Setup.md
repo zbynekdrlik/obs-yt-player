@@ -31,8 +31,16 @@ Implement the dependency management system that downloads and maintains yt-dlp a
 - All worker threads (sync, normalize, etc.) must check `tools_ready` before proceeding
 - Use `CREATE_NO_WINDOW` flag on Windows for subprocess calls
 
+## Testing Before Commit
+1. Load the script in OBS
+2. Verify tools download to `<cache_dir>/tools/`
+3. Check that both yt-dlp and FFmpeg executables are present
+4. Verify console shows appropriate log messages
+5. Test that tools work by running them manually from the tools directory
+6. Ensure OBS remains responsive during download
+
 ## Commit
-Suggested commit message:
+After successful testing, commit with message:
 > *"Add dependency management: auto-download yt-dlp and FFmpeg"*
 
 *After verification, proceed to Phase 03.*
