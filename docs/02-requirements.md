@@ -8,8 +8,8 @@ It is authoritative; later Phase prompts reference this spec.
 - Retry on failure; set `tools_ready` flag when verified.
 
 ## Playlist Synchronisation
-1. Trigger at startup and via *Sync Playlist Now* button.  
-2. Run periodically (every 60 minutes by default).
+1. Trigger **only** at startup and via *Sync Playlist Now* button.  
+2. **NO PERIODIC SYNC** - Script runs on slow LTE internet, sync only on demand.
 3. Process videos **one‑by‑one**: download → fingerprint → normalise → rename.  
 4. Remove local files whose IDs left the playlist (skip currently playing).
 
