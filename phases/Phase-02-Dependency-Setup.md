@@ -22,9 +22,26 @@ Implement the dependency management system that downloads and maintains yt-dlp a
 ### Logging Requirements
 - Log once when starting tool setup:
   > "Waiting for tools to be ready. Please be patient, downloading FFmpeg may take several minutes."
-- Log download progress at DEBUG level
+- Log download progress at DEBUG level **at milestones only** (0%, 25%, 50%, 75%, 100%)
 - Log successful verification at NORMAL level
 - Log errors with retry information
+
+### Download Progress Implementation
+```python
+# Use a set to track logged percentages
+logged_percentages = set()
+
+# Log only at milestone percentages
+if percent >= 100 and 100 not in logged_percentages:
+    milestone = 100
+elif percent >= 75 and 75 not in logged_percentages:
+    milestone = 75
+# ... etc for 50%, 25%, 0%
+
+if milestone is not None:
+    log(f"Downloading {description}: {milestone}%", "DEBUG")
+    logged_percentages.add(milestone)
+```
 
 ## Integration Notes
 - The `tools_thread` must start in `script_load()`
@@ -35,9 +52,10 @@ Implement the dependency management system that downloads and maintains yt-dlp a
 1. Load the script in OBS
 2. Verify tools download to `<cache_dir>/tools/`
 3. Check that both yt-dlp and FFmpeg executables are present
-4. Verify console shows appropriate log messages
+4. Verify console shows appropriate log messages (5 progress entries max per download)
 5. Test that tools work by running them manually from the tools directory
 6. Ensure OBS remains responsive during download
+7. Verify no log spam (should see only milestone percentages)
 
 ## Commit
 After successful testing, commit with message:
