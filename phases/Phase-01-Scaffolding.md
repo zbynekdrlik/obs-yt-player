@@ -5,7 +5,7 @@ Create the initial `ytfast.py` OBS script skeleton **only**. It should:
 
 - Define module‑level constants (see 02‑Requirements.md §Constants).
 - Declare global variables (e.g. queues, locks, flags) but **do not** implement worker logic yet.
-- Set up OBS script properties: Playlist URL text field, Cache Directory path field, *Sync Now* button, DEBUG level checkbox.
+- Set up OBS script properties: Playlist URL text field, Cache Directory text field, *Sync Now* button, DEBUG level checkbox.
 - Add minimal stubs for: `script_properties`, `script_load`, `script_description`, and placeholder worker thread starters.
 - Include placeholder logging helper `log(msg, level="NORMAL")`.
 
@@ -20,16 +20,20 @@ This phase sets up the foundation for all requirements in `02-requirements.md`.
   - `SCRIPT_NAME = os.path.splitext(os.path.basename(__file__))[0]`
   - `DEFAULT_CACHE_DIR = os.path.join(script_dir, f"{SCRIPT_NAME}-cache")`
   - `SCENE_NAME = SCRIPT_NAME`
+- **Cache directory property**: Use text field for full editability
+  - `obs.obs_properties_add_text(props, "cache_dir", "Cache Directory", obs.OBS_TEXT_DEFAULT)`
+  - Allows users to easily modify paths and add custom suffixes
 
 ## Testing Before Commit
 1. Load script in OBS Scripts menu
 2. Verify all properties appear correctly (URL, cache dir, sync button, debug checkbox)
-3. Check that script loads without errors
-4. Verify scene check runs after 3 seconds
+3. Check that cache directory field is editable (can type and modify)
+4. Verify script loads without errors
 5. Ensure default values are set correctly
 6. Check default cache directory is `<script_location>/<scriptname>-cache`
-7. Verify scene name matches script filename without extension
-8. Check log output shows proper timestamps and levels
+7. Test changing cache directory and verify it persists after OBS restart
+8. Verify scene name matches script filename without extension
+9. Check log output shows proper timestamps and levels
 
 ## Commit
 After successful testing, commit with message:  
