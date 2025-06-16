@@ -61,6 +61,19 @@ def download_video(video_id, title):
     if os.path.exists(output_path):
         os.remove(output_path)
     
+    # First, get video info to log quality
+    info_cmd = [
+        get_ytdlp_path(),
+        '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
+        '--print', '%(width)s,%(height)s,%(fps)s,%(vcodec)s,%(acodec)s',
+        '--no-warnings',
+        f'https://www.youtube.com/watch?v={video_id}'
+    ]
+    
+    # Log video quality information
+    # Example output: "Video quality: 1920x1080 @ 30fps, video: h264, audio: aac"
+    
+    # Then download with progress tracking
     cmd = [
         get_ytdlp_path(),
         '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
@@ -88,7 +101,20 @@ def download_video(video_id, title):
 - Audio: already included in video container
 - Save to temporary file first ({video_id}_temp.mp4)
 
-### 4. Progress Tracking
+### 4. Quality Logging
+Before downloading, query and log video quality information:
+- Resolution (width x height)
+- Frame rate (fps)
+- Video codec (e.g., h264, av01, vp9)
+- Audio codec (e.g., aac, opus)
+
+Example log output:
+```
+[NORMAL] Video quality: 2560x1080 @ 25fps, video: av01.0.12M.08, audio: opus
+[NORMAL] Starting download: Video Title (VideoID)
+```
+
+### 5. Progress Tracking
 Parse yt-dlp progress output:
 ```python
 def parse_progress(line, video_id, title):
@@ -99,22 +125,24 @@ def parse_progress(line, video_id, title):
         # Log at milestones: 0%, 25%, 50%, 75%, 100%
 ```
 
-### 5. Error Handling
+### 6. Error Handling
 - Network interruptions
 - Age-restricted videos
 - Private/deleted videos
 - Timeout after 10 minutes
 - Clean up partial downloads
 
-### 6. Important Notes
+### 7. Important Notes
 - **Keep downloaded files**: Downloaded temp files must be preserved for Phase 5 and 6
 - **Serial processing**: One video at a time for bandwidth management
 - **Skip cached**: Check `cached_videos` to avoid re-downloading
 - **Quality priority**: Prioritize high quality (up to 1440p) over small file size
+- **Quality transparency**: Log resolution and codecs before download
 
 ## Key Implementation Points
 - Start process_videos_worker thread in start_worker_threads
 - Hide console window on Windows
+- Log video quality (resolution, fps, codecs) before download
 - Log download progress at milestones only
 - Verify downloaded file exists and has size > 0
 - Thread-safe operations
@@ -125,6 +153,7 @@ def parse_progress(line, video_id, title):
 - [ ] Update `SCRIPT_VERSION` constant
 - [ ] Implement process_videos_worker thread
 - [ ] Implement download_video function
+- [ ] Add quality information logging
 - [ ] Add progress parsing
 - [ ] Handle various error cases
 - [ ] Start thread in start_worker_threads
@@ -144,6 +173,7 @@ def parse_progress(line, video_id, title):
 9. Check queue processing works correctly
 10. **Verify version was incremented**
 11. **Verify video quality is high (1080p/1440p, not 360p)**
+12. **Verify quality information is logged (resolution, fps, codecs)**
 
 ## Commit
 After successful testing, commit with message:  
