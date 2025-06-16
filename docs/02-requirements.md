@@ -36,12 +36,14 @@ It is authoritative; later Phase prompts reference this spec.
 - Separate worker threads/queues for download, normalisation, metadata.
 
 ## Logging
-- Two levels: DEBUG (default 1) & NORMAL; timestamp each entry.
-- Log script version on startup in format: "Script version X.Y.Z loaded"
-- Version format: MAJOR.MINOR.PATCH (e.g., 1.0.0)
+- Simple, unified logging system with timestamp.
+- Format: `[script_name] [timestamp] message`
+- Example: `[ytfast] [2025-06-16 21:30:33] Script version 1.3.4 loaded`
+- No debug levels or toggles - all messages are logged equally.
+- Log script version on startup.
 
 ## Versioning
-- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.0.0"`)
+- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.3.4"`)
 - Increment version with each development iteration:
   - PATCH: Bug fixes, minor changes
   - MINOR: New features, non-breaking changes
