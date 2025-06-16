@@ -38,9 +38,12 @@ def process_videos_worker():
             if not temp_path:
                 continue
                 
-            # Continue to metadata extraction (Phase 5)
-            # Continue to normalization (Phase 6)
-            # Final rename will happen in Phase 6
+            # TODO: Continue to metadata extraction (Phase 5)
+            # TODO: Continue to normalization (Phase 6)
+            # TODO: Final rename will happen in Phase 6
+            
+            # IMPORTANT: Keep temp file for future phases
+            # Do NOT delete the downloaded file yet!
             
         except queue.Empty:
             continue
@@ -77,7 +80,7 @@ def download_video(video_id, title):
 ### 3. Progress Tracking
 Parse yt-dlp progress output:
 ```python
-def parse_progress(line):
+def parse_progress(line, video_id, title):
     # Look for: [download]  XX.X% of ~XXX.XXMiB at XXX.XXKiB/s
     match = re.search(r'\[download\]\s+(\d+\.?\d*)%', line)
     if match:
@@ -92,6 +95,11 @@ def parse_progress(line):
 - Timeout after 10 minutes
 - Clean up partial downloads
 
+### 5. Important Notes
+- **Keep downloaded files**: Downloaded temp files must be preserved for Phase 5 and 6
+- **Serial processing**: One video at a time for bandwidth management
+- **Skip cached**: Check `cached_videos` to avoid re-downloading
+
 ## Key Implementation Points
 - Start process_videos_worker thread in start_worker_threads
 - Hide console window on Windows
@@ -99,6 +107,7 @@ def parse_progress(line):
 - Verify downloaded file exists and has size > 0
 - Thread-safe operations
 - One video at a time (serial processing)
+- **DO NOT delete temp files after download**
 
 ## Implementation Checklist
 - [ ] Update `SCRIPT_VERSION` constant
@@ -109,6 +118,7 @@ def parse_progress(line):
 - [ ] Start thread in start_worker_threads
 - [ ] Test with different video types
 - [ ] Verify serial processing
+- [ ] **Verify temp files are preserved**
 
 ## Testing Before Commit
 1. Download a short video - verify progress tracking
@@ -116,7 +126,7 @@ def parse_progress(line):
 3. Interrupt network during download - verify error handling
 4. Try downloading age-restricted video - should fail gracefully
 5. Download video requiring format merge - verify FFmpeg usage
-6. Check temp files are created in cache directory
+6. **Check temp files remain in cache directory after download**
 7. Verify console window stays hidden (Windows)
 8. Monitor bandwidth - should be one video at a time
 9. Check queue processing works correctly
