@@ -31,7 +31,6 @@ DEFAULT_CACHE_DIR = os.path.join(script_dir, f"{SCENE_NAME}-cache")
 - Playlist URL text field (editable)
 - Cache Directory text field (editable)
 - Sync Now button
-- Debug logging checkbox
 
 ### 4. Core Functions
 - `script_description()` - Return docstring ≤400 chars
@@ -40,7 +39,7 @@ DEFAULT_CACHE_DIR = os.path.join(script_dir, f"{SCENE_NAME}-cache")
 - `script_update()` - Handle property changes
 - `script_load()` - Initialize script
 - `script_unload()` - Cleanup
-- `log()` - Logging helper with timestamps
+- `log()` - Logging helper with timestamps (single level)
 
 ### 5. Placeholder Workers
 - Empty thread starter functions
@@ -52,14 +51,15 @@ DEFAULT_CACHE_DIR = os.path.join(script_dir, f"{SCENE_NAME}-cache")
 - **Dynamic naming**: Scene/cache based on script filename
 - **Editable cache path**: Text field for easy customization
 - Thread-safe design from the start
+- **Simple logging**: No debug levels, just timestamped messages
 
 ## Implementation Checklist
 - [ ] Set SCRIPT_VERSION to "1.0.0"
 - [ ] Add all required constants
 - [ ] Define global variables
 - [ ] Implement OBS callback functions
-- [ ] Add property definitions
-- [ ] Create logging helper
+- [ ] Add property definitions (no debug checkbox)
+- [ ] Create simple logging helper
 - [ ] Add thread starter placeholders
 - [ ] Include proper docstring
 - [ ] Test all functionality
@@ -74,7 +74,7 @@ DEFAULT_CACHE_DIR = os.path.join(script_dir, f"{SCENE_NAME}-cache")
 7. Check default cache: `<location>/<n>-cache`
 8. Test property persistence after restart
 9. Verify scene name matches script name
-10. Check log output format
+10. Check log output format: `[script_name] [timestamp] message`
 11. If any issues found during testing, increment version (e.g., to 1.0.1) and retest
 
 ## Commit
