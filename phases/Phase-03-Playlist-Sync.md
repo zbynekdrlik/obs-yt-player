@@ -1,78 +1,112 @@
 # Phase 03 – Playlist Sync & Queue Management
 
 ## Goal
-Implement playlist synchronization that fetches video IDs and queues them for processing. This phase creates the foundation for the video processing pipeline.
+Implement playlist synchronization that fetches video IDs and queues them for processing. This phase focuses ONLY on fetching playlist data and queueing - no cache operations yet.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., `1.1.0` → `1.2.0`)
+**This phase adds new features** → Increment MINOR version from current version
 
 ## Requirements Reference
 This phase implements playlist synchronization from `02-requirements.md`:
 - Trigger **only** at startup and via *Sync Playlist Now* button
 - **NO PERIODIC SYNC** - Script runs on slow LTE internet
-- Process videos **one-by-one** (queue for serial processing)
-- Remove local files whose IDs left the playlist
+- Queue videos for serial processing
 
 ## Components to Implement
 
 ### 1. Playlist Sync Worker
 ```python
 def playlist_sync_worker():
-    # Wait for sync_event signal
-    # Check tools_ready before proceeding
-    # Fetch playlist with yt-dlp
-    # Queue new videos for processing
-    # Clean up old videos
+    while not stop_threads:
+        # Wait for sync_event signal
+        if not sync_event.wait(timeout=1):
+            continue
+        
+        sync_event.clear()
+        
+        # Check tools_ready before proceeding
+        with state_lock:
+            if not tools_ready:
+                continue
+        
+        # Fetch playlist
+        videos = fetch_playlist_with_ytdlp(playlist_url)
+        
+        # Update playlist video IDs
+        with state_lock:
+            playlist_video_ids.clear()
+            playlist_video_ids.update(video['id'] for video in videos)
+        
+        # Queue videos for processing
+        for video in videos:
+            video_queue.put(video)
 ```
-
-Key features:
-- Triggered by `sync_event.set()`
-- Fetches playlist data via yt-dlp
-- Extracts video IDs and titles
-- Queues videos not already cached
-- NO automatic periodic sync
 
 ### 2. Playlist Fetching
 ```python
 def fetch_playlist_with_ytdlp(playlist_url):
-    # Use yt-dlp --flat-playlist
-    # Return list of video info dicts
-    # Handle errors gracefully
+    cmd = [
+        ytdlp_path,
+        '--flat-playlist',
+        '--dump-json',
+        '--no-warnings',
+        playlist_url
+    ]
+    # Parse JSON output
+    # Return list of {'id': ..., 'title': ..., 'duration': ...}
 ```
 
-### 3. Cache Management
+### 3. Startup Sync Trigger
 ```python
-def get_cached_videos():
-    # Scan cache directory
-    # Return dict of cached videos
+def trigger_startup_sync():
+    """Trigger one-time sync on startup after tools are ready."""
+    global sync_on_startup_done
     
-def cleanup_old_videos():
-    # Remove videos no longer in playlist
-    # Skip currently playing video
+    with state_lock:
+        if sync_on_startup_done:
+            return
+        sync_on_startup_done = True
+    
+    log("Starting one-time playlist sync on startup", "NORMAL")
+    sync_event.set()
 ```
 
-### 4. Queue Management
-- Use `queue.Queue()` for thread-safe operations
-- Queue video info objects (id, title, duration)
-- Process videos serially in later phases
+### 4. Manual Sync Button
+Update `sync_now_callback` to trigger sync:
+```python
+def sync_now_callback(props, prop):
+    with state_lock:
+        if not tools_ready:
+            log("Cannot sync - tools not ready yet", "NORMAL")
+            return True
+    
+    sync_event.set()
+    return True
+```
 
 ## Key Implementation Points
 - Use `threading.Event` for sync signaling
-- Queue contains video info, not video files
-- Implement robust error handling
-- Check `tools_ready` before using yt-dlp
-- Thread-safe cache operations
+- Queue contains video info dicts, not files
+- NO cache scanning in this phase
+- NO cleanup operations in this phase
+- Thread-safe queue and state operations
+- Call trigger_startup_sync from tools_setup_worker
+
+## What This Phase Does NOT Do
+- Does NOT scan cache directory
+- Does NOT cleanup old videos
+- Does NOT check if videos are already downloaded
+- Cache operations moved to Phase 7
 
 ## Implementation Checklist
 - [ ] Update `SCRIPT_VERSION` constant
-- [ ] Implement playlist_sync_worker thread
-- [ ] Add sync_event for manual trigger
+- [ ] Implement complete playlist_sync_worker
 - [ ] Implement fetch_playlist_with_ytdlp
-- [ ] Add get_cached_videos function
-- [ ] Add cleanup_old_videos function
-- [ ] Wire up "Sync Now" button callback
-- [ ] Add startup sync trigger
-- [ ] Test queue operations
+- [ ] Add trigger_startup_sync function
+- [ ] Update sync_now_callback to use sync_event
+- [ ] Call trigger_startup_sync from tools thread
+- [ ] Handle errors gracefully
+- [ ] Add appropriate logging
 
 ## Testing Before Commit
 1. Test playlist fetching with valid URL
@@ -81,8 +115,8 @@ def cleanup_old_videos():
 4. **Verify NO periodic sync** - wait 10+ minutes
 5. Test with empty playlist
 6. Test with invalid playlist URL
-7. Verify old video cleanup works
-8. Check queue fills correctly
+7. Check queue fills with video info
+8. Verify thread-safe operations
 9. Ensure OBS stays responsive
 10. **Verify version was incremented**
 
