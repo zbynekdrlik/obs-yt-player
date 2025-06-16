@@ -10,6 +10,14 @@
 - Use functions/classes for clarity; comment major sections.
 - Protect shared state with `threading.Lock`; wrap worker loops in `try/except`.
 
+## Logging Guidelines
+- Use simple, unified logging format: `[script_name] [timestamp] message`
+- Implement with a single `log(message)` function
+- No debug levels or toggles - all messages are treated equally
+- Example output: `[ytfast] [2025-06-16 21:30:33] Script version 1.3.4 loaded`
+- Log important events: version on startup, errors, major operations
+- Keep logs concise and informative
+
 ## Version Management
 **CRITICAL**: Claude **must** increment the `SCRIPT_VERSION` constant with **EVERY** code change:
 - **PATCH** increment (x.x.Z): Bug fixes, minor changes, iterations within a phase
