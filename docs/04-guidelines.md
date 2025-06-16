@@ -11,11 +11,15 @@
 - Protect shared state with `threading.Lock`; wrap worker loops in `try/except`.
 
 ## Logging Guidelines
-- Use simple logging format: `[timestamp] message`
-- Implement with a single `log(message)` function
-- OBS automatically prepends script name to output:
+- Use thread-aware logging to handle OBS's behavior with background threads
+- Implement with a single `log(message)` function that detects thread context
+- Format depends on whether code is running on main thread or background thread:
+  - Main thread: `print(f"[{timestamp}] {message}")`
+  - Background thread: `print(f"[{timestamp}] [{SCRIPT_NAME}] {message}")`
+- This ensures script identification even when OBS shows `[Unknown Script]` for background threads
+- Final output in OBS logs:
   - Main thread: `[script.py] [timestamp] message`
-  - Background threads: `[Unknown Script] [timestamp] message`
+  - Background thread: `[Unknown Script] [timestamp] [script_name] message`
 - No debug levels or toggles - all messages are treated equally
 - Log important events: version on startup, errors, major operations
 - Keep logs concise and informative
