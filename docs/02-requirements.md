@@ -23,7 +23,7 @@ It is authoritative; later Phase prompts reference this spec.
 - Retain only newest duplicate; clean temp `.part` files.
 
 ## Metadata Retrieval
-- Primary: **AcoustID** (`M6o6ia3dKu`).  
+- Primary: **AcoustID** (`RXS1uld515`).  
 - Fallback: parse YouTube title; log transformation.
 
 ## Playback Logic
