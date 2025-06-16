@@ -4,7 +4,8 @@
 Implement the dependency management system that downloads and maintains yt-dlp, FFmpeg, and fpcalc (for AcoustID). This phase ensures all required tools are available before any media processing begins.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., `1.0.0` → `1.1.0`)
+**This phase adds new features** → Increment MINOR version from current version (e.g., if current is `1.0.x`, increment to `1.1.0`)
+**Remember**: Increment version with EVERY code change during development, not just once per phase.
 
 ## Requirements Reference
 This phase implements the dependency setup from `02-requirements.md`:
@@ -76,7 +77,7 @@ Test arguments:
 - This prevents log spam while still providing progress feedback
 
 ## Implementation Checklist
-- [ ] Update `SCRIPT_VERSION` constant
+- [ ] Update `SCRIPT_VERSION` constant (increment MINOR version)
 - [ ] Add fpcalc URLs and constants
 - [ ] Implement download_fpcalc function
 - [ ] Update setup_tools to include fpcalc
@@ -87,17 +88,18 @@ Test arguments:
 
 ## Testing Before Commit
 1. Load the script in OBS
-2. Verify tools download to `<cache_dir>/tools/`
-3. Check that yt-dlp, FFmpeg, and fpcalc executables are present
-4. Verify console shows appropriate log messages (5 progress entries max per download)
-5. Test that all tools work by running them manually:
+2. **Verify correct version appears in logs** (should show incremented version)
+3. Verify tools download to `<cache_dir>/tools/`
+4. Check that yt-dlp, FFmpeg, and fpcalc executables are present
+5. Verify console shows appropriate log messages (5 progress entries max per download)
+6. Test that all tools work by running them manually:
    - `yt-dlp --version`
    - `ffmpeg -version`
    - `fpcalc -version`
-6. Ensure OBS remains responsive during download
-7. Verify no log spam (should see only milestone percentages)
-8. Test on fresh system with no existing tools
-9. **Verify version was incremented**
+7. Ensure OBS remains responsive during download
+8. Verify no log spam (should see only milestone percentages)
+9. Test on fresh system with no existing tools
+10. If bugs found, increment version again (PATCH) and retest
 
 ## Commit
 After successful testing, commit with message:
