@@ -23,7 +23,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.2.0"  # Updated for Phase 3
+SCRIPT_VERSION = "1.3.1"  # Updated for Phase 4 fix
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -43,6 +43,7 @@ SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
 MAX_RESOLUTION = "1440"
 TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
 ACOUSTID_API_KEY = "M6o6ia3dKu"  # AcoustID API key for metadata
+DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads
 
 # URLs for tool downloads
 YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
@@ -91,6 +92,9 @@ playlist_video_ids = set()  # Current playlist video IDs
 playlist_url = DEFAULT_PLAYLIST_URL
 cache_dir = DEFAULT_CACHE_DIR
 debug_enabled = True
+
+# Progress tracking
+download_progress_milestones = {}  # Track logged milestones per video
 
 # ===== LOGGING HELPER =====
 def log(message, level="NORMAL"):
@@ -566,11 +570,156 @@ def playlist_sync_worker():
     
     log("Playlist sync thread exiting", "DEBUG")
 
-# ===== PLACEHOLDER FUNCTIONS FOR FUTURE PHASES =====
+# ===== VIDEO DOWNLOAD FUNCTIONS =====
+def download_video(video_id, title):
+    """Download video to temporary file."""
+    output_path = os.path.join(cache_dir, f"{video_id}_temp.mp4")
+    
+    # Remove existing temp file
+    if os.path.exists(output_path):
+        try:
+            os.remove(output_path)
+            log(f"Removed existing temp file: {output_path}", "DEBUG")
+        except Exception as e:
+            log(f"Error removing temp file: {e}", "DEBUG")
+    
+    try:
+        cmd = [
+            get_ytdlp_path(),
+            '-f', f'best[height<={MAX_RESOLUTION}]/best',
+            '--ffmpeg-location', get_ffmpeg_path(),
+            '--no-playlist',
+            '--no-warnings',
+            '--progress',
+            '--newline',
+            '-o', output_path,
+            f'https://www.youtube.com/watch?v={video_id}'
+        ]
+        
+        log(f"Starting download: {title} ({video_id})", "NORMAL")
+        
+        # Prepare subprocess with hidden window on Windows
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        # Reset progress tracking for this video
+        global download_progress_milestones
+        download_progress_milestones[video_id] = set()
+        
+        # Start download process
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            startupinfo=startupinfo
+        )
+        
+        # Parse progress output
+        for line in process.stdout:
+            if '[download]' in line:
+                parse_progress(line, video_id, title)
+        
+        # Wait for process to complete
+        process.wait(timeout=DOWNLOAD_TIMEOUT)
+        
+        if process.returncode != 0:
+            log(f"Download failed for {title}: return code {process.returncode}", "NORMAL")
+            return None
+        
+        # Verify file exists and has size
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            log(f"Downloaded successfully: {title} ({file_size_mb:.1f} MB)", "NORMAL")
+            return output_path
+        else:
+            log(f"Download failed - file missing or empty: {title}", "NORMAL")
+            return None
+            
+    except subprocess.TimeoutExpired:
+        log(f"Download timeout for {title} after {DOWNLOAD_TIMEOUT} seconds", "NORMAL")
+        try:
+            process.kill()
+        except:
+            pass
+        return None
+    except Exception as e:
+        log(f"Error downloading {title}: {e}", "NORMAL")
+        return None
+    finally:
+        # Clean up progress tracking
+        download_progress_milestones.pop(video_id, None)
+
+def parse_progress(line, video_id, title):
+    """Parse yt-dlp progress output and log at milestones."""
+    # Look for: [download]  XX.X% of ~XXX.XXMiB at XXX.XXKiB/s
+    match = re.search(r'\[download\]\s+(\d+\.?\d*)%', line)
+    if match:
+        percent = float(match.group(1))
+        
+        # Get milestone set for this video
+        milestones = download_progress_milestones.get(video_id, set())
+        
+        # Log at milestones: 0%, 25%, 50%, 75%, 100%
+        milestone = None
+        if percent >= 100 and 100 not in milestones:
+            milestone = 100
+        elif percent >= 75 and 75 not in milestones:
+            milestone = 75
+        elif percent >= 50 and 50 not in milestones:
+            milestone = 50
+        elif percent >= 25 and 25 not in milestones:
+            milestone = 25
+        elif percent >= 0 and 0 not in milestones:
+            milestone = 0
+        
+        if milestone is not None:
+            log(f"Downloading {title}: {milestone}%", "DEBUG")
+            milestones.add(milestone)
+            download_progress_milestones[video_id] = milestones
+
 def process_videos_worker():
     """Process videos serially - download, metadata, normalize."""
-    # TODO: Implement in Phase 4
-    pass
+    global stop_threads
+    
+    while not stop_threads:
+        try:
+            # Get video from queue (timeout to check stop_threads)
+            try:
+                video_info = video_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+            
+            # Process this video through all stages
+            video_id = video_info['id']
+            title = video_info['title']
+            
+            # Skip if already fully processed
+            with state_lock:
+                if video_id in cached_videos:
+                    log(f"Skipping already cached video: {title}", "DEBUG")
+                    continue
+            
+            # Download video
+            temp_path = download_video(video_id, title)
+            if not temp_path:
+                log(f"Failed to download: {title}", "NORMAL")
+                continue
+                
+            # TODO: Continue to metadata extraction (Phase 5)
+            # TODO: Continue to normalization (Phase 6)
+            # TODO: Final rename will happen in Phase 6
+            
+            # IMPORTANT: Keep temp file for future phases - DO NOT DELETE!
+            log(f"Video ready for processing: {temp_path}", "DEBUG")
+            
+        except Exception as e:
+            log(f"Error processing video: {e}", "NORMAL")
+    
+    log("Video processing thread exiting", "DEBUG")
 
 # ===== UTILITY FUNCTIONS =====
 def ensure_cache_directory():
@@ -773,15 +922,15 @@ def start_worker_threads():
     playlist_sync_thread = threading.Thread(target=playlist_sync_worker, daemon=True)
     playlist_sync_thread.start()
     
-    # Video processing thread will be implemented in Phase 4
-    # process_videos_thread = threading.Thread(target=process_videos_worker, daemon=True)
-    # process_videos_thread.start()
+    # Start video processing thread
+    process_videos_thread = threading.Thread(target=process_videos_worker, daemon=True)
+    process_videos_thread.start()
     
     log("Worker threads started", "DEBUG")
 
 def stop_worker_threads():
     """Stop all background worker threads."""
-    global tools_thread, playlist_sync_thread
+    global tools_thread, playlist_sync_thread, process_videos_thread
     
     log("Stopping worker threads...")
     
@@ -794,5 +943,8 @@ def stop_worker_threads():
     
     if playlist_sync_thread and playlist_sync_thread.is_alive():
         playlist_sync_thread.join(timeout=5)
+        
+    if process_videos_thread and process_videos_thread.is_alive():
+        process_videos_thread.join(timeout=5)
     
     log("Worker threads stopped", "DEBUG")
