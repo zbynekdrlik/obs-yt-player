@@ -23,7 +23,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.3.1"  # Updated for Phase 4 fix
+SCRIPT_VERSION = "1.3.2"  # Updated for video quality fix
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -586,7 +586,8 @@ def download_video(video_id, title):
     try:
         cmd = [
             get_ytdlp_path(),
-            '-f', f'best[height<={MAX_RESOLUTION}]/best',
+            '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
+            '--merge-output-format', 'mp4',
             '--ffmpeg-location', get_ffmpeg_path(),
             '--no-playlist',
             '--no-warnings',
