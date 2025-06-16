@@ -69,13 +69,14 @@ The project is organized into logical implementation phases:
 
 ### Processing Pipeline
 4. **Phase 04**: Video Download - Download videos with yt-dlp
-5. **Phase 05**: Metadata Extraction - AcoustID fingerprinting + YouTube title fallback
-6. **Phase 06**: Audio Normalization - FFmpeg loudnorm to -14 LUFS
+5. **Phase 05**: AcoustID Metadata - Audio fingerprinting for accurate metadata
+6. **Phase 06**: Title Parser Fallback - Smart YouTube title parsing when AcoustID fails
+7. **Phase 07**: Audio Normalization - FFmpeg loudnorm to -14 LUFS
 
 ### Playback & Control
-7. **Phase 07**: Playback Control - Random playback, media source control
-8. **Phase 08**: Scene Management - Handle scene transitions, stop on exit
-9. **Phase 09**: Final Polish - Testing, optimization, documentation
+8. **Phase 08**: Playback Control - Random playback, media source control
+9. **Phase 09**: Scene Management - Handle scene transitions, stop on exit
+10. **Phase 10**: Final Polish - Testing, optimization, documentation
 
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
