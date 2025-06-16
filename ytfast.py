@@ -23,7 +23,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.1.0"  # Updated for Phase 2
+SCRIPT_VERSION = "1.2.0"  # Updated for Phase 3
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -429,8 +429,9 @@ def tools_setup_worker():
             
             # Try to setup tools
             if setup_tools():
-                # Tools are ready
+                # Tools are ready, trigger startup sync
                 log("Tools setup complete", "DEBUG")
+                trigger_startup_sync()
                 break
             
             # Wait before retry
@@ -448,15 +449,124 @@ def tools_setup_worker():
     
     log("Tools setup thread exiting", "DEBUG")
 
-# ===== PLACEHOLDER FUNCTIONS FOR FUTURE PHASES =====
+def trigger_startup_sync():
+    """Trigger one-time sync on startup after tools are ready."""
+    global sync_on_startup_done
+    
+    with state_lock:
+        if sync_on_startup_done:
+            return
+        sync_on_startup_done = True
+    
+    log("Starting one-time playlist sync on startup", "NORMAL")
+    sync_event.set()  # Signal playlist sync thread to run
+
+# ===== PLAYLIST SYNC FUNCTIONS =====
+def fetch_playlist_with_ytdlp(playlist_url):
+    """Fetch playlist information using yt-dlp."""
+    try:
+        ytdlp_path = get_ytdlp_path()
+        
+        # Prepare command
+        cmd = [
+            ytdlp_path,
+            '--flat-playlist',
+            '--dump-json',
+            '--no-warnings',
+            playlist_url
+        ]
+        
+        # Run command with hidden window on Windows
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            startupinfo=startupinfo,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            log(f"yt-dlp failed: {result.stderr}", "NORMAL")
+            return []
+        
+        # Parse JSON output (one JSON object per line)
+        videos = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                try:
+                    video_data = json.loads(line)
+                    videos.append({
+                        'id': video_data.get('id', ''),
+                        'title': video_data.get('title', 'Unknown'),
+                        'duration': video_data.get('duration', 0)
+                    })
+                except json.JSONDecodeError:
+                    continue
+        
+        log(f"Fetched {len(videos)} videos from playlist", "NORMAL")
+        return videos
+        
+    except Exception as e:
+        log(f"Error fetching playlist: {e}", "NORMAL")
+        return []
+
 def playlist_sync_worker():
-    """Background thread for playlist synchronization."""
-    # TODO: Implement in Phase 3
-    log("Playlist sync thread started (placeholder)", "DEBUG")
+    """Background thread for playlist synchronization - NO PERIODIC SYNC."""
+    global stop_threads
+    
     while not stop_threads:
-        time.sleep(1)
+        # Wait for sync signal or timeout
+        if not sync_event.wait(timeout=1):
+            continue
+        
+        # Clear the event
+        sync_event.clear()
+        
+        # Check if we should exit
+        if stop_threads:
+            break
+            
+        # Wait for tools to be ready
+        with state_lock:
+            if not tools_ready:
+                log("Sync requested but tools not ready", "DEBUG")
+                continue
+        
+        log("Starting playlist synchronization", "NORMAL")
+        
+        try:
+            # Fetch playlist
+            videos = fetch_playlist_with_ytdlp(playlist_url)
+            
+            if not videos:
+                log("No videos found in playlist or fetch failed", "NORMAL")
+                continue
+            
+            # Update playlist video IDs
+            with state_lock:
+                playlist_video_ids.clear()
+                playlist_video_ids.update(video['id'] for video in videos)
+            
+            # Queue videos for processing
+            queued_count = 0
+            for video in videos:
+                video_queue.put(video)
+                queued_count += 1
+            
+            log(f"Queued {queued_count} videos for processing", "NORMAL")
+            
+        except Exception as e:
+            log(f"Error in playlist sync: {e}", "NORMAL")
+    
     log("Playlist sync thread exiting", "DEBUG")
 
+# ===== PLACEHOLDER FUNCTIONS FOR FUTURE PHASES =====
 def process_videos_worker():
     """Process videos serially - download, metadata, normalize."""
     # TODO: Implement in Phase 4
@@ -598,8 +708,8 @@ def sync_now_callback(props, prop):
             log("Cannot sync - tools not ready yet", "NORMAL")
             return True
     
-    # TODO: Trigger playlist sync in Phase 3
-    log("Sync functionality will be implemented in Phase 3", "DEBUG")
+    # Trigger playlist sync
+    sync_event.set()
     return True
 
 def on_frontend_event(event):
@@ -659,7 +769,7 @@ def start_worker_threads():
     tools_thread = threading.Thread(target=tools_setup_worker, daemon=True)
     tools_thread.start()
     
-    # Start playlist sync thread (placeholder for now)
+    # Start playlist sync thread
     playlist_sync_thread = threading.Thread(target=playlist_sync_worker, daemon=True)
     playlist_sync_thread.start()
     
