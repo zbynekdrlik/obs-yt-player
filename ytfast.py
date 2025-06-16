@@ -23,7 +23,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.3.2"  # Updated for video quality fix
+SCRIPT_VERSION = "1.3.3"  # Updated for resolution logging
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -584,6 +584,43 @@ def download_video(video_id, title):
             log(f"Error removing temp file: {e}", "DEBUG")
     
     try:
+        # First, get video info to log quality
+        info_cmd = [
+            get_ytdlp_path(),
+            '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
+            '--print', '%(width)s,%(height)s,%(fps)s,%(vcodec)s,%(acodec)s',
+            '--no-warnings',
+            f'https://www.youtube.com/watch?v={video_id}'
+        ]
+        
+        # Get video info
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        try:
+            info_result = subprocess.run(
+                info_cmd,
+                capture_output=True,
+                text=True,
+                startupinfo=startupinfo,
+                timeout=10
+            )
+            
+            if info_result.returncode == 0 and info_result.stdout.strip():
+                info_parts = info_result.stdout.strip().split(',')
+                if len(info_parts) >= 2:
+                    width, height = info_parts[0], info_parts[1]
+                    fps = info_parts[2] if len(info_parts) > 2 else "?"
+                    vcodec = info_parts[3] if len(info_parts) > 3 else "?"
+                    acodec = info_parts[4] if len(info_parts) > 4 else "?"
+                    log(f"Video quality: {width}x{height} @ {fps}fps, video: {vcodec}, audio: {acodec}", "NORMAL")
+        except Exception as e:
+            log(f"Could not get video info: {e}", "DEBUG")
+        
+        # Now download the video
         cmd = [
             get_ytdlp_path(),
             '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
