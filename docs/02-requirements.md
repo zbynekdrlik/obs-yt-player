@@ -36,15 +36,19 @@ It is authoritative; later Phase prompts reference this spec.
 - Separate worker threads/queues for download, normalisation, metadata.
 
 ## Logging
-- Simple, unified logging system with timestamp.
-- Format: `[timestamp] message` (OBS prepends script name automatically)
-- OBS output format: `[script.py] [timestamp] message` from main thread
-- OBS output format: `[Unknown Script] [timestamp] message` from background threads
+- Thread-aware logging system with timestamp and script identification.
+- Format depends on thread context:
+  - Main thread: `[timestamp] message` (OBS prepends script name)
+  - Background threads: `[timestamp] [script_name] message` (to identify source)
+- OBS output format:
+  - Main thread: `[script.py] [timestamp] message`
+  - Background threads: `[Unknown Script] [timestamp] [script_name] message`
+- This allows distinguishing between multiple script instances in background threads.
 - No debug levels or toggles - all messages are logged equally.
 - Log script version on startup.
 
 ## Versioning
-- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.3.5"`)
+- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.3.6"`)
 - Increment version with each development iteration:
   - PATCH: Bug fixes, minor changes
   - MINOR: New features, non-breaking changes
