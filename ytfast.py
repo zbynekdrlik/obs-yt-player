@@ -24,7 +24,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.4.1"  # Incremented PATCH version for API key update
+SCRIPT_VERSION = "1.5.2"  # Incremented PATCH version for download progress fix
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -387,39 +387,29 @@ def setup_tools():
     tools_dir = get_tools_path()
     os.makedirs(tools_dir, exist_ok=True)
     
-    # Download yt-dlp
+    # Download yt-dlp (already verifies internally)
     ytdlp_success = download_ytdlp(tools_dir)
     if not ytdlp_success:
         log("Failed to setup yt-dlp, will retry in 60 seconds")
         return False
     
-    # Download FFmpeg
+    # Download FFmpeg (already verifies internally)
     ffmpeg_success = download_ffmpeg(tools_dir)
     if not ffmpeg_success:
         log("Failed to setup FFmpeg, will retry in 60 seconds")
         return False
     
-    # Download fpcalc
+    # Download fpcalc (already verifies internally)
     fpcalc_success = download_fpcalc(tools_dir)
     if not fpcalc_success:
         log("Failed to setup fpcalc, will retry in 60 seconds")
         return False
     
-    # Verify all three tools work
-    ytdlp_path = get_ytdlp_path()
-    ffmpeg_path = get_ffmpeg_path()
-    fpcalc_path = get_fpcalc_path()
-    
-    if (verify_tool(ytdlp_path, ["--version"]) and 
-        verify_tool(ffmpeg_path, ["-version"]) and
-        verify_tool(fpcalc_path, ["-version"])):
-        with state_lock:
-            tools_ready = True
-        log("All tools are ready and verified!")
-        return True
-    else:
-        log("Tool verification failed, will retry in 60 seconds")
-        return False
+    # All tools downloaded and verified successfully
+    with state_lock:
+        tools_ready = True
+    log("All tools are ready and verified!")
+    return True
 
 def tools_setup_worker():
     """Background thread for setting up tools."""
@@ -703,17 +693,18 @@ def parse_progress(line, video_id, title):
         milestones = download_progress_milestones.get(video_id, set())
         
         # Log at milestones: 0%, 25%, 50%, 75%, 100%
+        # Check in order from lowest to highest to ensure proper progression
         milestone = None
-        if percent >= 100 and 100 not in milestones:
-            milestone = 100
-        elif percent >= 75 and 75 not in milestones:
-            milestone = 75
-        elif percent >= 50 and 50 not in milestones:
-            milestone = 50
-        elif percent >= 25 and 25 not in milestones:
-            milestone = 25
-        elif percent >= 0 and 0 not in milestones:
+        if percent >= 0 and percent < 25 and 0 not in milestones:
             milestone = 0
+        elif percent >= 25 and percent < 50 and 25 not in milestones:
+            milestone = 25
+        elif percent >= 50 and percent < 75 and 50 not in milestones:
+            milestone = 50
+        elif percent >= 75 and percent < 100 and 75 not in milestones:
+            milestone = 75
+        elif percent >= 100 and 100 not in milestones:
+            milestone = 100
         
         if milestone is not None:
             log(f"Downloading {title}: {milestone}%")
@@ -721,6 +712,102 @@ def parse_progress(line, video_id, title):
             download_progress_milestones[video_id] = milestones
 
 # ===== METADATA EXTRACTION FUNCTIONS =====
+def search_itunes_metadata(search_query):
+    """
+    Search iTunes API for song metadata.
+    Returns (song, artist) or (None, None)
+    """
+    try:
+        # Clean up search query
+        search_query = search_query.lower()
+        
+        # Remove common video suffixes
+        for suffix in ['official music video', 'official video', 'lyrics', 'live', 
+                       'worship together session', 'official', 'music video', 'hd', '4k',
+                       '+ the choir room', 'the choir room']:
+            search_query = search_query.replace(suffix, '').strip()
+        
+        # Replace multiple separators with spaces
+        search_query = search_query.replace('//', ' ')
+        search_query = search_query.replace('|', ' ')
+        
+        # Remove extra whitespace
+        search_query = ' '.join(search_query.split())
+        
+        # Try multiple search strategies
+        search_queries = []
+        
+        # Strategy 1: Full cleaned query
+        search_queries.append(search_query)
+        
+        # Strategy 2: If "ft." or "feat." exists, try without featuring artist
+        if 'ft.' in search_query or 'feat.' in search_query:
+            # Extract main part before featuring
+            main_part = re.split(r'\s+(?:ft\.|feat\.)\s+', search_query)[0]
+            search_queries.append(main_part)
+        
+        # Strategy 3: Extract potential song and artist from patterns
+        # Pattern: "song_name artist_name" or "artist_name song_name"
+        words = search_query.split()
+        if len(words) >= 3:
+            # Try first few words as song name
+            search_queries.append(' '.join(words[:3]))
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_queries = []
+        for q in search_queries:
+            if q not in seen and q:
+                seen.add(q)
+                unique_queries.append(q)
+        
+        # Try each search strategy
+        for query in unique_queries:
+            # URL encode the search query
+            encoded_query = urllib.parse.quote(query)
+            url = f"https://itunes.apple.com/search?term={encoded_query}&media=music&limit=5"
+            
+            log(f"Searching iTunes API: {query}")
+            
+            # Make request
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', f'OBS-YouTube-Player/{SCRIPT_VERSION}')
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode('utf-8'))
+            
+            if data.get('resultCount', 0) > 0:
+                # Get first result
+                result = data['results'][0]
+                artist = result.get('artistName', '')
+                song = result.get('trackName', '')
+                album = result.get('collectionName', '')
+                
+                if artist and song:
+                    log(f"iTunes match found: {artist} - {song} (Album: {album})")
+                    return song, artist
+        
+        log("No iTunes results found after trying multiple strategies")
+        return None, None
+        
+    except Exception as e:
+        log(f"iTunes search error: {e}")
+        return None, None
+
+def extract_metadata_from_title(title):
+    """
+    Enhanced title parser that tries multiple strategies.
+    Returns (song, artist) or (None, None)
+    """
+    # First, try online searches
+    song, artist = search_itunes_metadata(title)
+    if song and artist:
+        return song, artist
+    
+    # If online search fails, use smart title parsing (Phase 7)
+    # This will be implemented in Phase 7
+    return None, None
+
 def get_acoustid_metadata(filepath):
     """Query AcoustID for metadata using audio fingerprint."""
     if not ACOUSTID_ENABLED:
@@ -882,6 +969,12 @@ def process_videos_worker():
             # Try AcoustID metadata extraction
             song, artist = get_acoustid_metadata(temp_path)
             
+            # If AcoustID fails, try online search
+            if not song or not artist:
+                song, artist = extract_metadata_from_title(title)
+                if song and artist:
+                    log(f"Found via iTunes search: {artist} - {song}")
+            
             # Store metadata for next phase
             metadata = {
                 'song': song,
@@ -889,10 +982,10 @@ def process_videos_worker():
                 'yt_title': title
             }
             
-            # TODO: Continue to Phase 6 (iTunes metadata)
-            # If AcoustID fails, will try iTunes in next phase
+            # TODO: Continue to Phase 7 (Title Parser Fallback)
+            # If both AcoustID and iTunes fail, will use title parser in next phase
             
-            # TODO: Continue to normalization (Phase 7)
+            # TODO: Continue to normalization (Phase 8)
             # TODO: Final rename will happen after normalization
             
             # IMPORTANT: Keep temp file for future phases - DO NOT DELETE!
@@ -900,7 +993,7 @@ def process_videos_worker():
             if song and artist:
                 log(f"Metadata found: {artist} - {song}")
             else:
-                log(f"No AcoustID metadata found, will try iTunes in Phase 6")
+                log(f"No metadata found from online sources, will use title parser in Phase 7")
             
         except Exception as e:
             log(f"Error processing video: {e}")
