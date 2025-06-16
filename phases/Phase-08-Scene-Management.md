@@ -4,7 +4,7 @@
 Handle scene transitions properly - stop playback when leaving the scene, resume when returning, and clean up resources appropriately.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., `1.5.0` → `1.6.0`)
+**This phase adds new features** → Increment MINOR version from current version
 
 ## Requirements Reference
 This phase implements scene transition handling from `02-requirements.md`:
@@ -14,7 +14,7 @@ This phase implements scene transition handling from `02-requirements.md`:
 ## Implementation Details
 
 ### 1. Scene Change Detection
-Already implemented in `on_frontend_event`:
+Update the existing `on_frontend_event`:
 ```python
 def on_frontend_event(event):
     global scene_active
@@ -41,7 +41,8 @@ def on_scene_activated():
     global is_playing
     
     # Start playback timer if not already running
-    obs.timer_add(playback_controller, PLAYBACK_CHECK_INTERVAL)
+    if not obs.timer_enabled(playback_controller):
+        obs.timer_add(playback_controller, PLAYBACK_CHECK_INTERVAL)
     
     # Log activation
     log(f"Scene '{SCENE_NAME}' activated - starting playback", "DEBUG")
@@ -101,6 +102,7 @@ def stop_current_video():
 - Handle preview/program scenes correctly
 - Thread-safe state management
 - Graceful handling of missing sources
+- Timer management using obs.timer_enabled()
 
 ## Implementation Checklist
 - [ ] Update `SCRIPT_VERSION` constant
