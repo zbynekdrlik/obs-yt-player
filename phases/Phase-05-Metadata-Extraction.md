@@ -26,8 +26,23 @@ def get_acoustid_metadata(filepath):
             filepath
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # Hide console window on Windows
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        result = subprocess.run(
+            cmd, 
+            capture_output=True, 
+            text=True,
+            startupinfo=startupinfo,
+            timeout=30
+        )
+        
         if result.returncode != 0:
+            log(f"fpcalc failed: {result.stderr}", "DEBUG")
             return None, None
             
         # Parse fingerprint data
@@ -38,15 +53,22 @@ def get_acoustid_metadata(filepath):
         # Query AcoustID API
         return query_acoustid(fingerprint, duration)
         
+    except subprocess.TimeoutExpired:
+        log("fpcalc timeout after 30 seconds", "DEBUG")
+        return None, None
     except Exception as e:
-        log(f"AcoustID error: {e}", "DEBUG")
+        log(f"AcoustID fingerprinting error: {e}", "DEBUG")
         return None, None
 ```
 
-### 2. AcoustID API Query
+### 2. AcoustID API Query (using urllib)
 ```python
 def query_acoustid(fingerprint, duration):
-    """Query AcoustID API for metadata."""
+    """Query AcoustID API for metadata using urllib."""
+    import urllib.parse
+    import urllib.request
+    import urllib.error
+    
     url = 'https://api.acoustid.org/v2/lookup'
     params = {
         'client': ACOUSTID_API_KEY,
@@ -56,19 +78,35 @@ def query_acoustid(fingerprint, duration):
     }
     
     try:
-        response = requests.get(url, params=params, timeout=5)
-        data = response.json()
+        # Build URL with parameters
+        query_string = urllib.parse.urlencode(params)
+        full_url = f"{url}?{query_string}"
+        
+        # Make request
+        with urllib.request.urlopen(full_url, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
         
         # Extract best match
         if data.get('results'):
-            result = data['results'][0]
-            if result.get('recordings'):
-                recording = result['recordings'][0]
-                artists = recording.get('artists', [])
-                artist = artists[0]['name'] if artists else 'Unknown Artist'
-                title = recording.get('title', 'Unknown Title')
-                return title, artist
+            for result in data['results']:
+                if result.get('recordings'):
+                    # Get first recording with good confidence
+                    confidence = result.get('score', 0)
+                    if confidence < 0.4:  # Skip low confidence matches
+                        continue
+                        
+                    for recording in result['recordings']:
+                        artists = recording.get('artists', [])
+                        if artists and recording.get('title'):
+                            artist = artists[0]['name']
+                            title = recording['title']
+                            log(f"AcoustID match (confidence: {confidence:.2f})", "DEBUG")
+                            return title, artist
                 
+    except urllib.error.HTTPError as e:
+        log(f"AcoustID API HTTP error: {e.code} {e.reason}", "DEBUG")
+    except urllib.error.URLError as e:
+        log(f"AcoustID API connection error: {e}", "DEBUG")
     except Exception as e:
         log(f"AcoustID API error: {e}", "DEBUG")
     
@@ -79,42 +117,66 @@ def query_acoustid(fingerprint, duration):
 ```python
 def parse_youtube_title(title):
     """Parse YouTube title to extract artist and song."""
+    # First, clean the title
+    cleaned_title = title
+    
+    # Remove common suffixes in parentheses or brackets
+    cleaned_title = re.sub(r'\s*\([^)]*\)\s*$', '', cleaned_title)  # Remove (Official Video) etc
+    cleaned_title = re.sub(r'\s*\[[^\]]*\]\s*$', '', cleaned_title)  # Remove [HD] etc
+    
     # Common patterns in YouTube titles
     patterns = [
-        (r'^(.*?)\s*-\s*(.*)$', 'hyphen'),  # Artist - Song
-        (r'^(.*?)\s*\|\s*(.*)$', 'pipe'),   # Artist | Song
-        (r'^(.*?)\s*:\s*(.*)$', 'colon'),   # Artist : Song
+        # Artist - Song (including various dash types)
+        (r'^(.*?)\s*[-–—]\s*(.*)$', 'hyphen'),
+        # Artist | Song
+        (r'^(.*?)\s*\|\s*(.*)$', 'pipe'),
+        # Artist : Song
+        (r'^(.*?)\s*:\s*(.*)$', 'colon'),
+        # "Song" by Artist
+        (r'^"(.+?)"\s+by\s+(.+)$', 'by_format', True),  # True = swap order
     ]
     
-    for pattern, name in patterns:
-        match = re.match(pattern, title)
+    for pattern_info in patterns:
+        pattern = pattern_info[0]
+        name = pattern_info[1]
+        swap = pattern_info[2] if len(pattern_info) > 2 else False
+        
+        match = re.match(pattern, cleaned_title, re.IGNORECASE)
         if match:
-            artist = match.group(1).strip()
-            song = match.group(2).strip()
+            if swap:
+                song = match.group(1).strip()
+                artist = match.group(2).strip()
+            else:
+                artist = match.group(1).strip()
+                song = match.group(2).strip()
             
-            # Clean up common suffixes
-            song = re.sub(r'\s*\([^)]*\)$', '', song)  # Remove (Official Video) etc
-            song = re.sub(r'\s*\[[^\]]*\]$', '', song)  # Remove [HD] etc
+            # Additional cleanup
+            song = song.strip('"\'')  # Remove quotes
+            artist = artist.strip('"\'')
             
+            # Remove "Official Audio/Video" from song if still present
+            song = re.sub(r'\s*(Official\s*(Audio|Video|Music\s*Video))?\s*$', '', song, flags=re.IGNORECASE)
+            
+            log(f"Parsed using {name} pattern", "DEBUG")
             return song, artist
     
-    # If no pattern matches, use title as song name
-    return title, "Unknown Artist"
+    # If no pattern matches, use cleaned title as song name
+    return cleaned_title, "Unknown Artist"
 ```
 
 ### 4. Metadata Selection
 ```python
-def get_metadata(filepath, yt_title):
+def get_metadata(filepath, yt_title, video_id):
     """Get song and artist metadata using AcoustID or YouTube title."""
     # Try AcoustID first
     song, artist = get_acoustid_metadata(filepath)
-    if song and artist:
-        log(f"YT: '{yt_title}' → Song: '{song}', Artist: '{artist}'")
+    if song and artist and song != "Unknown Title":
+        log(f"Metadata via AcoustID: '{yt_title}' → Song: '{song}', Artist: '{artist}'", "NORMAL")
         return song, artist
     
     # Fallback to parsing YouTube title
     song, artist = parse_youtube_title(yt_title)
-    log(f"YT: '{yt_title}' → Song: '{song}', Artist: '{artist}'")
+    log(f"Metadata via title parser: '{yt_title}' → Song: '{song}', Artist: '{artist}'", "NORMAL")
     return song, artist
 ```
 
@@ -122,25 +184,39 @@ def get_metadata(filepath, yt_title):
 Update process_videos_worker to call metadata extraction after download:
 ```python
 # In process_videos_worker, after download:
-song, artist = get_metadata(temp_path, title)
-# Pass metadata to normalization phase
+# Download video
+temp_path = download_video(video_id, title)
+if not temp_path:
+    log(f"Failed to download: {title}", "NORMAL")
+    continue
+
+# Extract metadata
+song, artist = get_metadata(temp_path, title, video_id)
+
+# TODO: Continue to normalization (Phase 6)
+# Pass song, artist, and temp_path to normalization phase
 ```
 
 ## Key Considerations
 - fpcalc must be available (installed in Phase 2)
-- Use urllib instead of requests (standard library)
+- Use urllib (standard library) NOT requests
 - API rate limit: 3 requests/second (free tier)
 - Some videos won't have AcoustID matches
-- Log which method provided metadata
+- Log clearly shows which method provided metadata
+- Hide console windows on Windows
+- Handle various dash types (-, –, —) in titles
+- Skip low confidence AcoustID matches (<0.4)
 
 ## Implementation Checklist
 - [ ] Update `SCRIPT_VERSION` constant
 - [ ] Implement get_acoustid_metadata function
-- [ ] Implement query_acoustid with urllib
+- [ ] Implement query_acoustid with urllib (NOT requests)
 - [ ] Implement parse_youtube_title function
 - [ ] Implement get_metadata wrapper
 - [ ] Update process_videos_worker to use metadata
+- [ ] Add Windows console hiding for subprocess
 - [ ] Handle all error cases gracefully
+- [ ] Add confidence threshold for AcoustID
 - [ ] Test with various video types
 
 ## Testing Before Commit
@@ -151,9 +227,15 @@ song, artist = get_metadata(temp_path, title)
 5. Process classical music - verify multi-artist handling
 6. Test API rate limiting with rapid requests
 7. Verify metadata extraction works correctly
-8. Check logs clearly show metadata source
-9. Test YouTube title parser with various formats
-10. **Verify version was incremented**
+8. Check logs clearly show metadata source (AcoustID vs parser)
+9. Test YouTube title parser with various formats:
+   - "Artist - Song"
+   - "Artist | Song"
+   - "Song by Artist"
+   - Titles with (Official Video), [HD], etc.
+10. Test various dash types (hyphen, en-dash, em-dash)
+11. **Verify version was incremented**
+12. **Verify no console windows appear on Windows**
 
 ## Commit
 After successful testing, commit with message:  
