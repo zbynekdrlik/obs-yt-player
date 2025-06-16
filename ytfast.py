@@ -24,7 +24,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.4.0"  # Incremented MINOR version for Phase 5
+SCRIPT_VERSION = "1.4.1"  # Incremented PATCH version for API key update
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -43,7 +43,7 @@ PLAYBACK_CHECK_INTERVAL = 1000  # 1 second in milliseconds
 SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
 MAX_RESOLUTION = "1440"
 TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
-ACOUSTID_API_KEY = "M6o6ia3dKu"  # AcoustID API key for metadata
+ACOUSTID_API_KEY = "RXS1uld515"  # AcoustID API key for metadata
 ACOUSTID_ENABLED = True  # Toggle to enable/disable AcoustID lookups
 DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads
 
