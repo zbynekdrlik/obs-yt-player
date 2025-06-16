@@ -37,13 +37,14 @@ It is authoritative; later Phase prompts reference this spec.
 
 ## Logging
 - Simple, unified logging system with timestamp.
-- Format: `[script_name] [timestamp] message`
-- Example: `[ytfast] [2025-06-16 21:30:33] Script version 1.3.4 loaded`
+- Format: `[timestamp] message` (OBS prepends script name automatically)
+- OBS output format: `[script.py] [timestamp] message` from main thread
+- OBS output format: `[Unknown Script] [timestamp] message` from background threads
 - No debug levels or toggles - all messages are logged equally.
 - Log script version on startup.
 
 ## Versioning
-- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.3.4"`)
+- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.3.5"`)
 - Increment version with each development iteration:
   - PATCH: Bug fixes, minor changes
   - MINOR: New features, non-breaking changes
