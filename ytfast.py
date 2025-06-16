@@ -12,6 +12,7 @@ import logging
 import subprocess
 from pathlib import Path
 import urllib.request
+import urllib.parse
 import platform
 import stat
 import json
@@ -23,7 +24,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.3.6"  # Added thread-safe logging with script name prefix
+SCRIPT_VERSION = "1.4.0"  # Incremented MINOR version for Phase 5
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -43,6 +44,7 @@ SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
 MAX_RESOLUTION = "1440"
 TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
 ACOUSTID_API_KEY = "M6o6ia3dKu"  # AcoustID API key for metadata
+ACOUSTID_ENABLED = True  # Toggle to enable/disable AcoustID lookups
 DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads
 
 # URLs for tool downloads
@@ -718,6 +720,137 @@ def parse_progress(line, video_id, title):
             milestones.add(milestone)
             download_progress_milestones[video_id] = milestones
 
+# ===== METADATA EXTRACTION FUNCTIONS =====
+def get_acoustid_metadata(filepath):
+    """Query AcoustID for metadata using audio fingerprint."""
+    if not ACOUSTID_ENABLED:
+        log("AcoustID disabled, skipping fingerprinting")
+        return None, None
+        
+    try:
+        # Run fpcalc to generate fingerprint
+        cmd = [
+            get_fpcalc_path(),
+            '-json',
+            '-length', '120',  # Analyze first 2 minutes
+            filepath
+        ]
+        
+        # Hide console window on Windows
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        result = subprocess.run(
+            cmd, 
+            capture_output=True, 
+            text=True,
+            startupinfo=startupinfo,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            log(f"fpcalc failed: {result.stderr}")
+            return None, None
+            
+        # Parse fingerprint data
+        try:
+            data = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            log(f"Failed to parse fpcalc JSON output: {e}")
+            log(f"fpcalc output: {result.stdout[:200]}...")
+            return None, None
+            
+        fingerprint = data.get('fingerprint')
+        duration = data.get('duration')
+        
+        if not fingerprint or not duration:
+            log(f"Missing fingerprint or duration in fpcalc output")
+            return None, None
+            
+        log(f"Generated fingerprint, duration: {duration}s")
+        
+        # Query AcoustID API
+        return query_acoustid(fingerprint, duration)
+        
+    except subprocess.TimeoutExpired:
+        log("fpcalc timeout after 30 seconds")
+        return None, None
+    except Exception as e:
+        log(f"AcoustID fingerprinting error: {e}")
+        return None, None
+
+def query_acoustid(fingerprint, duration):
+    """Query AcoustID API for metadata using urllib."""
+    url = 'https://api.acoustid.org/v2/lookup'
+    params = {
+        'client': ACOUSTID_API_KEY,
+        'fingerprint': fingerprint,
+        'duration': int(duration),
+        'meta': 'recordings'
+    }
+    
+    try:
+        # Build URL with parameters
+        query_string = urllib.parse.urlencode(params)
+        full_url = f"{url}?{query_string}"
+        
+        # Log the request details for debugging (but not the full fingerprint)
+        log(f"AcoustID request - duration: {duration}s, fingerprint length: {len(fingerprint)}")
+        
+        # Make request with User-Agent
+        req = urllib.request.Request(full_url)
+        req.add_header('User-Agent', f'OBS-YouTube-Player/{SCRIPT_VERSION}')
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            response_data = response.read().decode('utf-8')
+            data = json.loads(response_data)
+        
+        # Log API response status
+        status = data.get('status', 'unknown')
+        if status != 'ok':
+            log(f"AcoustID API status: {status}")
+            if 'error' in data:
+                log(f"AcoustID error: {data['error']}")
+            return None, None
+        
+        # Extract best match
+        results = data.get('results', [])
+        log(f"AcoustID returned {len(results)} results")
+        
+        for result in results:
+            if result.get('recordings'):
+                # Get first recording with good confidence
+                confidence = result.get('score', 0)
+                if confidence < 0.4:  # Skip low confidence matches
+                    log(f"Skipping low confidence match: {confidence:.2f}")
+                    continue
+                    
+                for recording in result['recordings']:
+                    artists = recording.get('artists', [])
+                    if artists and recording.get('title'):
+                        artist = artists[0]['name']
+                        title = recording['title']
+                        log(f"AcoustID match (confidence: {confidence:.2f}): {artist} - {title}")
+                        return title, artist
+        
+        log("No suitable AcoustID matches found")
+        return None, None
+                
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8') if e.fp else 'No response body'
+        log(f"AcoustID API HTTP error: {e.code} {e.reason}")
+        log(f"Error response: {error_body[:200]}")
+    except urllib.error.URLError as e:
+        log(f"AcoustID API connection error: {e}")
+    except Exception as e:
+        log(f"AcoustID API error: {e}")
+    
+    return None, None
+
+# ===== VIDEO PROCESSING FUNCTIONS =====
 def process_videos_worker():
     """Process videos serially - download, metadata, normalize."""
     global stop_threads
@@ -745,13 +878,29 @@ def process_videos_worker():
             if not temp_path:
                 log(f"Failed to download: {title}")
                 continue
-                
-            # TODO: Continue to metadata extraction (Phase 5)
-            # TODO: Continue to normalization (Phase 6)
-            # TODO: Final rename will happen in Phase 6
+            
+            # Try AcoustID metadata extraction
+            song, artist = get_acoustid_metadata(temp_path)
+            
+            # Store metadata for next phase
+            metadata = {
+                'song': song,
+                'artist': artist,
+                'yt_title': title
+            }
+            
+            # TODO: Continue to Phase 6 (iTunes metadata)
+            # If AcoustID fails, will try iTunes in next phase
+            
+            # TODO: Continue to normalization (Phase 7)
+            # TODO: Final rename will happen after normalization
             
             # IMPORTANT: Keep temp file for future phases - DO NOT DELETE!
-            log(f"Video ready for processing: {temp_path}")
+            log(f"Video ready for next phase: {temp_path}")
+            if song and artist:
+                log(f"Metadata found: {artist} - {song}")
+            else:
+                log(f"No AcoustID metadata found, will try iTunes in Phase 6")
             
         except Exception as e:
             log(f"Error processing video: {e}")
@@ -932,7 +1081,7 @@ def verify_scene_setup():
 
 def playback_controller():
     """Main playback controller - runs on main thread."""
-    # TODO: Implement in Phase 7
+    # TODO: Implement in Phase 9
     pass
 
 # ===== WORKER THREAD STARTERS =====
