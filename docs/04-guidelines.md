@@ -11,10 +11,12 @@
 - Protect shared state with `threading.Lock`; wrap worker loops in `try/except`.
 
 ## Logging Guidelines
-- Use simple, unified logging format: `[script_name] [timestamp] message`
+- Use simple logging format: `[timestamp] message`
 - Implement with a single `log(message)` function
+- OBS automatically prepends script name to output:
+  - Main thread: `[script.py] [timestamp] message`
+  - Background threads: `[Unknown Script] [timestamp] message`
 - No debug levels or toggles - all messages are treated equally
-- Example output: `[ytfast] [2025-06-16 21:30:33] Script version 1.3.4 loaded`
 - Log important events: version on startup, errors, major operations
 - Keep logs concise and informative
 
@@ -42,7 +44,7 @@ Examples:
 ## Testing Version
 Users should always check the OBS logs to verify the correct version is loaded:
 ```
-[ytfast] Script version X.Y.Z loaded
+[ytfast.py] [timestamp] Script version X.Y.Z loaded
 ```
 
 ## Commit Messages
