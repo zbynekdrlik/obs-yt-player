@@ -63,7 +63,8 @@ def download_video(video_id, title):
     
     cmd = [
         get_ytdlp_path(),
-        '-f', f'best[height<={MAX_RESOLUTION}]',
+        '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
+        '--merge-output-format', 'mp4',
         '--ffmpeg-location', get_ffmpeg_path(),
         '--no-playlist',
         '--no-warnings',
@@ -77,7 +78,17 @@ def download_video(video_id, title):
     # Return output_path on success, None on failure
 ```
 
-### 3. Progress Tracking
+### 3. Download Strategy
+- Use yt-dlp for downloading
+- Video format: best quality up to 1440p (balance quality/size)
+- Format selection: `bestvideo[height<=1440]+bestaudio/best[height<=1440]/best`
+  - First try: Download best video + best audio separately and merge
+  - Fallback 1: Download best combined format up to 1440p
+  - Fallback 2: Download best available format
+- Audio: already included in video container
+- Save to temporary file first ({video_id}_temp.mp4)
+
+### 4. Progress Tracking
 Parse yt-dlp progress output:
 ```python
 def parse_progress(line, video_id, title):
@@ -88,17 +99,18 @@ def parse_progress(line, video_id, title):
         # Log at milestones: 0%, 25%, 50%, 75%, 100%
 ```
 
-### 4. Error Handling
+### 5. Error Handling
 - Network interruptions
 - Age-restricted videos
 - Private/deleted videos
 - Timeout after 10 minutes
 - Clean up partial downloads
 
-### 5. Important Notes
+### 6. Important Notes
 - **Keep downloaded files**: Downloaded temp files must be preserved for Phase 5 and 6
 - **Serial processing**: One video at a time for bandwidth management
 - **Skip cached**: Check `cached_videos` to avoid re-downloading
+- **Quality priority**: Prioritize high quality (up to 1440p) over small file size
 
 ## Key Implementation Points
 - Start process_videos_worker thread in start_worker_threads
@@ -131,6 +143,7 @@ def parse_progress(line, video_id, title):
 8. Monitor bandwidth - should be one video at a time
 9. Check queue processing works correctly
 10. **Verify version was incremented**
+11. **Verify video quality is high (1080p/1440p, not 360p)**
 
 ## Commit
 After successful testing, commit with message:  
