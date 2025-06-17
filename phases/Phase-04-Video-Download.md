@@ -114,16 +114,48 @@ Example log output:
 [NORMAL] Starting download: Video Title (VideoID)
 ```
 
-### 5. Progress Tracking
-Parse yt-dlp progress output:
+### 5. Progress Tracking (Updated in v1.6.5)
+Optimized download progress logging to show only essential information:
+
 ```python
 def parse_progress(line, video_id, title):
+    """Parse yt-dlp progress output and log at milestones."""
     # Look for: [download]  XX.X% of ~XXX.XXMiB at XXX.XXKiB/s
     match = re.search(r'\[download\]\s+(\d+\.?\d*)%', line)
     if match:
         percent = float(match.group(1))
-        # Log at milestones: 0%, 25%, 50%, 75%, 100%
+        
+        # Get milestone set for this video
+        milestones = download_progress_milestones.get(video_id, set())
+        
+        # If we've already logged 50%, ignore further progress
+        if 50 in milestones:
+            return
+        
+        # Log only at 50%
+        if percent >= 50 and 50 not in milestones:
+            log(f"Downloading {title}: 50%")
+            milestones.add(50)
+            download_progress_milestones[video_id] = milestones
 ```
+
+**Download Progress Output (v1.6.5)**:
+- **Starting download**: Shows video quality and indicates download has begun
+- **50% progress**: Single progress indicator to show download is active
+- **Downloaded successfully**: Confirmation with file size
+
+Example:
+```
+[ytfast] Video quality: 2560x1080 @ 25fps, video: av01.0.12M.08, audio: opus
+[ytfast] Starting download: Joy Of The Lord | Planetshakers Official Music Video (UIzIfEMpFV0)
+[ytfast] Downloading Joy Of The Lord | Planetshakers Official Music Video: 50%
+[ytfast] Downloaded successfully: Joy Of The Lord | Planetshakers Official Music Video (148.7 MB)
+```
+
+This minimal logging approach:
+- Reduces log clutter
+- Shows download is progressing without overwhelming output
+- Provides file size confirmation on completion
 
 ### 6. Error Handling
 - Network interruptions
@@ -143,23 +175,24 @@ def parse_progress(line, video_id, title):
 - Start process_videos_worker thread in start_worker_threads
 - Hide console window on Windows
 - Log video quality (resolution, fps, codecs) before download
-- Log download progress at milestones only
+- Log download progress at 50% only (v1.6.5)
 - Verify downloaded file exists and has size > 0
 - Thread-safe operations
 - One video at a time (serial processing)
 - **DO NOT delete temp files after download**
 
 ## Implementation Checklist
-- [ ] Update `SCRIPT_VERSION` constant
-- [ ] Implement process_videos_worker thread
-- [ ] Implement download_video function
-- [ ] Add quality information logging
-- [ ] Add progress parsing
-- [ ] Handle various error cases
-- [ ] Start thread in start_worker_threads
-- [ ] Test with different video types
-- [ ] Verify serial processing
-- [ ] **Verify temp files are preserved**
+- [x] Update `SCRIPT_VERSION` constant
+- [x] Implement process_videos_worker thread
+- [x] Implement download_video function
+- [x] Add quality information logging
+- [x] Add progress parsing
+- [x] Optimize progress logging (v1.6.5)
+- [x] Handle various error cases
+- [x] Start thread in start_worker_threads
+- [x] Test with different video types
+- [x] Verify serial processing
+- [x] **Verify temp files are preserved**
 
 ## Testing Before Commit
 1. Download a short video - verify progress tracking
@@ -174,6 +207,7 @@ def parse_progress(line, video_id, title):
 10. **Verify version was incremented**
 11. **Verify video quality is high (1080p/1440p, not 360p)**
 12. **Verify quality information is logged (resolution, fps, codecs)**
+13. **Verify minimal progress logging (start, 50%, success)**
 
 ## Commit
 After successful testing, commit with message:  
