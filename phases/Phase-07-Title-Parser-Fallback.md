@@ -206,23 +206,7 @@ log(f"=====================================")
 # TODO: Continue to Phase 8 (Audio Normalization)
 ```
 
-## Logging Improvements
-
-### Download Progress Logging (v1.6.5)
-Download progress has been optimized to show only essential information:
-- **Starting download**: Shows video quality and indicates download has begun
-- **50% progress**: Single progress indicator to show download is active
-- **Success**: Confirmation with file size
-
-Example:
-```
-[ytfast] Video quality: 2560x1080 @ 25fps, video: av01.0.12M.08, audio: opus
-[ytfast] Starting download: Joy Of The Lord | Planetshakers Official Music Video (UIzIfEMpFV0)
-[ytfast] Downloading Joy Of The Lord | Planetshakers Official Music Video: 50%
-[ytfast] Downloaded successfully: Joy Of The Lord | Planetshakers Official Music Video (148.7 MB)
-```
-
-### Metadata Result Logging
+## Metadata Result Logging
 Each processed video shows a clear, formatted metadata result:
 ```
 === METADATA RESULT for 'Video Title' ===
@@ -282,7 +266,6 @@ This provides:
 - [x] Add detailed logging of transformations
 - [x] Update process_videos_worker integration
 - [x] Implement metadata result logging
-- [x] Optimize download progress logging
 
 ## Testing Before Commit
 1. Test basic format: "Artist - Song"
@@ -298,7 +281,6 @@ This provides:
 11. **Verify version was incremented**
 12. **Check logs show transformations**
 13. **Verify metadata result formatting**
-14. **Confirm minimal download progress**
 
 ## Commit
 After successful testing, commit with message:  
