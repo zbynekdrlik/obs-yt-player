@@ -24,7 +24,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.6.0"  # Incremented MINOR version for title parser feature
+SCRIPT_VERSION = "1.7.5"  # Fixed iTunes false positive matching for worship content
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -650,7 +650,12 @@ def download_video(video_id, title):
         # Parse progress output
         for line in process.stdout:
             if '[download]' in line:
-                parse_progress(line, video_id, title)
+                # Skip fragment/part download progress lines
+                if any(skip in line.lower() for skip in ['fragment', 'downloading', 'destination:']):
+                    continue
+                # Only parse percentage lines that show actual download progress
+                if '%' in line and 'of' in line:
+                    parse_progress(line, video_id, title)
         
         # Wait for process to complete
         process.wait(timeout=DOWNLOAD_TIMEOUT)
@@ -692,107 +697,258 @@ def parse_progress(line, video_id, title):
         # Get milestone set for this video
         milestones = download_progress_milestones.get(video_id, set())
         
-        # Log at milestones: 0%, 25%, 50%, 75%, 100%
-        # Check in order from lowest to highest to ensure proper progression
-        milestone = None
-        if percent >= 0 and percent < 25 and 0 not in milestones:
-            milestone = 0
-        elif percent >= 25 and percent < 50 and 25 not in milestones:
-            milestone = 25
-        elif percent >= 50 and percent < 75 and 50 not in milestones:
-            milestone = 50
-        elif percent >= 75 and percent < 100 and 75 not in milestones:
-            milestone = 75
-        elif percent >= 100 and 100 not in milestones:
-            milestone = 100
+        # If we've already logged 50%, ignore further progress
+        if 50 in milestones:
+            return
         
-        if milestone is not None:
-            log(f"Downloading {title}: {milestone}%")
-            milestones.add(milestone)
+        # Log only at 50%
+        if percent >= 50 and 50 not in milestones:
+            log(f"Downloading {title}: 50%")
+            milestones.add(50)
             download_progress_milestones[video_id] = milestones
 
 # ===== METADATA EXTRACTION FUNCTIONS =====
-def search_itunes_metadata(search_query):
+def search_itunes_metadata(search_query, expected_artist=None):
     """
-    Search iTunes API for song metadata.
+    Search iTunes API for song metadata with improved matching.
     Returns (song, artist) or (None, None)
     """
     try:
+        original_query = search_query
+        
         # Clean up search query
         search_query = search_query.lower()
         
         # Remove common video suffixes
         for suffix in ['official music video', 'official video', 'lyrics', 'live', 
                        'worship together session', 'official', 'music video', 'hd', '4k',
-                       '+ the choir room', 'the choir room']:
+                       '+ the choir room', 'the choir room', 'video oficial', '(video oficial)',
+                       '[official]', '(official)', 'en vivo', '(en vivo)', 'worship cover',
+                       'songs for church', 'live at chapel', 'revival', 'feat.', 'ft.']:
             search_query = search_query.replace(suffix, '').strip()
         
         # Replace multiple separators with spaces
         search_query = search_query.replace('//', ' ')
         search_query = search_query.replace('|', ' ')
+        search_query = search_query.replace(' - ', ' ')
         
         # Remove extra whitespace
         search_query = ' '.join(search_query.split())
         
-        # Try multiple search strategies
-        search_queries = []
+        log(f"iTunes search - Query: '{search_query}', Expected artist: '{expected_artist}'")
         
-        # Strategy 1: Full cleaned query
-        search_queries.append(search_query)
+        # URL encode the search query
+        encoded_query = urllib.parse.quote(search_query)
+        url = f"https://itunes.apple.com/search?term={encoded_query}&media=music&limit=25"
         
-        # Strategy 2: If "ft." or "feat." exists, try without featuring artist
-        if 'ft.' in search_query or 'feat.' in search_query:
-            # Extract main part before featuring
-            main_part = re.split(r'\s+(?:ft\.|feat\.)\s+', search_query)[0]
-            search_queries.append(main_part)
+        # Make request
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', f'OBS-YouTube-Player/{SCRIPT_VERSION}')
         
-        # Strategy 3: Extract potential song and artist from patterns
-        # Pattern: "song_name artist_name" or "artist_name song_name"
-        words = search_query.split()
-        if len(words) >= 3:
-            # Try first few words as song name
-            search_queries.append(' '.join(words[:3]))
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode('utf-8'))
         
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_queries = []
-        for q in search_queries:
-            if q not in seen and q:
-                seen.add(q)
-                unique_queries.append(q)
+        if data.get('resultCount', 0) == 0:
+            log("No iTunes results found")
+            return None, None
         
-        # Try each search strategy
-        for query in unique_queries:
-            # URL encode the search query
-            encoded_query = urllib.parse.quote(query)
-            url = f"https://itunes.apple.com/search?term={encoded_query}&media=music&limit=5"
-            
-            log(f"Searching iTunes API: {query}")
-            
-            # Make request
-            req = urllib.request.Request(url)
-            req.add_header('User-Agent', f'OBS-YouTube-Player/{SCRIPT_VERSION}')
-            
-            with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read().decode('utf-8'))
-            
-            if data.get('resultCount', 0) > 0:
-                # Get first result
-                result = data['results'][0]
-                artist = result.get('artistName', '')
-                song = result.get('trackName', '')
-                album = result.get('collectionName', '')
-                
-                if artist and song:
-                    log(f"iTunes match found: {artist} - {song} (Album: {album})")
-                    return song, artist
+        # Strategy 1: If we have expected artist, try strict matching first
+        if expected_artist:
+            best_match = find_artist_match(data['results'], expected_artist, search_query, strict=True)
+            if best_match:
+                song, artist = best_match
+                log(f"iTunes strict match: {artist} - {song}")
+                return song, artist
         
-        log("No iTunes results found after trying multiple strategies")
+        # Strategy 2: Enhanced genre-aware matching
+        best_match = find_best_itunes_match_with_validation(data['results'], search_query, expected_artist, original_query)
+        if best_match:
+            song, artist = best_match
+            log(f"iTunes validated match: {artist} - {song}")
+            return song, artist
+        
+        log("No suitable iTunes matches found")
         return None, None
         
     except Exception as e:
         log(f"iTunes search error: {e}")
         return None, None
+
+def find_artist_match(results, expected_artist, search_query, strict=True):
+    """Find iTunes results that match expected artist."""
+    expected_artist_lower = expected_artist.lower()
+    best_match = None
+    best_score = 0
+    
+    for result in results:
+        artist = result.get('artistName', '')
+        song = result.get('trackName', '')
+        
+        if not artist or not song:
+            continue
+        
+        artist_lower = artist.lower()
+        
+        # Artist similarity check
+        artist_match = False
+        if strict:
+            # Strict: exact substring match or word subset
+            if expected_artist_lower in artist_lower or artist_lower in expected_artist_lower:
+                artist_match = True
+            else:
+                # Check if all words in expected artist are in result artist
+                expected_words = set(expected_artist_lower.split())
+                result_words = set(artist_lower.split())
+                if expected_words and expected_words.issubset(result_words):
+                    artist_match = True
+        else:
+            # Relaxed: any significant word overlap
+            expected_words = set(w for w in expected_artist_lower.split() if len(w) > 2)
+            result_words = set(w for w in artist_lower.split() if len(w) > 2)
+            overlap = len(expected_words.intersection(result_words))
+            if overlap > 0 and overlap >= len(expected_words) * 0.6:
+                artist_match = True
+        
+        if not artist_match:
+            continue
+        
+        # Score based on how well song title matches search
+        song_lower = song.lower()
+        search_words = set(w for w in search_query.split() if len(w) > 2)
+        song_score = sum(1 for word in search_words if word in song_lower)
+        
+        if song_score > best_score:
+            best_match = (song, artist)
+            best_score = song_score
+            
+    return best_match
+
+def find_best_itunes_match_with_validation(results, search_query, expected_artist=None, original_query=""):
+    """Find best iTunes match with enhanced genre validation and context checking."""
+    search_words = set(w for w in search_query.split() if len(w) > 2)
+    
+    if len(search_words) < 2:
+        return None
+    
+    best_match = None
+    best_score = 0
+    
+    for result in results:
+        artist = result.get('artistName', '')
+        song = result.get('trackName', '')
+        
+        if not artist or not song:
+            continue
+        
+        # Enhanced genre/context mismatch detection
+        if is_enhanced_genre_mismatch(search_query, artist.lower(), song.lower(), original_query):
+            log(f"Rejected iTunes match for genre mismatch: {artist} - {song}")
+            continue
+        
+        # Score based on word matching
+        song_lower = song.lower()
+        artist_lower = artist.lower()
+        
+        # Count matches in song title (weighted more)
+        song_matches = sum(2 for word in search_words if word in song_lower)
+        
+        # Count matches in artist name
+        artist_matches = sum(1 for word in search_words if word in artist_lower)
+        
+        # Bonus for artist consistency if we have expected artist
+        artist_bonus = 0
+        if expected_artist:
+            expected_lower = expected_artist.lower()
+            expected_words = set(w for w in expected_lower.split() if len(w) > 2)
+            result_words = set(w for w in artist_lower.split() if len(w) > 2)
+            if expected_words.intersection(result_words):
+                artist_bonus = 3
+        
+        total_score = song_matches + artist_matches + artist_bonus
+        
+        # Stricter validation: Require higher threshold
+        min_required = max(4, len(search_words) // 2)  # Increased threshold
+        
+        # Require meaningful song title overlap (not just artist name matches)
+        if song_matches == 0 and artist_bonus == 0:
+            continue  # Must match something in the song title or have artist consistency
+        
+        if total_score >= min_required and total_score > best_score:
+            best_match = (song, artist)
+            best_score = total_score
+    
+    return best_match
+
+def is_enhanced_genre_mismatch(search_query, artist_lower, song_lower, original_query=""):
+    """Enhanced genre mismatch detection with better context awareness."""
+    search_lower = search_query.lower()
+    original_lower = original_query.lower()
+    
+    # Worship/Christian music indicators (expanded)
+    worship_indicators = [
+        'worship', 'church', 'praise', 'glory', 'lord', 'god', 'jesus', 'christ', 'holy', 
+        'prayer', 'faith', 'blessed', 'heaven', 'salvation', 'hallelujah', 'amen',
+        'planetshakers', 'elevation', 'hillsong', 'bethel', 'gateway', 'lakewood',
+        'revival', 'presence', 'sanctuary', 'almighty', 'sovereign', 'redeemer',
+        'savior', 'emmanuel', 'hosanna', 'christian', 'gospel'
+    ]
+    
+    # Secular genre indicators that would be clear mismatches
+    secular_genres = [
+        'jazz', 'funk', 'disco', 'metal', 'punk', 'rap', 'hip hop', 'techno', 
+        'electronic', 'blues', 'country', 'classical', 'rock', 'pop', 'r&b'
+    ]
+    
+    # Known problematic artist patterns
+    problematic_artists = [
+        'level 42',           # Jazz-funk band often matched incorrectly
+        'physical presence',  # Common false match
+        'worship songs on the piano',  # Generic cover artist
+        'piano tribute',      # Generic tribute albums
+        'instrumental',       # Generic instrumental versions
+    ]
+    
+    # Check if search suggests worship context
+    has_worship_context = any(indicator in search_lower for indicator in worship_indicators)
+    has_worship_context = has_worship_context or any(indicator in original_lower for indicator in worship_indicators)
+    
+    # Check result text for problematic patterns
+    result_text = f"{artist_lower} {song_lower}".lower()
+    
+    # Check for known problematic artists
+    if any(problematic in result_text for problematic in problematic_artists):
+        if has_worship_context:
+            log(f"Genre mismatch detected: worship context with problematic artist pattern")
+            return True
+    
+    # Check for secular genre indicators
+    has_secular_genre = any(genre in result_text for genre in secular_genres)
+    if has_worship_context and has_secular_genre:
+        log(f"Genre mismatch detected: worship context with secular genre indicators")
+        return True
+    
+    # Specific pattern checks
+    if has_worship_context:
+        # Reject "Level 42" matches for worship content
+        if 'level 42' in artist_lower:
+            log(f"Genre mismatch detected: Level 42 matched for worship content")
+            return True
+        
+        # Reject piano tribute/cover albums for specific worship content
+        if 'piano' in artist_lower and any(word in artist_lower for word in ['tribute', 'cover', 'instrumental']):
+            # Only reject if we have specific artist expectations
+            if any(artist in original_lower for artist in ['planetshakers', 'elevation', 'hillsong']):
+                log(f"Genre mismatch detected: generic piano cover for specific worship artist")
+                return True
+    
+    # Check for obvious instrumental/cover mismatches when original artist is expected
+    original_words = original_lower.split()
+    if any(artist in original_words for artist in ['planetshakers', 'elevation', 'hillsong', 'bethel']):
+        if 'instrumental' in result_text or 'karaoke' in result_text:
+            log(f"Genre mismatch detected: instrumental/karaoke version when original artist expected")
+            return True
+    
+    return False
 
 def parse_title_smart(title):
     """
@@ -803,18 +959,73 @@ def parse_title_smart(title):
         return None, None
         
     # Log original title
-    log(f"Parsing title: {title}")
+    log(f"Title parser - Original: '{title}'")
     
     # Clean the title
     cleaned = title.strip()
     
-    # Remove common video suffixes
+    # First check for special patterns that indicate artist
+    # Pattern 1: "Song | Artist" or "Song | Artist feat. X"
+    pipe_match = re.match(r'^([^|]+)\s*\|\s*([^|]+?)(?:\s*(?:Official|Music|Video|Live|feat\.|ft\.)|$)', cleaned, re.IGNORECASE)
+    if pipe_match:
+        song = pipe_match.group(1).strip()
+        artist = pipe_match.group(2).strip()
+        # Clean up artist name
+        for suffix in ['Official Music Video', 'Official Video', 'Music Video', 'Official', 'Video', 'Live']:
+            artist = re.sub(f'\\s*{suffix}.*', '', artist, flags=re.IGNORECASE)
+        if song and artist and len(artist) > 2:
+            song = clean_featuring_from_song(song)
+            log(f"Title parser - Pipe pattern: Artist='{artist}', Song='{song}'")
+            return song, artist
+    
+    # Pattern 2: "Artist - Song" (most common)
+    dash_match = re.match(r'^([^-]+?)\s*-\s*([^-]+?)(?:\s*\(|\s*\[|$)', cleaned)
+    if dash_match:
+        part1 = dash_match.group(1).strip()
+        part2 = dash_match.group(2).strip()
+        
+        # Check if this looks like "Artist - Song" pattern
+        # Usually artist names are shorter and don't contain certain keywords
+        song_keywords = ['official', 'video', 'lyrics', 'live', 'feat', 'ft.', 'audio']
+        if any(keyword in part2.lower() for keyword in song_keywords):
+            # Part2 likely contains song + extra info
+            artist = part1
+            song = part2
+        else:
+            # Standard "Artist - Song"
+            artist = part1
+            song = part2
+        
+        # Clean up
+        song = clean_featuring_from_song(song)
+        # Remove video suffixes from song
+        for suffix in ['Official Music Video', 'Official Video', 'Music Video', 'Official', 'Video', 'Live', 'Audio']:
+            song = re.sub(f'\\s*[\\(\\[]?{suffix}[\\)\\]]?', '', song, flags=re.IGNORECASE).strip()
+        
+        if song and artist and len(artist) > 2:
+            log(f"Title parser - Dash pattern: Artist='{artist}', Song='{song}'")
+            return song, artist
+    
+    # Pattern 3: Check for worship/church patterns
+    worship_match = re.match(r'^(.+?)\s*\|\s*([\w\s]+?)(?:\s*\(worship.*?\))?', cleaned, re.IGNORECASE)
+    if worship_match and 'worship' in cleaned.lower():
+        song = worship_match.group(1).strip()
+        artist = worship_match.group(2).strip()
+        # Remove common suffixes
+        artist = re.sub(r'\s*\(.*?\)\s*', '', artist, flags=re.IGNORECASE)
+        if song and artist and len(artist) > 2:
+            log(f"Title parser - Worship pattern: Artist='{artist}', Song='{song}'")
+            return song, artist
+    
+    # Remove common video suffixes before further parsing
     suffixes_to_remove = [
         'official music video', 'official video', 'official audio',
         'music video', 'lyrics video', 'lyric video', 'lyrics',
         'hd', '4k', 'live', 'acoustic', 'cover', 'remix',
         'feat.', 'ft.', 'featuring', '(audio)', '[audio]',
-        'worship together session', 'official', 'video'
+        'worship together session', 'official', 'video',
+        'video oficial', '(video oficial)', 'en vivo', '(en vivo)',
+        'songs for church', 'live at chapel'
     ]
     
     # Make lowercase for suffix matching
@@ -832,12 +1043,12 @@ def parse_title_smart(title):
     if len(cleaned_lower) < len(cleaned):
         cleaned = cleaned[:len(cleaned_lower)]
     
-    # Try different separator patterns
+    log(f"Title parser - After cleaning: '{cleaned}'")
+    
+    # Try other separator patterns
     separators = [
-        ' - ',     # Most common: "Artist - Song"
         ' – ',     # Em dash variant
         ' — ',     # En dash variant  
-        ' | ',     # Pipe separator
         ' // ',    # Double slash
         ': ',      # Colon separator
         ' by ',    # "Song by Artist"
@@ -850,56 +1061,33 @@ def parse_title_smart(title):
             if len(parts) == 2:
                 part1, part2 = parts[0].strip(), parts[1].strip()
                 
-                # Determine which is artist and which is song
-                # Common patterns:
-                # "Artist - Song" (most common)
-                # "Song by Artist"
-                # "Song | Artist"
-                
                 if sep == ' by ':
                     # "Song by Artist" pattern
                     song, artist = part1, part2
                 else:
-                    # Try to determine based on content
-                    # If part2 contains "feat" or "ft", it's likely the song
-                    if any(x in part2.lower() for x in ['feat', 'ft.']):
-                        artist, song = part1, part2
-                    else:
-                        # Default assumption: Artist - Song
-                        artist, song = part1, part2
+                    # Default assumption: Artist - Song
+                    artist, song = part1, part2
                 
                 # Clean up featuring artists from song title
                 song = clean_featuring_from_song(song)
                 
-                log(f"Parsed: Artist='{artist}', Song='{song}'")
-                return song, artist
-    
-    # No separator found - try other patterns
-    
-    # Pattern: "Artist: Song Title"
-    if ':' in cleaned:
-        parts = cleaned.split(':', 1)
-        if len(parts) == 2:
-            artist, song = parts[0].strip(), parts[1].strip()
-            song = clean_featuring_from_song(song)
-            log(f"Parsed (colon): Artist='{artist}', Song='{song}'")
-            return song, artist
+                if song and artist and len(artist) > 2:
+                    log(f"Title parser - Found separator '{sep}': Artist='{artist}', Song='{song}'")
+                    return song, artist
     
     # Pattern: Quoted song title
-    quote_match = re.search(r'[""](.*?)[""]', cleaned)
+    quote_match = re.search(r'[""''](.*?)["'']', cleaned)
     if quote_match:
         song = quote_match.group(1)
         # Remove the quoted part to find artist
         artist = cleaned.replace(quote_match.group(0), '').strip()
-        if artist and song:
-            log(f"Parsed (quotes): Artist='{artist}', Song='{song}'")
+        if artist and song and len(artist) > 2:
+            log(f"Title parser - Quote pattern: Artist='{artist}', Song='{song}'")
             return song, artist
     
-    # Last resort: Use whole title as song, "Unknown Artist"
-    song = clean_featuring_from_song(cleaned)
-    artist = "Unknown Artist"
-    log(f"Parsed (fallback): Artist='{artist}', Song='{song}'")
-    return song, artist
+    # Unable to parse - return None to avoid bad metadata
+    log(f"Title parser - Unable to parse title reliably")
+    return None, None
 
 def clean_featuring_from_song(song):
     """
@@ -923,21 +1111,28 @@ def clean_featuring_from_song(song):
 
 def extract_metadata_from_title(title):
     """
-    Enhanced title parser that tries multiple strategies.
-    Returns (song, artist) or (None, None)
+    Enhanced title parser that tries iTunes then falls back to parsing.
+    Always returns metadata - never None. This is the final fallback step.
+    Returns (song, artist, source)
     """
-    # First, try online searches
-    song, artist = search_itunes_metadata(title)
-    if song and artist:
-        return song, artist
+    # First, try smart title parsing to extract expected artist
+    song_parsed, artist_parsed = parse_title_smart(title)
     
-    # Fall back to smart title parsing
-    song, artist = parse_title_smart(title)
-    if song and artist:
-        log(f"Using parsed metadata: {artist} - {song}")
-        return song, artist
+    # Try iTunes search with multiple strategies:
+    # 1. If we have parsed artist, try strict matching
+    # 2. Always try relaxed matching regardless of parsing success
+    song_itunes, artist_itunes = search_itunes_metadata(title, expected_artist=artist_parsed)
+    if song_itunes and artist_itunes:
+        return song_itunes, artist_itunes, "iTunes"
     
-    return None, None
+    # If iTunes fails but we have good parsed results, use them
+    if song_parsed and artist_parsed:
+        log(f"Using parsed metadata: {artist_parsed} - {song_parsed}")
+        return song_parsed, artist_parsed, "title_parsing"
+    
+    # Conservative fallback - still counts as title parsing attempt
+    log("No reliable artist/song could be parsed - using conservative fallback")
+    return title, "Unknown Artist", "title_parsing"
 
 def get_acoustid_metadata(filepath):
     """Query AcoustID for metadata using audio fingerprint."""
@@ -1102,23 +1297,11 @@ def process_videos_worker():
             metadata_source = "AcoustID" if (song and artist) else None
             
             # If AcoustID fails, try title-based extraction (iTunes + parsing)
-            if not song or not artist:
-                song, artist = extract_metadata_from_title(title)
-                if song and artist:
-                    # Determine source based on whether iTunes was mentioned in recent logs
-                    # This is a simple check - in production you might track this more formally
-                    metadata_source = "iTunes" if "iTunes match found" in title else "parsed"
+            # This function always returns metadata - never None
+            song, artist, metadata_source = extract_metadata_from_title(title)
             
-            # Log metadata source
-            if metadata_source:
-                log(f"Metadata from {metadata_source}: {artist} - {song}")
-            
-            # Ensure we always have some metadata
-            if not song or not artist:
-                # This shouldn't happen with our fallback parser
-                song = title
-                artist = "Unknown Artist"
-                log(f"Using minimal metadata: {artist} - {song}")
+            # Log metadata source with detailed results
+            log(f"Metadata from {metadata_source}: {artist} - {song}")
             
             # Store metadata for next phase
             metadata = {
@@ -1127,12 +1310,18 @@ def process_videos_worker():
                 'yt_title': title
             }
             
+            # Log final metadata decision
+            log(f"=== METADATA RESULT for '{title}' ===")
+            log(f"    Artist: {artist}")
+            log(f"    Song: {song}")
+            log(f"    Source: {metadata_source}")
+            log(f"=====================================")
+            
             # TODO: Continue to Phase 8 (Audio Normalization)
             # TODO: Final rename will happen after normalization
             
             # IMPORTANT: Keep temp file for future phases - DO NOT DELETE!
             log(f"Video ready for next phase: {temp_path}")
-            log(f"Final metadata: {artist} - {song}")
             
         except Exception as e:
             log(f"Error processing video: {e}")
