@@ -196,8 +196,47 @@ metadata = {
     'yt_title': title
 }
 
+# Log final metadata result with clear formatting
+log(f"=== METADATA RESULT for '{title}' ===")
+log(f"    Artist: {artist}")
+log(f"    Song: {song}")
+log(f"    Source: {metadata_source if metadata_source else 'fallback'}")
+log(f"=====================================")
+
 # TODO: Continue to Phase 8 (Audio Normalization)
 ```
+
+## Logging Improvements
+
+### Download Progress Logging (v1.6.5)
+Download progress has been optimized to show only essential information:
+- **Starting download**: Shows video quality and indicates download has begun
+- **50% progress**: Single progress indicator to show download is active
+- **Success**: Confirmation with file size
+
+Example:
+```
+[ytfast] Video quality: 2560x1080 @ 25fps, video: av01.0.12M.08, audio: opus
+[ytfast] Starting download: Joy Of The Lord | Planetshakers Official Music Video (UIzIfEMpFV0)
+[ytfast] Downloading Joy Of The Lord | Planetshakers Official Music Video: 50%
+[ytfast] Downloaded successfully: Joy Of The Lord | Planetshakers Official Music Video (148.7 MB)
+```
+
+### Metadata Result Logging
+Each processed video shows a clear, formatted metadata result:
+```
+=== METADATA RESULT for 'Video Title' ===
+    Artist: Artist Name
+    Song: Song Title
+    Source: AcoustID/iTunes/parsed/fallback
+=====================================
+```
+
+This provides:
+- Clear visual separation of results
+- Easy-to-read indented format
+- Source tracking for debugging
+- Consistent output for all videos
 
 ## Title Format Examples
 
@@ -229,18 +268,21 @@ metadata = {
 - Case-insensitive suffix matching
 - Preserves original case in results
 - Falls back to "Unknown Artist" if needed
+- Provides clear metadata result logging
 
 ## Implementation Checklist
-- [ ] Update `SCRIPT_VERSION` (increment MINOR version)
-- [ ] Implement parse_title_smart function
-- [ ] Implement clean_featuring_from_song helper
-- [ ] Update extract_metadata_from_title
-- [ ] Add comprehensive title cleaning
-- [ ] Handle multiple separator types
-- [ ] Add quote detection pattern
-- [ ] Ensure fallback always returns something
-- [ ] Add detailed logging of transformations
-- [ ] Update process_videos_worker integration
+- [x] Update `SCRIPT_VERSION` (increment MINOR version)
+- [x] Implement parse_title_smart function
+- [x] Implement clean_featuring_from_song helper
+- [x] Update extract_metadata_from_title
+- [x] Add comprehensive title cleaning
+- [x] Handle multiple separator types
+- [x] Add quote detection pattern
+- [x] Ensure fallback always returns something
+- [x] Add detailed logging of transformations
+- [x] Update process_videos_worker integration
+- [x] Implement metadata result logging
+- [x] Optimize download progress logging
 
 ## Testing Before Commit
 1. Test basic format: "Artist - Song"
@@ -255,6 +297,8 @@ metadata = {
 10. Test empty/null title handling
 11. **Verify version was incremented**
 12. **Check logs show transformations**
+13. **Verify metadata result formatting**
+14. **Confirm minimal download progress**
 
 ## Commit
 After successful testing, commit with message:  
