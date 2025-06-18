@@ -1,5 +1,5 @@
 """
-Audio normalization for OBS YouTube Player.
+Audio normalization for OBS YouTube Player (Windows-only).
 Normalizes audio to -14 LUFS using FFmpeg.
 """
 
@@ -75,11 +75,9 @@ def normalize_audio(input_path, video_id, metadata):
         ]
         
         # Hide console window on Windows
-        startupinfo = None
-        if os.name == 'nt':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
         
         # Run analysis
         result = subprocess.run(
@@ -126,7 +124,7 @@ def normalize_audio(input_path, video_id, metadata):
             output_path
         ]
         
-        # Show progress for long operation
+        # Show progress for long operation with hidden window
         process = subprocess.Popen(
             normalize_cmd,
             stderr=subprocess.PIPE,

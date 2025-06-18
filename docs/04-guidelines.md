@@ -105,8 +105,55 @@ Users should always check the OBS logs to verify the correct version is loaded:
 [ytfast.py] [timestamp] Script version X.Y.Z loaded
 ```
 
+## Development Workflow - Branches and Pull Requests
+
+### Branch-Based Development
+All changes to the codebase **MUST** be made through feature branches and pull requests:
+
+1. **Create Feature Branch**: 
+   - Branch from `main` for each new feature or fix
+   - Use descriptive branch names: `feature/phase-10-playback`, `fix/metadata-parsing`, `refactor/windows-only`
+
+2. **Develop and Test**:
+   - Make changes in the feature branch
+   - Test thoroughly in OBS Studio
+   - Ensure all tests pass and logs show expected behavior
+
+3. **Create Pull Request**:
+   - Push the feature branch to GitHub
+   - Create a PR with clear description of changes
+   - Include testing results and logs in PR description
+   - Reference any related issues
+
+4. **Review and Merge**:
+   - Review code changes
+   - Verify testing was completed
+   - Merge only after approval
+
+### Benefits of PR Workflow
+- **Code Review**: All changes are reviewed before merging
+- **History**: Clear record of what changed and why
+- **Rollback**: Easy to revert changes if issues arise
+- **Collaboration**: Multiple people can work on different features
+- **CI/CD**: Can add automated testing in the future
+
+### Example Workflow
+```bash
+# Create and switch to feature branch
+git checkout -b feature/windows-only-cleanup
+
+# Make changes, test, commit
+git add .
+git commit -m "Remove multi-platform code, make Windows-only (v2.1.0)"
+
+# Push branch
+git push origin feature/windows-only-cleanup
+
+# Create PR on GitHub
+```
+
 ## Commit Messages
-After each Phase implementation and **successful testing with user approval**, use a concise but informative commit message (e.g. *"Add playlist sync thread"*, *"Implement Phase 10 - Playback control"*).
+Use clear, descriptive commit messages that explain what changed and why. For feature branches, the final merge commit should summarize all changes in the PR.
 
 Always reconcile implementations with **02‑Requirements.md** and respect environment rules in **03‑OBS_API.md**.
 

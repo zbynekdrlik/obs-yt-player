@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.0.0"  # Major version for modular refactoring
+SCRIPT_VERSION = "2.1.0"  # Minor version for Windows-only cleanup
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -25,10 +25,10 @@ TEXT_SOURCE_NAME = "title"
 # Directory names
 TOOLS_SUBDIR = "tools"
 
-# Tool filenames
-YTDLP_FILENAME = "yt-dlp.exe" if os.name == 'nt' else "yt-dlp"
-FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
-FPCALC_FILENAME = "fpcalc.exe" if os.name == 'nt' else "fpcalc"
+# Tool filenames (Windows-only)
+YTDLP_FILENAME = "yt-dlp.exe"
+FFMPEG_FILENAME = "ffmpeg.exe"
+FPCALC_FILENAME = "fpcalc.exe"
 
 # Timing intervals (milliseconds)
 PLAYBACK_CHECK_INTERVAL = 1000  # 1 second
@@ -44,20 +44,7 @@ NORMALIZE_TIMEOUT = 300  # 5 minutes
 ACOUSTID_API_KEY = "RXS1uld515"
 ACOUSTID_ENABLED = True
 
-# Tool download URLs
-YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
-YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-
-# FFmpeg URLs by platform
-FFMPEG_URLS = {
-    "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-    "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
-    "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-}
-
-# fpcalc (Chromaprint) URLs by platform
-FPCALC_URLS = {
-    "win32": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip",
-    "darwin": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-macos-x86_64.tar.gz",
-    "linux": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-linux-x86_64.tar.gz"
-}
+# Tool download URLs (Windows-only)
+YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+FPCALC_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
