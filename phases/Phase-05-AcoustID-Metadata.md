@@ -4,7 +4,7 @@
 Implement metadata extraction using AcoustID audio fingerprinting. This provides accurate song and artist information from an extensive music database when matches are found.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., from 1.3.6 to 1.4.0)
+**This phase adds new features** → Increment MINOR version from current version
 
 ## Requirements Reference
 This phase implements the primary metadata retrieval method from `02-requirements.md`:
