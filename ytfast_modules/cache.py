@@ -6,7 +6,6 @@ Handles existing cache scanning and cleanup.
 import os
 from pathlib import Path
 
-from config import YOUTUBE_ID_PATTERN
 from logger import log
 from state import (
     get_cache_dir, get_cached_videos, add_cached_video, 
