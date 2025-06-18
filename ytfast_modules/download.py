@@ -1,5 +1,5 @@
 """
-Video downloading for OBS YouTube Player.
+Video downloading for OBS YouTube Player (Windows-only).
 Downloads videos using yt-dlp and manages the processing pipeline.
 """
 
@@ -43,12 +43,10 @@ def download_video(video_id, title):
             f'https://www.youtube.com/watch?v={video_id}'
         ]
         
-        # Get video info
-        startupinfo = None
-        if os.name == 'nt':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
+        # Get video info (Windows-specific subprocess settings)
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
         
         try:
             info_result = subprocess.run(
@@ -86,17 +84,10 @@ def download_video(video_id, title):
         
         log(f"Starting download: {title} ({video_id})")
         
-        # Prepare subprocess with hidden window on Windows
-        startupinfo = None
-        if os.name == 'nt':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-        
         # Reset progress tracking for this video
         download_progress_milestones[video_id] = set()
         
-        # Start download process
+        # Start download process with hidden window
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
