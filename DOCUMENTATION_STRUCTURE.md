@@ -36,7 +36,7 @@ This document explains the relationship between all documentation files.
 1. **Read Requirements**: Check relevant sections in `02-requirements.md`
 2. **Review Constraints**: Ensure compliance with `03-obs_api.md`
 3. **Follow Guidelines**: Apply rules from `04-guidelines.md`
-4. **Update Version**: Increment `SCRIPT_VERSION` according to changes
+4. **Update Version**: Increment `SCRIPT_VERSION` according to phase requirements
 5. **Implement**: Output code in Markdown block
 6. **Test**: Follow testing steps in each phase
 7. **Commit**: Only after successful testing
@@ -50,9 +50,10 @@ The script uses a simplified, thread-aware logging system:
 
 ### Version Management
 - Each code output must increment the script version
-- PATCH: Bug fixes, minor changes
-- MINOR: New features (most phases)
-- MAJOR: Breaking changes
+- **MAJOR**: New phases, significant feature additions (each phase increments MAJOR)
+- **MINOR**: Enhancements within existing phases
+- **PATCH**: Bug fixes, minor changes
+- Phase documents should use generic increment descriptions, not specific version numbers
 
 ### Cross-References
 - Every phase references the requirements it implements
@@ -74,7 +75,7 @@ The script uses a simplified, thread-aware logging system:
 - Phase 4: Adds downloading capability
 - Phase 5: Adds AcoustID metadata extraction
 - Phase 6: Adds iTunes metadata search
-- Phase 7: Adds smart title parsing fallback
+- Phase 7: Adds smart title parsing fallback + universal cleaning
 - Phase 8: Adds audio normalization
 - Phase 9: Adds playback functionality
 - Phase 10: Adds scene transition handling
@@ -83,15 +84,10 @@ The script uses a simplified, thread-aware logging system:
 Each phase builds on previous phases, creating a complete system.
 
 ## Current Implementation Status
-As of version 1.8.1:
-- ✅ Phase 1: Scaffolding complete
-- ✅ Phase 2: Tool management complete
-- ✅ Phase 3: Playlist sync complete
-- ✅ Phase 4: Video download complete
-- ✅ Phase 5: AcoustID metadata extraction complete
-- ✅ Phase 6: iTunes metadata search complete
-- ✅ Phase 7: Smart title parsing fallback complete + song title cleaning extension
-- ✅ Phase 8: Audio normalization complete
-- ⏳ Phase 9-11: To be implemented
+The complete video processing pipeline is now functional with:
+- ✅ Phase 1-8: Complete foundation and processing pipeline
+- ✅ Universal song title cleaning for all metadata sources
+- ✅ Audio normalization to -14 LUFS with clean, annotation-free song titles
+- ⏳ Phase 9-11: Playback and control features to be implemented
 
-The complete video processing pipeline is now functional with consistent audio normalization to -14 LUFS and clean song titles without annotations.
+All videos are processed through: download → metadata extraction → universal cleaning → audio normalization.
