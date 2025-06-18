@@ -12,6 +12,7 @@ An OBS Studio Python script that syncs YouTube playlists, caches videos locally 
 - **Background Processing**: All heavy tasks run in separate threads
 - **OBS Integration**: Seamless integration with OBS Studio scenes and sources
 - **Multi-Instance Support**: Rename script to run multiple instances with separate caches
+- **Modular Architecture**: Clean, maintainable code structure with separated concerns
 
 ## Requirements
 
@@ -21,14 +22,15 @@ An OBS Studio Python script that syncs YouTube playlists, caches videos locally 
 
 ## Installation
 
-1. Download `ytfast.py` from the releases
-2. (Optional) Rename the script for multiple instances (e.g., `music1.py`, `bgm-stream.py`)
-3. In OBS Studio, go to Tools → Scripts
-4. Click the "+" button and select your script
-5. Configure the script properties:
+1. Download the latest release (includes `ytfast.py` and `ytfast_modules/` folder)
+2. Copy both the script and modules folder to your OBS scripts directory
+3. (Optional) Rename the script for multiple instances (e.g., `music1.py`, `bgm-stream.py`)
+   - The modules folder will be automatically named to match (e.g., `music1_modules/`)
+4. In OBS Studio, go to Tools → Scripts
+5. Click the "+" button and select your script
+6. Configure the script properties:
    - Set your YouTube playlist URL
    - Cache directory (defaults to `<script_location>/<scriptname>-cache/`)
-   - Enable debug logging if needed
 
 ## Usage
 
@@ -47,14 +49,39 @@ You can run multiple instances by copying and renaming the script:
 
 ```
 obs-scripts/
-├── ytfast.py          → Scene: ytfast, Cache: ./ytfast-cache/
-├── music-chill.py     → Scene: music-chill, Cache: ./music-chill-cache/
-└── stream-bgm.py      → Scene: stream-bgm, Cache: ./stream-bgm-cache/
+├── ytfast.py              → Scene: ytfast, Cache: ./ytfast-cache/
+├── ytfast_modules/        → Modules for ytfast.py
+├── music-chill.py         → Scene: music-chill, Cache: ./music-chill-cache/
+├── music-chill_modules/   → Modules for music-chill.py
+└── stream-bgm.py          → Scene: stream-bgm, Cache: ./stream-bgm-cache/
+└── stream-bgm_modules/    → Modules for stream-bgm.py
 ```
 
-Each instance maintains its own playlist, cache, and settings.
+Each instance maintains its own playlist, cache, settings, and module folder.
 
 ## Project Structure
+
+### Script Architecture
+
+```
+ytfast.py                    # Main entry point (minimal OBS interface)
+ytfast_modules/
+    __init__.py             # Package marker
+    config.py               # Configuration constants
+    logger.py               # Thread-aware logging
+    state.py                # Thread-safe global state
+    utils.py                # Utility functions
+    tools.py                # Tool download/management
+    cache.py                # Cache scanning/cleanup
+    playlist.py             # Playlist synchronization
+    download.py             # Video downloading
+    metadata.py             # Metadata extraction (AcoustID, iTunes, parsing)
+    normalize.py            # Audio normalization
+    playback.py             # Playback control
+    scene.py                # Scene management
+```
+
+### Documentation
 
 This project follows a phased development approach. See the `docs/` directory for detailed implementation specifications and the `phases/` directory for step-by-step development guides.
 
@@ -72,14 +99,22 @@ The project is organized into logical implementation phases:
 5. **Phase 05**: AcoustID Metadata - Audio fingerprinting for accurate metadata
 6. **Phase 06**: iTunes Metadata - Secondary metadata source via iTunes API
 7. **Phase 07**: Title Parser Fallback - Smart YouTube title parsing when online sources fail
-8. **Phase 08**: Audio Normalization - FFmpeg loudnorm to -14 LUFS
+8. **Phase 08**: Universal Metadata Cleaning - Clean song titles from all sources
+9. **Phase 09**: Audio Normalization - FFmpeg loudnorm to -14 LUFS
 
 ### Playback & Control
-9. **Phase 09**: Playback Control - Random playback, media source control
-10. **Phase 10**: Scene Management - Handle scene transitions, stop on exit
-11. **Phase 11**: Final Polish - Testing, optimization, documentation
+10. **Phase 10**: Playback Control - Random playback, media source control
+11. **Phase 11**: Scene Management - Handle scene transitions, stop on exit
+12. **Phase 12**: Final Polish - Testing, optimization, documentation
 
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
+
+## Current Status
+
+Version 2.0.0 introduces a modular architecture for better maintainability:
+- ✅ Phases 1-9: Complete foundation and processing pipeline
+- ✅ Modular code structure with separated concerns
+- ⏳ Phase 10-12: Playback control and final polish to be implemented
 
 ## License
 
