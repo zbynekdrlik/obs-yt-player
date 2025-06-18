@@ -4,7 +4,7 @@
 Implement random video playback through OBS Media Source with metadata display, handling playback end detection and scene transitions.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., from 1.7.0 to 1.8.0)
+**This phase adds new features** → Increment MINOR version from current version
 
 ## Requirements Reference
 This phase implements playback logic from `02-requirements.md`:
