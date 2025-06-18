@@ -24,7 +24,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.8.0"  # Added audio normalization to -14 LUFS (Phase 8)
+SCRIPT_VERSION = "1.8.2"  # Universal song title cleaning applied to all metadata sources (AcoustID, iTunes, title parsing)
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -1092,23 +1092,160 @@ def parse_title_smart(title):
 
 def clean_featuring_from_song(song):
     """
-    Remove featuring artist info from song title.
+    Remove ALL bracket phrases from song title including multiple consecutive brackets.
+    Handles: (feat. X), [Live], {Official}, (Audio), etc.
     """
-    # Remove featuring patterns
-    feat_patterns = [
-        r'\s*\(feat\..*?\)',
-        r'\s*\[feat\..*?\]',
-        r'\s*\(ft\..*?\)',
-        r'\s*\[ft\..*?\]',
-        r'\s*feat\..*$',
-        r'\s*ft\..*$',
-        r'\s*featuring.*$'
+    if not song:
+        return song
+    
+    original_song = song
+    log(f"Song title cleaning - Original: '{original_song}'")
+    
+    # Define bracket types and their patterns
+    bracket_pairs = [
+        ('(', ')'),  # Parentheses
+        ('[', ']'),  # Square brackets  
+        ('{', '}'),  # Curly brackets
     ]
     
-    for pattern in feat_patterns:
-        song = re.sub(pattern, '', song, flags=re.IGNORECASE)
+    # Common annotation patterns to remove (case-insensitive)
+    annotation_patterns = [
+        # Featuring patterns
+        r'feat\.?\s+[^)}\]]*',
+        r'ft\.?\s+[^)}\]]*', 
+        r'featuring\s+[^)}\]]*',
+        
+        # Video/audio descriptors
+        r'official\s*(?:music\s*)?video',
+        r'official\s*audio',
+        r'music\s*video',
+        r'lyric\s*video',
+        r'lyrics?\s*video',
+        r'lyrics?',
+        r'audio',
+        r'video',
+        
+        # Performance descriptors
+        r'live',
+        r'acoustic',
+        r'unplugged',
+        r'session',
+        r'worship\s+together\s+session',
+        r'en\s+vivo',
+        
+        # Quality descriptors
+        r'hd',
+        r'4k',
+        r'high\s+quality',
+        
+        # Miscellaneous
+        r'official',
+        r'cover',
+        r'remix',
+        r'radio\s+edit',
+        r'extended\s+version',
+        r'choir\s+room',
+        r'video\s+oficial',
+    ]
     
-    return song.strip()
+    # Step 1: Remove complete bracket phrases that contain annotations
+    cleaned = song
+    iteration = 0
+    max_iterations = 10  # Prevent infinite loops
+    
+    while iteration < max_iterations:
+        iteration += 1
+        original_length = len(cleaned)
+        
+        # For each bracket type
+        for open_bracket, close_bracket in bracket_pairs:
+            # Find all bracket pairs of this type
+            bracket_pattern = re.escape(open_bracket) + r'([^' + re.escape(open_bracket) + re.escape(close_bracket) + r']*)' + re.escape(close_bracket)
+            
+            def should_remove_bracket(match):
+                content = match.group(1).strip().lower()
+                if not content:
+                    return True  # Remove empty brackets
+                
+                # Check if content matches any annotation pattern
+                for pattern in annotation_patterns:
+                    if re.search(pattern, content, re.IGNORECASE):
+                        return True
+                
+                # Check for additional numeric/year patterns
+                if re.match(r'^\d{4}$', content):  # Year like (2019)
+                    return True
+                if re.match(r'^[0-9\s\-:]+$', content):  # Time stamps or numbers
+                    return True
+                
+                return False
+            
+            # Remove matching brackets
+            def replace_bracket(match):
+                if should_remove_bracket(match):
+                    log(f"Removing bracket phrase: '{match.group(0)}'")
+                    return ''
+                return match.group(0)
+            
+            cleaned = re.sub(bracket_pattern, replace_bracket, cleaned)
+        
+        # Clean up whitespace and check if we made changes
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        if len(cleaned) == original_length:
+            break  # No more changes
+    
+    # Step 2: Remove trailing annotation phrases without brackets
+    trailing_patterns = [
+        r'\s+feat\.?\s+.*$',
+        r'\s+ft\.?\s+.*$',
+        r'\s+featuring\s+.*$',
+        r'\s+official\s*(?:music\s*)?video\s*$',
+        r'\s+official\s*audio\s*$',
+        r'\s+music\s*video\s*$',
+        r'\s+live\s*$',
+        r'\s+acoustic\s*$',
+        r'\s+hd\s*$',
+        r'\s+4k\s*$',
+    ]
+    
+    for pattern in trailing_patterns:
+        new_cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+        if new_cleaned != cleaned:
+            log(f"Removing trailing phrase: '{pattern}' from '{cleaned}'")
+            cleaned = new_cleaned
+    
+    # Step 3: Final cleanup
+    cleaned = cleaned.strip()
+    
+    # Remove any remaining double spaces
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    
+    # Remove trailing punctuation that might be left behind
+    cleaned = re.sub(r'[,\-\|\s]+$', '', cleaned).strip()
+    
+    if cleaned != original_song:
+        log(f"Song title cleaned: '{original_song}' → '{cleaned}'")
+    
+    return cleaned or original_song  # Return original if cleaning resulted in empty string
+
+def apply_universal_song_cleaning(song, artist, source):
+    """
+    Apply universal song title cleaning to metadata from ANY source.
+    This is the final step that ensures ALL song titles are clean regardless of source.
+    """
+    if not song:
+        return song, artist
+    
+    original_song = song
+    
+    # Apply the comprehensive cleaning function
+    cleaned_song = clean_featuring_from_song(song)
+    
+    # Log the cleaning if it changed anything
+    if cleaned_song != original_song:
+        log(f"Universal cleaning applied to {source} result: '{original_song}' → '{cleaned_song}'")
+    
+    return cleaned_song, artist
 
 def extract_metadata_from_title(title):
     """
@@ -1124,11 +1261,15 @@ def extract_metadata_from_title(title):
     # 2. Always try relaxed matching regardless of parsing success
     song_itunes, artist_itunes = search_itunes_metadata(title, expected_artist=artist_parsed)
     if song_itunes and artist_itunes:
+        # Apply universal cleaning to iTunes results
+        song_itunes, artist_itunes = apply_universal_song_cleaning(song_itunes, artist_itunes, "iTunes")
         return song_itunes, artist_itunes, "iTunes"
     
     # If iTunes fails but we have good parsed results, use them
     if song_parsed and artist_parsed:
         log(f"Using parsed metadata: {artist_parsed} - {song_parsed}")
+        # Apply universal cleaning to parsed results (already cleaned, but ensures consistency)
+        song_parsed, artist_parsed = apply_universal_song_cleaning(song_parsed, artist_parsed, "title_parsing")
         return song_parsed, artist_parsed, "title_parsing"
     
     # Conservative fallback - still counts as title parsing attempt
@@ -1478,6 +1619,10 @@ def process_videos_worker():
             # Try AcoustID metadata extraction
             song, artist = get_acoustid_metadata(temp_path)
             metadata_source = "AcoustID" if (song and artist) else None
+            
+            # Apply universal cleaning to AcoustID results if found
+            if song and artist:
+                song, artist = apply_universal_song_cleaning(song, artist, "AcoustID")
             
             # If AcoustID fails, try title-based extraction (iTunes + parsing)
             # This function always returns metadata - never None
