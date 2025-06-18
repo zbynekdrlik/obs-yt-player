@@ -1,6 +1,6 @@
-# OBS YouTube Player
+# OBS YouTube Player (Windows)
 
-An OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them randomly via Media Source with metadata display. All processing runs in background threads to keep OBS responsive.
+A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them randomly via Media Source with metadata display. All processing runs in background threads to keep OBS responsive.
 
 ## Features
 
@@ -16,6 +16,7 @@ An OBS Studio Python script that syncs YouTube playlists, caches videos locally 
 
 ## Requirements
 
+- **Windows Operating System** (Windows 10/11 recommended)
 - OBS Studio with Python scripting support
 - Internet connection for initial video downloads
 - Sufficient disk space for video cache
@@ -59,6 +60,14 @@ obs-scripts/
 
 Each instance maintains its own playlist, cache, settings, and module folder.
 
+## Windows-Specific Features
+
+The script is optimized for Windows with:
+- Hidden console windows for background processes
+- Automatic download of Windows binaries (yt-dlp.exe, ffmpeg.exe, fpcalc.exe)
+- Windows-compatible file path handling
+- Native Windows subprocess management
+
 ## Project Structure
 
 ### Script Architecture
@@ -71,7 +80,7 @@ ytfast_modules/
     logger.py               # Thread-aware logging
     state.py                # Thread-safe global state
     utils.py                # Utility functions
-    tools.py                # Tool download/management
+    tools.py                # Tool download/management (Windows binaries)
     cache.py                # Cache scanning/cleanup
     playlist.py             # Playlist synchronization
     download.py             # Video downloading
@@ -91,7 +100,7 @@ The project is organized into logical implementation phases:
 
 ### Foundation
 1. **Phase 01**: Scaffolding - Basic script structure and OBS integration
-2. **Phase 02**: Tool Management - Download and verify yt-dlp, FFmpeg, fpcalc
+2. **Phase 02**: Tool Management - Download and verify Windows binaries
 3. **Phase 03**: Playlist Sync - Fetch playlist, queue videos, manage cache
 
 ### Processing Pipeline
@@ -111,9 +120,10 @@ Each phase builds upon the previous one, ensuring a systematic and maintainable 
 
 ## Current Status
 
-Version 2.0.0 introduces a modular architecture for better maintainability:
+Version 2.1.0 - Windows-only release:
 - ✅ Phases 1-9: Complete foundation and processing pipeline
 - ✅ Modular code structure with separated concerns
+- ✅ Windows-optimized with platform-specific code removed
 - ⏳ Phase 10-12: Playback control and final polish to be implemented
 
 ## License
