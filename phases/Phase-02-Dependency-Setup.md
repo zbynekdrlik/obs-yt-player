@@ -4,7 +4,7 @@
 Implement the dependency management system that downloads and maintains yt-dlp, FFmpeg, and fpcalc (for AcoustID). This phase ensures all required tools are available before any media processing begins.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version from current version (e.g., if current is `1.0.x`, increment to `1.1.0`)
+**This phase adds new features** → Increment MINOR version from current version
 **Remember**: Increment version with EVERY code change during development, not just once per phase.
 
 ## Requirements Reference
