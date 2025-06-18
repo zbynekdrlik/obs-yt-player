@@ -25,6 +25,9 @@ It is authoritative; later Phase prompts reference this spec.
 ## Metadata Retrieval
 - Primary: **AcoustID** (`RXS1uld515`).  
 - Fallback: parse YouTube title; log transformation.
+- Apply universal song title cleaning to ALL metadata sources
+- Remove annotations like (Live), [Official], (feat. Artist) from every result
+- Log all cleaning transformations for debugging
 
 ## Playback Logic
 - Scene name == script filename without extension (e.g. `ytfast.py` → scene `ytfast`).  
@@ -48,11 +51,12 @@ It is authoritative; later Phase prompts reference this spec.
 - Log script version on startup.
 
 ## Versioning
-- Maintain version constant in script (e.g., `SCRIPT_VERSION = "1.3.6"`)
+- Maintain version constant in script (`SCRIPT_VERSION = "X.Y.Z"`)
 - Increment version with each development iteration:
-  - PATCH: Bug fixes, minor changes
-  - MINOR: New features, non-breaking changes
-  - MAJOR: Breaking changes, major refactors
+  - **MAJOR**: New phases, significant feature additions
+  - **MINOR**: Enhancements within existing phases
+  - **PATCH**: Bug fixes, minor changes
+- Each phase implementation increments MAJOR version
 - Log version on script startup
 
 ## Default Configuration
