@@ -83,15 +83,15 @@ The script uses a simplified, thread-aware logging system:
 Each phase builds on previous phases, creating a complete system.
 
 ## Current Implementation Status
-As of version 1.8.0:
+As of version 1.8.1:
 - ✅ Phase 1: Scaffolding complete
 - ✅ Phase 2: Tool management complete
 - ✅ Phase 3: Playlist sync complete
 - ✅ Phase 4: Video download complete
 - ✅ Phase 5: AcoustID metadata extraction complete
 - ✅ Phase 6: iTunes metadata search complete
-- ✅ Phase 7: Smart title parsing fallback complete
+- ✅ Phase 7: Smart title parsing fallback complete + song title cleaning extension
 - ✅ Phase 8: Audio normalization complete
 - ⏳ Phase 9-11: To be implemented
 
-The complete video processing pipeline is now functional with consistent audio normalization to -14 LUFS.
+The complete video processing pipeline is now functional with consistent audio normalization to -14 LUFS and clean song titles without annotations.
