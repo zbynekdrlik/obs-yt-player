@@ -23,7 +23,6 @@ from state import (
     set_tools_logged_waiting, should_stop_threads
 )
 from utils import get_ytdlp_path, get_ffmpeg_path, get_fpcalc_path, get_tools_path, ensure_cache_directory
-from playlist import trigger_startup_sync
 
 def download_file(url, destination, description="file"):
     """Download a file from URL to destination with progress logging."""
@@ -332,6 +331,8 @@ def tools_setup_worker():
             if setup_tools():
                 # Tools are ready, trigger startup sync
                 log("Tools setup complete")
+                # Import here to avoid circular import
+                from playlist import trigger_startup_sync
                 trigger_startup_sync()
                 break
             
