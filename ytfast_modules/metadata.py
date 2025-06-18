@@ -1,5 +1,5 @@
 """
-Metadata extraction for OBS YouTube Player.
+Metadata extraction for OBS YouTube Player (Windows-only).
 Handles AcoustID fingerprinting, iTunes search, and title parsing.
 """
 
@@ -50,11 +50,9 @@ def get_acoustid_metadata(filepath):
         ]
         
         # Hide console window on Windows
-        startupinfo = None
-        if os.name == 'nt':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
         
         result = subprocess.run(
             cmd, 
