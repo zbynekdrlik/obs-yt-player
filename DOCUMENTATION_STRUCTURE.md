@@ -16,7 +16,7 @@ This document explains the relationship between all documentation files.
 #### Foundation Phases
 1. **Phase-01-Scaffolding.md** - Basic script structure
 2. **Phase-02-Dependency-Setup.md** - Tool download system (yt-dlp, FFmpeg, fpcalc)
-3. **Phase-03-Playlist-Sync.md** - YouTube playlist synchronization
+3. **Phase-03-Playlist-Sync.md** - Cache-aware playlist synchronization with cleanup
 
 #### Processing Pipeline Phases
 4. **Phase-04-Video-Download.md** - Download videos with yt-dlp
@@ -73,6 +73,7 @@ The script uses a simplified, thread-aware logging system:
 
 ## Phase Dependencies
 - Phase 1-3: Foundation (can run but no videos)
+  - Phase 3 includes cache scanning for efficient restarts
 - Phase 4: Adds downloading capability
 - Phase 5: Adds AcoustID metadata extraction
 - Phase 6: Adds iTunes metadata search
@@ -88,6 +89,7 @@ Each phase builds on previous phases, creating a complete system.
 ## Current Implementation Status
 The implementation includes:
 - ✅ Phase 1-9: Complete foundation, processing pipeline, and audio normalization
+- ✅ Cache-aware sync in Phase 3 prevents re-downloading existing videos
 - ✅ Universal song title cleaning for all metadata sources
 - ✅ Audio normalization to -14 LUFS with clean, annotation-free song titles
 - ⏳ Phase 10-12: Playback, scene management, and final polish to be implemented
