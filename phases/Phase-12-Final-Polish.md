@@ -15,84 +15,7 @@ This phase ensures all requirements from `02-requirements.md` are fully implemen
 
 ## Implementation Details
 
-### 1. Scan Cache on Startup
-```python
-def scan_existing_cache():
-    """Scan cache directory for existing normalized videos."""
-    cache_path = Path(cache_dir)
-    if not cache_path.exists():
-        return
-    
-    log("Scanning cache for existing videos...")
-    found_count = 0
-    
-    # Look for normalized videos
-    for file_path in cache_path.glob("*_normalized.mp4"):
-        try:
-            # Extract video ID from filename
-            # Format: song_artist_videoId_normalized.mp4
-            filename = file_path.stem  # Remove .mp4
-            parts = filename.rsplit('_', 2)  # Split from right
-            
-            if len(parts) >= 3 and parts[2] == 'normalized':
-                video_id = parts[1]
-                
-                # Try to extract metadata from filename
-                metadata_parts = parts[0].split('_', 1)
-                if len(metadata_parts) == 2:
-                    song, artist = metadata_parts
-                else:
-                    song = parts[0]
-                    artist = "Unknown Artist"
-                
-                # Add to cached videos
-                with state_lock:
-                    if video_id not in cached_videos:
-                        cached_videos[video_id] = {
-                            'path': str(file_path),
-                            'song': song.replace('_', ' '),
-                            'artist': artist.replace('_', ' '),
-                            'normalized': True
-                        }
-                        found_count += 1
-                        
-        except Exception as e:
-            log(f"Error scanning file {file_path}: {e}")
-    
-    if found_count > 0:
-        log(f"Found {found_count} existing videos in cache")
-```
-
-### 2. Add to Tools Setup Worker
-Update tools_setup_worker to scan cache after tools are ready:
-```python
-def tools_setup_worker():
-    """Background thread for setting up tools."""
-    global stop_threads
-    
-    while not stop_threads:
-        try:
-            # Ensure cache directory exists
-            if not ensure_cache_directory():
-                time.sleep(TOOLS_CHECK_INTERVAL)
-                continue
-            
-            # Try to setup tools
-            if setup_tools():
-                # Tools are ready
-                log("Tools setup complete")
-                
-                # Scan existing cache
-                scan_existing_cache()
-                
-                # Trigger startup sync
-                trigger_startup_sync()
-                break
-            
-            # Rest of existing code...
-```
-
-### 3. Progress Summary Logging
+### 1. Progress Summary Logging
 ```python
 def log_processing_summary():
     """Log summary of processing progress."""
@@ -107,7 +30,7 @@ def log_processing_summary():
 log_processing_summary()
 ```
 
-### 4. Robust Error Recovery
+### 2. Robust Error Recovery
 ```python
 def handle_corrupt_video(video_id, file_path):
     """Handle corrupted video files."""
@@ -137,11 +60,20 @@ def handle_corrupt_video(video_id, file_path):
         log(f"Error handling corrupt video: {e}")
 ```
 
-### 5. Performance Optimizations
+### 3. Performance Optimizations
 ```python
 # Add to module constants
 MAX_CONCURRENT_DOWNLOADS = 1  # Already serial, but make it explicit
 CACHE_SCAN_BATCH_SIZE = 100  # Process files in batches
+MAX_RETRY_ATTEMPTS = 3  # Retry failed downloads
+
+# Track failed downloads
+failed_downloads = {}  # video_id: attempt_count
+
+def should_retry_download(video_id):
+    """Check if download should be retried."""
+    attempts = failed_downloads.get(video_id, 0)
+    return attempts < MAX_RETRY_ATTEMPTS
 
 # Optimize file operations
 def batch_remove_files(file_paths):
@@ -158,10 +90,10 @@ def batch_remove_files(file_paths):
     return removed_count
 ```
 
-### 6. Final Safety Checks
+### 4. Cache Integrity Validation
 ```python
 def validate_cache_integrity():
-    """Validate cache integrity on startup."""
+    """Validate cache integrity - called after cache scan."""
     log("Validating cache integrity...")
     
     with state_lock:
@@ -174,10 +106,14 @@ def validate_cache_integrity():
                 continue
             
             # Check if file has reasonable size (at least 1MB)
-            file_size = os.path.getsize(info['path'])
-            if file_size < 1024 * 1024:
+            try:
+                file_size = os.path.getsize(info['path'])
+                if file_size < 1024 * 1024:
+                    invalid_entries.append(video_id)
+                    log(f"Invalid file size for {video_id}: {file_size} bytes")
+            except Exception as e:
                 invalid_entries.append(video_id)
-                log(f"Invalid file size for {video_id}: {file_size} bytes")
+                log(f"Error checking file size for {video_id}: {e}")
         
         # Remove invalid entries
         for video_id in invalid_entries:
@@ -188,12 +124,17 @@ def validate_cache_integrity():
             log(f"Removed {len(invalid_entries)} invalid cache entries")
         else:
             log("Cache integrity verified")
+
+# Call this after scan_existing_cache in playlist_sync_worker
 ```
 
-### 7. User Experience Improvements
+### 5. User Experience Improvements
 ```python
 def format_time(seconds):
     """Format seconds into human-readable time."""
+    if seconds is None or seconds < 0:
+        return "unknown"
+    
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
     seconds = int(seconds % 60)
@@ -205,11 +146,20 @@ def format_time(seconds):
     else:
         return f"{seconds}s"
 
+def format_size(bytes):
+    """Format bytes into human-readable size."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes < 1024.0:
+            return f"{bytes:.1f} {unit}"
+        bytes /= 1024.0
+    return f"{bytes:.1f} TB"
+
 # Use in logging:
 log(f"Video duration: {format_time(duration)}")
+log(f"File size: {format_size(file_size)}")
 ```
 
-### 8. Complete Feature Summary
+### 6. Complete Feature Summary
 ```python
 def log_startup_summary():
     """Log complete feature summary on startup."""
@@ -219,17 +169,73 @@ def log_startup_summary():
     log(f"Cache: {cache_dir}")
     log(f"Playlist: {playlist_url}")
     log("Features:")
+    log("  - Cache-aware sync (no re-downloads)")
     log("  - Auto-download from YouTube playlists")
     log("  - AcoustID music recognition")
     log("  - iTunes metadata search")
     log("  - Smart title parsing")
+    log("  - Universal title cleaning")
     log("  - Audio normalization to -14 LUFS")
     log("  - Random no-repeat playback")
     log("  - Scene-aware playback control")
+    log("  - Automatic cleanup of removed videos")
     log("=" * 50)
 
 # Add to script_load after settings update:
 log_startup_summary()
+```
+
+### 7. Enhanced Error Handling
+```python
+def safe_file_operation(operation, *args, **kwargs):
+    """Safely execute file operations with retry logic."""
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            return operation(*args, **kwargs)
+        except PermissionError:
+            if attempt < max_attempts - 1:
+                time.sleep(0.5 * (attempt + 1))  # Exponential backoff
+                continue
+            raise
+        except Exception as e:
+            log(f"File operation failed: {e}")
+            raise
+
+# Update download error handling in process_videos_worker:
+if not download_success:
+    video_id = video_info['id']
+    failed_downloads[video_id] = failed_downloads.get(video_id, 0) + 1
+    
+    if should_retry_download(video_id):
+        log(f"Queueing retry for {video_info['title']} (attempt {failed_downloads[video_id] + 1})")
+        video_queue.put(video_info)  # Re-queue for retry
+    else:
+        log(f"Max retries reached for {video_info['title']}, skipping")
+```
+
+### 8. Resource Monitoring
+```python
+def log_resource_usage():
+    """Log current resource usage."""
+    try:
+        import psutil
+        process = psutil.Process()
+        
+        # Memory usage
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        
+        # CPU usage (over 1 second interval)
+        cpu_percent = process.cpu_percent(interval=1)
+        
+        # Thread count
+        thread_count = threading.active_count()
+        
+        log(f"Resources - Memory: {memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%, Threads: {thread_count}")
+    except ImportError:
+        # psutil not available in OBS environment
+        thread_count = threading.active_count()
+        log(f"Active threads: {thread_count}")
 ```
 
 ## Testing Checklist
@@ -245,6 +251,8 @@ log_startup_summary()
 8. ✓ Scene switching stress test
 9. ✓ Long playlist (100+ videos)
 10. ✓ Unicode/special characters
+11. ✓ Retry logic for failed downloads
+12. ✓ Cache integrity validation
 
 ### Performance Testing
 1. ✓ Startup time with large cache
@@ -252,6 +260,7 @@ log_startup_summary()
 3. ✓ CPU usage during processing
 4. ✓ Disk space management
 5. ✓ Thread cleanup verification
+6. ✓ File operation efficiency
 
 ### Integration Testing
 1. ✓ Multiple script instances
@@ -262,13 +271,14 @@ log_startup_summary()
 
 ## Final Implementation Checklist
 - [ ] Update `SCRIPT_VERSION` to 2.0.0
-- [ ] Add scan_existing_cache function
-- [ ] Add cache integrity validation
 - [ ] Add progress summary logging
+- [ ] Add cache integrity validation
 - [ ] Add corrupt video handling
-- [ ] Add time formatting helper
+- [ ] Add retry logic for failed downloads
+- [ ] Add time and size formatting helpers
 - [ ] Add startup feature summary
-- [ ] Update tools_setup_worker
+- [ ] Add resource monitoring (optional)
+- [ ] Update error handling throughout
 - [ ] Test all edge cases
 - [ ] Verify thread safety
 - [ ] Check resource cleanup
