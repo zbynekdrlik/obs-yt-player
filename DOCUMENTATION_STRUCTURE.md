@@ -23,12 +23,13 @@ This document explains the relationship between all documentation files.
 5. **Phase-05-AcoustID-Metadata.md** - AcoustID fingerprinting
 6. **Phase-06-iTunes-Metadata.md** - iTunes metadata as secondary source
 7. **Phase-07-Title-Parser-Fallback.md** - Smart YouTube title parsing
-8. **Phase-08-Audio-Normalization.md** - FFmpeg loudness normalization
+8. **Phase-08-Universal-Metadata-Cleaning.md** - Universal song title cleaning for all metadata sources
+9. **Phase-09-Audio-Normalization.md** - FFmpeg loudness normalization to -14 LUFS
 
 #### Playback & Control Phases
-9. **Phase-09-Playback-Control.md** - Random playback and media control
-10. **Phase-10-Scene-Management.md** - Scene transition handling
-11. **Phase-11-Final-Polish.md** - Integration testing and optimization
+10. **Phase-10-Playback-Control.md** - Random playback and media control
+11. **Phase-11-Scene-Management.md** - Scene transition handling and stop button
+12. **Phase-12-Final-Polish.md** - Integration testing and optimization
 
 ## Development Workflow
 
@@ -75,19 +76,20 @@ The script uses a simplified, thread-aware logging system:
 - Phase 4: Adds downloading capability
 - Phase 5: Adds AcoustID metadata extraction
 - Phase 6: Adds iTunes metadata search
-- Phase 7: Adds smart title parsing fallback + universal cleaning
-- Phase 8: Adds audio normalization
-- Phase 9: Adds playback functionality
-- Phase 10: Adds scene transition handling
-- Phase 11: Final polish and optimization
+- Phase 7: Adds smart title parsing fallback
+- Phase 8: Adds universal metadata cleaning
+- Phase 9: Adds audio normalization
+- Phase 10: Adds playback functionality
+- Phase 11: Adds scene management and stop control
+- Phase 12: Final polish and optimization
 
 Each phase builds on previous phases, creating a complete system.
 
 ## Current Implementation Status
-The complete video processing pipeline is now functional with:
-- ✅ Phase 1-8: Complete foundation and processing pipeline
+The implementation includes:
+- ✅ Phase 1-9: Complete foundation, processing pipeline, and audio normalization
 - ✅ Universal song title cleaning for all metadata sources
 - ✅ Audio normalization to -14 LUFS with clean, annotation-free song titles
-- ⏳ Phase 9-11: Playback and control features to be implemented
+- ⏳ Phase 10-12: Playback, scene management, and final polish to be implemented
 
 All videos are processed through: download → metadata extraction → universal cleaning → audio normalization.
