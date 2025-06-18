@@ -27,16 +27,17 @@
 ## Version Management
 **CRITICAL**: Claude **must** increment the `SCRIPT_VERSION` constant with **EVERY** code change:
 - **PATCH** increment (x.x.Z): Bug fixes, minor changes, iterations within a phase
-- **MINOR** increment (x.Y.x): New features, completing a new phase
-- **MAJOR** increment (X.x.x): Breaking changes, major refactors
+- **MINOR** increment (x.Y.x): New features, completing a new phase implementation
+- **MAJOR** increment (X.x.x): Breaking changes, major refactors, final releases
 
 **Important**: The version must be incremented **every time** Claude outputs code, not just once per phase. This ensures that during testing, users can verify they are running the correct version of the code.
 
 Examples:
-- Phase 2 initial implementation: `1.0.0` → `1.1.0`
-- Bug fix during Phase 2 testing: `1.1.0` → `1.1.1`
-- Another iteration in Phase 2: `1.1.1` → `1.1.2`
-- Phase 3 implementation: `1.1.2` → `1.2.0`
+- Phase 2 initial implementation: `1.0.0` → `1.1.0` (MINOR for new phase)
+- Bug fix during Phase 2 testing: `1.1.0` → `1.1.1` (PATCH for iteration)
+- Another iteration in Phase 2: `1.1.1` → `1.1.2` (PATCH for iteration)
+- Phase 3 implementation: `1.1.2` → `1.2.0` (MINOR for new phase)
+- Final release: `1.11.x` → `2.0.0` (MAJOR for final release)
 
 ## Development Workflow & Commit Requirements
 
