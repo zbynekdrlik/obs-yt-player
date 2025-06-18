@@ -24,7 +24,7 @@ import unicodedata
 import string
 
 # ===== MODULE-LEVEL CONSTANTS =====
-SCRIPT_VERSION = "1.8.2"  # Universal song title cleaning applied to all metadata sources (AcoustID, iTunes, title parsing)
+SCRIPT_VERSION = "1.9.0"  # Phase 3: Cache-aware sync prevents re-downloads on restart
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 # Set default cache dir to script location + scriptname-cache subfolder
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -47,6 +47,9 @@ ACOUSTID_API_KEY = "RXS1uld515"  # AcoustID API key for metadata
 ACOUSTID_ENABLED = True  # Toggle to enable/disable AcoustID lookups
 DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads
 NORMALIZE_TIMEOUT = 300  # 5 minutes timeout for normalization
+
+# YouTube ID validation pattern
+YOUTUBE_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{11}$')
 
 # URLs for tool downloads
 YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
@@ -85,6 +88,7 @@ is_playing = False
 current_video_path = None
 stop_threads = False
 sync_on_startup_done = False  # Track if startup sync has been done
+current_playback_video_id = None  # Track currently playing video ID
 
 # Data structures
 cached_videos = {}  # {video_id: {"path": str, "song": str, "artist": str, "normalized": bool}}
@@ -111,6 +115,112 @@ def log(message):
     else:
         # For main thread, OBS already shows script name
         print(f"[{timestamp}] {message}")
+
+# ===== CACHE MANAGEMENT FUNCTIONS (Phase 3) =====
+def scan_existing_cache():
+    """Scan cache directory for existing normalized videos."""
+    cache_path = Path(cache_dir)
+    if not cache_path.exists():
+        return
+    
+    log("Scanning cache for existing videos...")
+    found_count = 0
+    
+    # Look for normalized videos
+    for file_path in cache_path.glob("*_normalized.mp4"):
+        try:
+            # Extract video ID from filename
+            # Format: song_artist_videoId_normalized.mp4
+            filename = file_path.stem  # Remove .mp4
+            parts = filename.rsplit('_', 2)  # Split from right
+            
+            if len(parts) >= 3 and parts[2] == 'normalized':
+                video_id = parts[1]
+                
+                # Validate YouTube ID format
+                if not YOUTUBE_ID_PATTERN.match(video_id):
+                    continue
+                
+                # Try to extract metadata from filename
+                metadata_parts = parts[0].split('_', 1)
+                if len(metadata_parts) == 2:
+                    song, artist = metadata_parts
+                else:
+                    song = parts[0]
+                    artist = "Unknown Artist"
+                
+                # Add to cached videos
+                with state_lock:
+                    if video_id not in cached_videos:
+                        cached_videos[video_id] = {
+                            'path': str(file_path),
+                            'song': song.replace('_', ' '),
+                            'artist': artist.replace('_', ' '),
+                            'normalized': True
+                        }
+                        found_count += 1
+                        
+        except Exception as e:
+            log(f"Error scanning file {file_path}: {e}")
+    
+    if found_count > 0:
+        log(f"Found {found_count} existing videos in cache")
+
+def cleanup_removed_videos():
+    """Remove videos that are no longer in playlist."""
+    with state_lock:
+        # Find videos to remove
+        videos_to_remove = []
+        for video_id in list(cached_videos.keys()):
+            if video_id not in playlist_video_ids:
+                # Check if it's currently playing
+                if not is_video_being_processed(video_id):
+                    videos_to_remove.append(video_id)
+                else:
+                    log(f"Skipping removal of currently playing video: {video_id}")
+        
+        # Remove videos
+        for video_id in videos_to_remove:
+            video_info = cached_videos[video_id]
+            try:
+                if os.path.exists(video_info['path']):
+                    os.remove(video_info['path'])
+                del cached_videos[video_id]
+                log(f"Removed: {video_info['artist']} - {video_info['song']}")
+            except Exception as e:
+                log(f"Error removing video {video_id}: {e}")
+        
+        if videos_to_remove:
+            log(f"Cleaned up {len(videos_to_remove)} removed videos")
+
+def is_video_being_processed(video_id):
+    """Check if video is currently being downloaded/processed."""
+    # Check if it's currently playing
+    return video_id == current_playback_video_id
+
+def cleanup_temp_files():
+    """Clean up any temporary files."""
+    try:
+        cache_path = Path(cache_dir)
+        if cache_path.exists():
+            # Clean up .part files
+            for part_file in cache_path.glob("*.part"):
+                try:
+                    os.remove(part_file)
+                    log(f"Removed temp file: {part_file.name}")
+                except Exception as e:
+                    log(f"Error removing {part_file}: {e}")
+            
+            # Clean up _temp.mp4 files
+            for temp_file in cache_path.glob("*_temp.mp4"):
+                try:
+                    os.remove(temp_file)
+                    log(f"Removed temp file: {temp_file.name}")
+                except Exception as e:
+                    log(f"Error removing {temp_file}: {e}")
+                    
+    except Exception as e:
+        log(f"Error during temp file cleanup: {e}")
 
 # ===== TOOL MANAGEMENT FUNCTIONS =====
 def download_file(url, destination, description="file"):
@@ -537,6 +647,9 @@ def playlist_sync_worker():
         log("Starting playlist synchronization")
         
         try:
+            # First scan existing cache (Phase 3 addition)
+            scan_existing_cache()
+            
             # Fetch playlist
             videos = fetch_playlist_with_ytdlp(playlist_url)
             
@@ -549,13 +662,27 @@ def playlist_sync_worker():
                 playlist_video_ids.clear()
                 playlist_video_ids.update(video['id'] for video in videos)
             
-            # Queue videos for processing
+            # Queue only videos not in cache (Phase 3 enhancement)
             queued_count = 0
+            skipped_count = 0
+            
             for video in videos:
+                video_id = video['id']
+                
+                # Check if already cached
+                with state_lock:
+                    if video_id in cached_videos:
+                        skipped_count += 1
+                        continue
+                
+                # Queue for processing
                 video_queue.put(video)
                 queued_count += 1
             
-            log(f"Queued {queued_count} videos for processing")
+            log(f"Queued {queued_count} videos for processing, {skipped_count} already in cache")
+            
+            # Clean up removed videos (Phase 3 addition)
+            cleanup_removed_videos()
             
         except Exception as e:
             log(f"Error in playlist sync: {e}")
@@ -1783,6 +1910,9 @@ def script_unload():
     # Remove timers
     obs.timer_remove(verify_scene_setup)
     obs.timer_remove(playback_controller)
+    
+    # Clean up temp files
+    cleanup_temp_files()
     
     log("Script unloaded")
 
