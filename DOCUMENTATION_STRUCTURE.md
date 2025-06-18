@@ -50,9 +50,9 @@ The script uses a simplified, thread-aware logging system:
 
 ### Version Management
 - Each code output must increment the script version
-- **MAJOR**: New phases, significant feature additions (each phase increments MAJOR)
-- **MINOR**: Enhancements within existing phases
-- **PATCH**: Bug fixes, minor changes
+- **MINOR**: New phase implementations, completing new features
+- **PATCH**: Bug fixes, minor changes, iterations within a phase
+- **MAJOR**: Breaking changes, major refactors, final releases
 - Phase documents should use generic increment descriptions, not specific version numbers
 
 ### Cross-References
