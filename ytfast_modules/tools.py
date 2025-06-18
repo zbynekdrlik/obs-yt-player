@@ -1,12 +1,10 @@
 """
-Tool management for OBS YouTube Player.
+Tool management for OBS YouTube Player (Windows-only).
 Downloads and verifies yt-dlp, FFmpeg, and fpcalc.
 """
 
 import os
 import time
-import platform
-import stat
 import subprocess
 import urllib.request
 import threading
@@ -14,7 +12,7 @@ from pathlib import Path
 
 from config import (
     YTDLP_FILENAME, FFMPEG_FILENAME, FPCALC_FILENAME,
-    YTDLP_URL, YTDLP_URL_WIN, FFMPEG_URLS, FPCALC_URLS,
+    YTDLP_URL, FFMPEG_URL, FPCALC_URL,
     TOOLS_CHECK_INTERVAL
 )
 from logger import log
@@ -67,93 +65,44 @@ def download_file(url, destination, description="file"):
         return False
 
 def extract_ffmpeg(archive_path, tools_dir):
-    """Extract FFmpeg from downloaded archive."""
-    system = platform.system().lower()
-    
+    """Extract FFmpeg from downloaded zip archive (Windows)."""
     try:
-        if system == "windows":
-            # Windows: Extract from zip
-            import zipfile
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                # Find ffmpeg.exe in the archive
-                for file_info in zip_ref.filelist:
-                    if file_info.filename.endswith('ffmpeg.exe'):
-                        # Extract to tools directory
-                        target_path = os.path.join(tools_dir, FFMPEG_FILENAME)
-                        with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
-                            target.write(source.read())
-                        log("Extracted ffmpeg.exe from archive")
-                        return True
-                        
-        elif system == "darwin":
-            # macOS: Extract from zip
-            import zipfile
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                # Extract ffmpeg binary
-                zip_ref.extract('ffmpeg', tools_dir)
-                
-        elif system == "linux":
-            # Linux: Extract from tar.xz
-            import tarfile
-            with tarfile.open(archive_path, 'r:xz') as tar_ref:
-                # Find ffmpeg in the archive
-                for member in tar_ref.getmembers():
-                    if member.name.endswith('ffmpeg') and member.isfile():
-                        # Extract to tools directory
-                        member.name = FFMPEG_FILENAME
-                        tar_ref.extract(member, tools_dir)
-                        log("Extracted ffmpeg from archive")
-                        return True
-                        
-        # Make executable on Unix-like systems
-        if system in ["darwin", "linux"]:
-            ffmpeg_path = os.path.join(tools_dir, FFMPEG_FILENAME)
-            os.chmod(ffmpeg_path, os.stat(ffmpeg_path).st_mode | stat.S_IEXEC)
-            
-        return True
+        import zipfile
+        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+            # Find ffmpeg.exe in the archive
+            for file_info in zip_ref.filelist:
+                if file_info.filename.endswith('ffmpeg.exe'):
+                    # Extract to tools directory
+                    target_path = os.path.join(tools_dir, FFMPEG_FILENAME)
+                    with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
+                        target.write(source.read())
+                    log("Extracted ffmpeg.exe from archive")
+                    return True
+        
+        log("ffmpeg.exe not found in archive")
+        return False
         
     except Exception as e:
         log(f"Failed to extract FFmpeg: {e}")
         return False
 
 def extract_fpcalc(archive_path, tools_dir):
-    """Extract fpcalc from downloaded archive."""
-    system = platform.system().lower()
-    
+    """Extract fpcalc from downloaded zip archive (Windows)."""
     try:
-        if system == "windows":
-            # Windows: Extract from zip
-            import zipfile
-            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                # Find fpcalc.exe in the archive
-                for file_info in zip_ref.filelist:
-                    if file_info.filename.endswith('fpcalc.exe'):
-                        # Extract to tools directory
-                        target_path = os.path.join(tools_dir, FPCALC_FILENAME)
-                        with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
-                            target.write(source.read())
-                        log("Extracted fpcalc.exe from archive")
-                        return True
-                        
-        elif system in ["darwin", "linux"]:
-            # macOS/Linux: Extract from tar.gz
-            import tarfile
-            with tarfile.open(archive_path, 'r:gz') as tar_ref:
-                # Find fpcalc in the archive
-                for member in tar_ref.getmembers():
-                    if member.name.endswith('fpcalc') and member.isfile():
-                        # Extract to tools directory
-                        member.name = FPCALC_FILENAME
-                        tar_ref.extract(member, tools_dir)
-                        log("Extracted fpcalc from archive")
-                        return True
-                        
-        # Make executable on Unix-like systems
-        if system in ["darwin", "linux"]:
-            fpcalc_path = os.path.join(tools_dir, FPCALC_FILENAME)
-            os.chmod(fpcalc_path, os.stat(fpcalc_path).st_mode | stat.S_IEXEC)
-            
-        return True
+        import zipfile
+        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+            # Find fpcalc.exe in the archive
+            for file_info in zip_ref.filelist:
+                if file_info.filename.endswith('fpcalc.exe'):
+                    # Extract to tools directory
+                    target_path = os.path.join(tools_dir, FPCALC_FILENAME)
+                    with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
+                        target.write(source.read())
+                    log("Extracted fpcalc.exe from archive")
+                    return True
+        
+        log("fpcalc.exe not found in archive")
+        return False
         
     except Exception as e:
         log(f"Failed to extract fpcalc: {e}")
@@ -162,13 +111,10 @@ def extract_fpcalc(archive_path, tools_dir):
 def verify_tool(tool_path, test_args):
     """Verify that a tool works by running it with test arguments."""
     try:
-        # Prepare subprocess arguments
-        startupinfo = None
-        if os.name == 'nt':
-            # Hide console window on Windows
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
+        # Hide console window on Windows
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
         
         # Run tool with test arguments
         result = subprocess.run(
@@ -191,7 +137,7 @@ def verify_tool(tool_path, test_args):
         return False
 
 def download_ytdlp(tools_dir):
-    """Download yt-dlp executable."""
+    """Download yt-dlp executable for Windows."""
     ytdlp_path = os.path.join(tools_dir, YTDLP_FILENAME)
     
     # Skip if already exists and works
@@ -199,19 +145,14 @@ def download_ytdlp(tools_dir):
         log("yt-dlp already exists and works")
         return True
     
-    # Download appropriate version
-    url = YTDLP_URL_WIN if os.name == 'nt' else YTDLP_URL
-    
-    if download_file(url, ytdlp_path, "yt-dlp"):
-        # Make executable on Unix-like systems
-        if os.name != 'nt':
-            os.chmod(ytdlp_path, os.stat(ytdlp_path).st_mode | stat.S_IEXEC)
+    # Download Windows version
+    if download_file(YTDLP_URL, ytdlp_path, "yt-dlp"):
         return True
     
     return False
 
 def download_ffmpeg(tools_dir):
-    """Download FFmpeg executable."""
+    """Download FFmpeg executable for Windows."""
     ffmpeg_path = os.path.join(tools_dir, FFMPEG_FILENAME)
     
     # Skip if already exists and works
@@ -219,24 +160,10 @@ def download_ffmpeg(tools_dir):
         log("FFmpeg already exists and works")
         return True
     
-    # Get platform-specific URL
-    system = platform.system().lower()
-    if system == "windows":
-        system = "win32"
-    elif system == "darwin":
-        system = "darwin"
-    else:
-        system = "linux"
+    # Download Windows zip archive
+    archive_path = os.path.join(tools_dir, "ffmpeg_temp.zip")
     
-    if system not in FFMPEG_URLS:
-        log(f"Unsupported platform for FFmpeg: {system}")
-        return False
-    
-    # Download archive
-    archive_ext = ".zip" if system in ["win32", "darwin"] else ".tar.xz"
-    archive_path = os.path.join(tools_dir, f"ffmpeg_temp{archive_ext}")
-    
-    if download_file(FFMPEG_URLS[system], archive_path, "FFmpeg"):
+    if download_file(FFMPEG_URL, archive_path, "FFmpeg"):
         # Extract FFmpeg
         if extract_ffmpeg(archive_path, tools_dir):
             # Clean up archive
@@ -249,7 +176,7 @@ def download_ffmpeg(tools_dir):
     return False
 
 def download_fpcalc(tools_dir):
-    """Download fpcalc executable for AcoustID fingerprinting."""
+    """Download fpcalc executable for Windows (AcoustID fingerprinting)."""
     fpcalc_path = os.path.join(tools_dir, FPCALC_FILENAME)
     
     # Skip if already exists and works
@@ -257,24 +184,10 @@ def download_fpcalc(tools_dir):
         log("fpcalc already exists and works")
         return True
     
-    # Get platform-specific URL
-    system = platform.system().lower()
-    if system == "windows":
-        system = "win32"
-    elif system == "darwin":
-        system = "darwin"
-    else:
-        system = "linux"
+    # Download Windows zip archive
+    archive_path = os.path.join(tools_dir, "fpcalc_temp.zip")
     
-    if system not in FPCALC_URLS:
-        log(f"Unsupported platform for fpcalc: {system}")
-        return False
-    
-    # Download archive
-    archive_ext = ".zip" if system == "win32" else ".tar.gz"
-    archive_path = os.path.join(tools_dir, f"fpcalc_temp{archive_ext}")
-    
-    if download_file(FPCALC_URLS[system], archive_path, "fpcalc"):
+    if download_file(FPCALC_URL, archive_path, "fpcalc"):
         # Extract fpcalc
         if extract_fpcalc(archive_path, tools_dir):
             # Clean up archive
