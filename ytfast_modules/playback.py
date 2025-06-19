@@ -33,16 +33,6 @@ _last_cached_count = 0
 _first_run = True
 _sources_verified = False
 _initial_state_checked = False
-_clear_stopped_timer = None
-
-def cancel_stopped_message_timer():
-    """Cancel the stopped message timer if it's running."""
-    global _clear_stopped_timer
-    if _clear_stopped_timer:
-        obs.timer_remove(clear_stopped_message)
-        _clear_stopped_timer = None
-        # Clear any lingering text
-        update_text_source("", "")
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -407,7 +397,7 @@ def update_text_source(song, artist):
             elif artist:
                 text = artist
             else:
-                text = ""  # Allow empty when called from cancel_stopped_message_timer
+                text = ""  # Allow empty when clearing
                 
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "text", text)
@@ -489,23 +479,13 @@ def start_next_video():
             log("Max retries reached, stopping")
             set_playing(False)
 
-def clear_stopped_message():
-    """Clear the stopped message from text source."""
-    global _clear_stopped_timer
-    obs.timer_remove(clear_stopped_message)
-    _clear_stopped_timer = None
-    
-    # Only show "Ready" if scene is not active (we're not about to start playing)
-    if not is_scene_active():
-        update_text_source("Ready", "")
-    # Otherwise leave it blank - a new video will start soon
-
-def stop_current_playback(show_stopped_message=True):
+def stop_current_playback():
     """
     Enhanced stop with complete cleanup.
     Must be called from main thread.
+    REMOVED: Status messages and timers that cause the flashing issue
     """
-    global _last_progress_log, _playback_retry_count, _clear_stopped_timer
+    global _last_progress_log, _playback_retry_count
     
     if not is_playing():
         log("No active playback to stop")
@@ -527,11 +507,9 @@ def stop_current_playback(show_stopped_message=True):
             obs.obs_data_release(settings)
             obs.obs_source_release(source)
         
-        # Show stopped message only if requested
-        if show_stopped_message:
-            update_text_source("⏹ Stopped", "")
-        else:
-            update_text_source("", "")
+        # Clear text source - but don't show any status messages
+        # This prevents the "Stopped" / "Ready" messages from appearing
+        update_text_source("", "")
         
         # Update state
         set_playing(False)
@@ -543,13 +521,6 @@ def stop_current_playback(show_stopped_message=True):
         _playback_retry_count = 0
         
         log("Playback stopped and all sources cleared")
-        
-        # Clear the stopped message after a delay only if we showed it
-        if show_stopped_message:
-            if _clear_stopped_timer:
-                obs.timer_remove(clear_stopped_message)
-            _clear_stopped_timer = clear_stopped_message
-            obs.timer_add(_clear_stopped_timer, 2000)
         
     except Exception as e:
         log(f"ERROR stopping playback: {e}")
@@ -576,18 +547,13 @@ def start_playback_controller():
 
 def stop_playback_controller():
     """Stop the playback controller timer."""
-    global _playback_timer, _clear_stopped_timer
+    global _playback_timer
     
     try:
         if _playback_timer:
             obs.timer_remove(_playback_timer)
             _playback_timer = None
             log("Playback controller stopped")
-        
-        # Also remove clear stopped timer if active
-        if _clear_stopped_timer:
-            obs.timer_remove(clear_stopped_message)
-            _clear_stopped_timer = None
             
     except Exception as e:
         log(f"ERROR stopping playback controller: {e}")
