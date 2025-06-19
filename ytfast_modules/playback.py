@@ -29,13 +29,14 @@ _playback_retry_count = 0
 _max_retry_attempts = 3
 _waiting_for_videos_logged = False
 _last_cached_count = 0
+_first_run = True
 
 def playback_controller():
     """
     Main playback controller - runs on main thread via timer.
     Manages video playback state and transitions.
     """
-    global _waiting_for_videos_logged, _last_cached_count
+    global _waiting_for_videos_logged, _last_cached_count, _first_run
     
     try:
         # Check if scene is active
@@ -55,6 +56,7 @@ def playback_controller():
         if current_count != _last_cached_count:
             if _last_cached_count == 0 and current_count > 0:
                 log(f"First video available! Starting playback with {current_count} video(s)")
+                _first_run = False
             elif current_count > _last_cached_count:
                 log(f"New video added to cache. Total videos: {current_count}")
             _last_cached_count = current_count
@@ -72,6 +74,11 @@ def playback_controller():
         
         # Get current media state
         media_state = get_media_state(MEDIA_SOURCE_NAME)
+        
+        # Debug logging on first run with videos
+        if _first_run and cached_videos:
+            _first_run = False
+            log(f"DEBUG: Media state = {media_state}, is_playing = {is_playing()}, scene_active = {is_scene_active()}")
         
         # Handle different states
         if media_state == obs.OBS_MEDIA_STATE_PLAYING:
