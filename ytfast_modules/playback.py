@@ -35,6 +35,15 @@ _sources_verified = False
 _initial_state_checked = False
 _clear_stopped_timer = None
 
+def cancel_stopped_message_timer():
+    """Cancel the stopped message timer if it's running."""
+    global _clear_stopped_timer
+    if _clear_stopped_timer:
+        obs.timer_remove(clear_stopped_message)
+        _clear_stopped_timer = None
+        # Clear any lingering text
+        update_text_source("", "")
+
 def verify_sources():
     """Verify that required sources exist and log their status."""
     global _sources_verified
@@ -398,7 +407,7 @@ def update_text_source(song, artist):
             elif artist:
                 text = artist
             else:
-                text = "Loading..."
+                text = ""  # Allow empty when called from cancel_stopped_message_timer
                 
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "text", text)
@@ -407,7 +416,8 @@ def update_text_source(song, artist):
             obs.obs_data_release(settings)
             obs.obs_source_release(source)
             
-            log(f"Updated text source: {text}")
+            if text:
+                log(f"Updated text source: {text}")
             return True
         else:
             log(f"WARNING: Text source '{TEXT_SOURCE_NAME}' not found")
@@ -490,7 +500,7 @@ def clear_stopped_message():
         update_text_source("Ready", "")
     # Otherwise leave it blank - a new video will start soon
 
-def stop_current_playback():
+def stop_current_playback(show_stopped_message=True):
     """
     Enhanced stop with complete cleanup.
     Must be called from main thread.
@@ -517,8 +527,11 @@ def stop_current_playback():
             obs.obs_data_release(settings)
             obs.obs_source_release(source)
         
-        # Show stopped message
-        update_text_source("⏹ Stopped", "")
+        # Show stopped message only if requested
+        if show_stopped_message:
+            update_text_source("⏹ Stopped", "")
+        else:
+            update_text_source("", "")
         
         # Update state
         set_playing(False)
@@ -531,11 +544,12 @@ def stop_current_playback():
         
         log("Playback stopped and all sources cleared")
         
-        # Clear the stopped message after a delay
-        if _clear_stopped_timer:
-            obs.timer_remove(clear_stopped_message)
-        _clear_stopped_timer = clear_stopped_message
-        obs.timer_add(_clear_stopped_timer, 2000)
+        # Clear the stopped message after a delay only if we showed it
+        if show_stopped_message:
+            if _clear_stopped_timer:
+                obs.timer_remove(clear_stopped_message)
+            _clear_stopped_timer = clear_stopped_message
+            obs.timer_add(_clear_stopped_timer, 2000)
         
     except Exception as e:
         log(f"ERROR stopping playback: {e}")
