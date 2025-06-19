@@ -30,6 +30,44 @@ _max_retry_attempts = 3
 _waiting_for_videos_logged = False
 _last_cached_count = 0
 _first_run = True
+_sources_verified = False
+
+def verify_sources():
+    """Verify that required sources exist and log their status."""
+    global _sources_verified
+    
+    # Check scene
+    scene_source = obs.obs_get_source_by_name(SCENE_NAME)
+    scene_exists = scene_source is not None
+    if scene_source:
+        obs.obs_source_release(scene_source)
+    
+    # Check media source
+    media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+    media_exists = media_source is not None
+    if media_source:
+        # Get source type for debugging
+        source_id = obs.obs_source_get_id(media_source)
+        obs.obs_source_release(media_source)
+    else:
+        source_id = "not found"
+    
+    # Check text source
+    text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+    text_exists = text_source is not None
+    if text_source:
+        obs.obs_source_release(text_source)
+    
+    # Log verification results
+    if not _sources_verified or not (scene_exists and media_exists and text_exists):
+        log("=== SOURCE VERIFICATION ===")
+        log(f"Scene '{SCENE_NAME}': {'✓ EXISTS' if scene_exists else '✗ MISSING'}")
+        log(f"Media Source '{MEDIA_SOURCE_NAME}': {'✓ EXISTS' if media_exists else '✗ MISSING'} (type: {source_id})")
+        log(f"Text Source '{TEXT_SOURCE_NAME}': {'✓ EXISTS' if text_exists else '✗ MISSING'}")
+        log("==========================")
+        _sources_verified = True
+    
+    return scene_exists and media_exists and text_exists
 
 def playback_controller():
     """
@@ -39,6 +77,10 @@ def playback_controller():
     global _waiting_for_videos_logged, _last_cached_count, _first_run
     
     try:
+        # Verify sources exist
+        if not verify_sources():
+            return
+        
         # Check if scene is active
         if not is_scene_active():
             if is_playing():
@@ -78,7 +120,14 @@ def playback_controller():
         # Debug logging on first run with videos
         if _first_run and cached_videos:
             _first_run = False
-            log(f"DEBUG: Media state = {media_state}, is_playing = {is_playing()}, scene_active = {is_scene_active()}")
+            state_names = {
+                obs.OBS_MEDIA_STATE_NONE: "NONE",
+                obs.OBS_MEDIA_STATE_PLAYING: "PLAYING", 
+                obs.OBS_MEDIA_STATE_STOPPED: "STOPPED",
+                obs.OBS_MEDIA_STATE_ENDED: "ENDED"
+            }
+            state_name = state_names.get(media_state, f"UNKNOWN({media_state})")
+            log(f"DEBUG: Media state = {state_name}, is_playing = {is_playing()}, scene_active = {is_scene_active()}")
         
         # Handle different states
         if media_state == obs.OBS_MEDIA_STATE_PLAYING:
@@ -95,6 +144,8 @@ def playback_controller():
             
     except Exception as e:
         log(f"ERROR in playback controller: {e}")
+        import traceback
+        log(f"Traceback: {traceback.format_exc()}")
 
 def handle_playing_state():
     """Handle currently playing video state."""
@@ -309,6 +360,8 @@ def start_next_video():
     Must be called from main thread.
     """
     global _playback_retry_count, _last_progress_log
+    
+    log("start_next_video called")
     
     # Reset retry count on successful transition
     _playback_retry_count = 0
