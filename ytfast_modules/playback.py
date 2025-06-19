@@ -270,7 +270,7 @@ def log_playback_progress(video_id, current_time, duration):
         # Get video info for better logging
         video_info = get_cached_video_info(video_id)
         if video_info:
-            log(f"Playing: {video_info['artist']} - {video_info['song']} "
+            log(f"Playing: {video_info['song']} - {video_info['artist']} "
                 f"[{percent}% - {int(current_time/1000)}s / {int(duration/1000)}s]")
 
 def select_next_video():
@@ -292,7 +292,7 @@ def select_next_video():
         selected = available_videos[0]
         # Don't add to played list if it's the only video
         video_info = cached_videos[selected]
-        log(f"Selected (only video): {video_info['artist']} - {video_info['song']}")
+        log(f"Selected (only video): {video_info['song']} - {video_info['artist']}")
         return selected
     
     # If all videos have been played, reset the played list
@@ -314,7 +314,7 @@ def select_next_video():
     add_played_video(selected)
     
     video_info = cached_videos[selected]
-    log(f"Selected: {video_info['artist']} - {video_info['song']}")
+    log(f"Selected: {video_info['song']} - {video_info['artist']}")
     
     return selected
 
@@ -351,15 +351,16 @@ def update_media_source(video_path):
         log(f"ERROR updating media source: {e}")
         return False
 
-def update_text_source(artist, song):
+def update_text_source(song, artist):
     """
     Update OBS Text Source with metadata.
     Must be called from main thread.
+    Format: Song - Artist
     """
     try:
         source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
         if source:
-            text = f"{artist} - {song}" if artist and song else ""
+            text = f"{song} - {artist}" if song and artist else ""
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "text", text)
             
@@ -414,14 +415,14 @@ def start_next_video():
     
     # Update sources
     if update_media_source(video_info['path']):
-        update_text_source(video_info['artist'], video_info['song'])
+        update_text_source(video_info['song'], video_info['artist'])
         
         # Update playback state
         set_playing(True)
         set_current_video_path(video_info['path'])
         set_current_playback_video_id(video_id)
         
-        log(f"Started playback: {video_info['artist']} - {video_info['song']}")
+        log(f"Started playback: {video_info['song']} - {video_info['artist']}")
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
