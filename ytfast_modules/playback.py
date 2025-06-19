@@ -19,7 +19,8 @@ from state import (
     get_current_playback_video_id, set_current_playback_video_id,
     get_cached_videos, get_cached_video_info,
     get_played_videos, add_played_video, clear_played_videos,
-    is_scene_active
+    is_scene_active, is_stop_requested, clear_stop_request,
+    should_stop_threads
 )
 
 # Module-level variables
@@ -32,6 +33,7 @@ _last_cached_count = 0
 _first_run = True
 _sources_verified = False
 _initial_state_checked = False
+_clear_stopped_timer = None
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -78,11 +80,24 @@ def playback_controller():
     global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
     
     try:
+        # Priority 1: Check for stop request
+        if is_stop_requested():
+            clear_stop_request()
+            if is_playing():
+                stop_current_playback()
+            return
+        
+        # Priority 2: Check if we're shutting down
+        if should_stop_threads():
+            if is_playing():
+                stop_current_playback()
+            return
+        
         # Verify sources exist
         if not verify_sources():
             return
         
-        # Check if scene is active
+        # Priority 3: Check if scene is active
         if not is_scene_active():
             if is_playing():
                 log("Scene inactive, stopping playback")
@@ -433,32 +448,65 @@ def start_next_video():
             log("Max retries reached, stopping")
             set_playing(False)
 
+def clear_stopped_message():
+    """Clear the stopped message from text source."""
+    global _clear_stopped_timer
+    obs.timer_remove(clear_stopped_message)
+    _clear_stopped_timer = None
+    update_text_source("", "")
+
 def stop_current_playback():
     """
-    Stop current playback and clear sources.
+    Enhanced stop with complete cleanup.
     Must be called from main thread.
     """
-    global _last_progress_log
+    global _last_progress_log, _playback_retry_count, _clear_stopped_timer
+    
+    if not is_playing():
+        log("No active playback to stop")
+        return
     
     try:
-        # Stop media source
+        # Clear media source completely
         source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
         if source:
+            # Stop playback
             obs.obs_source_media_stop(source)
+            
+            # Clear the file path - THIS IS IMPORTANT
+            settings = obs.obs_data_create()
+            obs.obs_data_set_string(settings, "local_file", "")
+            obs.obs_data_set_bool(settings, "unload_when_not_showing", True)
+            
+            obs.obs_source_update(source, settings)
+            obs.obs_data_release(settings)
             obs.obs_source_release(source)
         
-        # Clear text
-        update_text_source("", "")
+        # Clear text with status message
+        source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+        if source:
+            settings = obs.obs_data_create()
+            obs.obs_data_set_string(settings, "text", "⏹ Stopped")
+            obs.obs_source_update(source, settings)
+            obs.obs_data_release(settings)
+            obs.obs_source_release(source)
         
         # Update state
         set_playing(False)
         set_current_video_path(None)
         set_current_playback_video_id(None)
         
-        # Clear progress tracking
+        # Clear tracking
         _last_progress_log.clear()
+        _playback_retry_count = 0
         
-        log("Playback stopped")
+        log("Playback stopped and all sources cleared")
+        
+        # Clear the stopped message after a delay
+        if _clear_stopped_timer:
+            obs.timer_remove(clear_stopped_message)
+        _clear_stopped_timer = clear_stopped_message
+        obs.timer_add(_clear_stopped_timer, 2000)
         
     except Exception as e:
         log(f"ERROR stopping playback: {e}")
@@ -485,13 +533,18 @@ def start_playback_controller():
 
 def stop_playback_controller():
     """Stop the playback controller timer."""
-    global _playback_timer
+    global _playback_timer, _clear_stopped_timer
     
     try:
         if _playback_timer:
             obs.timer_remove(_playback_timer)
             _playback_timer = None
             log("Playback controller stopped")
+        
+        # Also remove clear stopped timer if active
+        if _clear_stopped_timer:
+            obs.timer_remove(clear_stopped_message)
+            _clear_stopped_timer = None
             
     except Exception as e:
         log(f"ERROR stopping playback controller: {e}")
