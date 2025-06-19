@@ -12,9 +12,6 @@ from state import (
     set_stop_requested, set_stop_threads
 )
 
-# Import to cancel the timer
-from playback import cancel_stopped_message_timer
-
 def verify_scene_setup():
     """Verify that required scene and sources exist."""
     scene_source = obs.obs_get_source_by_name(SCENE_NAME)
@@ -83,8 +80,6 @@ def handle_scene_change():
             
             if is_active:
                 log(f"Scene activated: {scene_name}")
-                # Cancel any pending "Ready" message timer
-                cancel_stopped_message_timer()
                 # Playback controller will handle starting
             else:
                 log(f"Scene deactivated (was on: {scene_name})")
