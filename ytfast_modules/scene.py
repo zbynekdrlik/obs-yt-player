@@ -1,6 +1,6 @@
 """
 Scene management for OBS YouTube Player.
-Handles scene verification and frontend events with proper transition support.
+Handles scene verification and frontend events with transition awareness.
 """
 
 import obspython as obs
@@ -13,9 +13,9 @@ from state import (
 )
 
 # Module-level variables for transition tracking
-_transitioning = False
-_transition_target_scene = None
-_pending_stop = False
+_last_scene_change_time = 0
+_pending_deactivation = False
+_deactivation_timer = None
 
 def verify_scene_setup():
     """Verify that required scene and sources exist."""
@@ -64,15 +64,36 @@ def get_preview_scene_name():
         return name
     return None
 
+def is_studio_mode_active():
+    """Check if Studio Mode (preview/program) is active."""
+    return obs.obs_frontend_preview_program_mode_active()
+
+def delayed_deactivation():
+    """Handle delayed deactivation after transition."""
+    global _deactivation_timer, _pending_deactivation
+    
+    # Clear the timer reference
+    obs.timer_remove(delayed_deactivation)
+    _deactivation_timer = None
+    
+    # Now actually deactivate
+    if _pending_deactivation:
+        log("Deactivating scene after transition delay")
+        set_scene_active(False)
+        # Request stop if playing
+        if is_playing():
+            set_stop_requested(True)
+        _pending_deactivation = False
+
 def on_frontend_event(event):
     """Handle OBS frontend events."""
     try:
-        if event == obs.OBS_FRONTEND_EVENT_TRANSITION_STARTED:
-            handle_transition_started()
-        elif event == obs.OBS_FRONTEND_EVENT_TRANSITION_STOPPED:
-            handle_transition_stopped()
-        elif event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
+        if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
             handle_scene_change()
+        elif event == obs.OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED:
+            handle_preview_change()
+        elif event == obs.OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED:
+            handle_transition_duration_changed()
         elif event == obs.OBS_FRONTEND_EVENT_EXIT:
             handle_obs_exit()
         elif event == obs.OBS_FRONTEND_EVENT_FINISHED_LOADING:
@@ -81,81 +102,40 @@ def on_frontend_event(event):
     except Exception as e:
         log(f"ERROR in frontend event handler: {e}")
 
-def handle_transition_started():
+def handle_preview_change():
     """
-    Handle transition start event.
-    Start playback immediately if transitioning TO our scene.
+    Handle preview scene change in Studio Mode.
+    This lets us prepare for upcoming transitions.
     """
-    global _transitioning, _transition_target_scene, _pending_stop
-    
-    _transitioning = True
-    
-    # Get current and target scenes
-    current_scene = obs.obs_frontend_get_current_scene()
-    if not current_scene:
+    if not is_studio_mode_active():
         return
     
-    try:
-        current_scene_name = obs.obs_source_get_name(current_scene)
-        
-        # In Studio Mode, preview scene becomes the target
-        # In regular mode, we need to check after transition
-        preview_scene_name = get_preview_scene_name()
-        
-        if preview_scene_name:
-            # Studio Mode - we know the target
-            _transition_target_scene = preview_scene_name
-            log(f"Transition started: {current_scene_name} → {preview_scene_name}")
+    preview_scene_name = get_preview_scene_name()
+    if preview_scene_name:
+        current_scene = obs.obs_frontend_get_current_scene()
+        if current_scene:
+            current_scene_name = obs.obs_source_get_name(current_scene)
+            obs.obs_source_release(current_scene)
             
-            # If transitioning TO our scene, activate immediately
-            if preview_scene_name == SCENE_NAME and not is_scene_active():
-                log(f"Activating scene at transition start")
-                set_scene_active(True)
-                # Playback controller will start playing
-            
-            # If transitioning FROM our scene, mark for pending stop
-            elif current_scene_name == SCENE_NAME and preview_scene_name != SCENE_NAME:
-                log(f"Marking scene for deactivation after transition")
-                _pending_stop = True
-        else:
-            # Regular mode - we'll handle in scene_changed
-            log(f"Transition started from: {current_scene_name}")
-            _transition_target_scene = None
-            
-    finally:
-        obs.obs_source_release(current_scene)
+            # If our scene is now in preview and not in program, it might go live soon
+            if preview_scene_name == SCENE_NAME and current_scene_name != SCENE_NAME:
+                log(f"Scene '{SCENE_NAME}' loaded in preview, ready to transition")
 
-def handle_transition_stopped():
-    """
-    Handle transition stop event.
-    Stop playback if we transitioned away FROM our scene.
-    """
-    global _transitioning, _transition_target_scene, _pending_stop
-    
-    _transitioning = False
-    
-    log("Transition completed")
-    
-    # If we have a pending stop (transitioned away from our scene)
-    if _pending_stop:
-        _pending_stop = False
-        if is_scene_active():
-            log("Deactivating scene after transition")
-            set_scene_active(False)
-            # Request stop if playing
-            if is_playing():
-                set_stop_requested(True)
-    
-    _transition_target_scene = None
+def handle_transition_duration_changed():
+    """Handle transition duration change event."""
+    # Get the new transition duration when user changes it
+    duration = obs.obs_frontend_get_transition_duration()
+    log(f"Transition duration changed to: {duration}ms")
 
 def handle_scene_change():
     """
-    Handle scene change events.
-    This is called after transitions complete or for instant scene changes.
+    Handle scene change events with transition awareness.
     """
-    # If we're in a transition, let transition handlers manage state
-    if _transitioning:
-        return
+    global _last_scene_change_time, _pending_deactivation, _deactivation_timer
+    
+    current_time = time.time() * 1000  # Convert to milliseconds
+    time_since_last_change = current_time - _last_scene_change_time
+    _last_scene_change_time = current_time
     
     current_scene = obs.obs_frontend_get_current_scene()
     if not current_scene:
@@ -167,14 +147,43 @@ def handle_scene_change():
         is_active = (scene_name == SCENE_NAME)
         
         # Only act on actual changes
-        if is_active != was_active:
-            set_scene_active(is_active)
+        if is_active == was_active:
+            return
+        
+        # Cancel any pending deactivation if scene is becoming active
+        if is_active and _deactivation_timer:
+            obs.timer_remove(delayed_deactivation)
+            _deactivation_timer = None
+            _pending_deactivation = False
+        
+        # Get transition duration
+        transition_duration = obs.obs_frontend_get_transition_duration()
+        
+        # Check if this is likely a transition (rapid scene changes or Studio Mode)
+        is_likely_transition = (time_since_last_change < 100) or is_studio_mode_active()
+        
+        if is_active:
+            # Scene becoming active - start immediately
+            log(f"Scene activated: {scene_name}")
+            set_scene_active(True)
+            # Playback controller will handle starting
             
-            if is_active:
-                log(f"Scene activated: {scene_name}")
-                # Playback controller will handle starting
+        else:
+            # Scene becoming inactive
+            if is_likely_transition and transition_duration > 300:
+                # This is likely a transition - delay the deactivation
+                log(f"Scene transitioning out (was on: {scene_name}), delaying stop for {transition_duration}ms")
+                _pending_deactivation = True
+                
+                # Set timer for deactivation after transition completes
+                if _deactivation_timer:
+                    obs.timer_remove(delayed_deactivation)
+                _deactivation_timer = delayed_deactivation
+                obs.timer_add(_deactivation_timer, int(transition_duration))
             else:
+                # Instant scene change or very short transition
                 log(f"Scene deactivated (was on: {scene_name})")
+                set_scene_active(False)
                 # Request stop if playing
                 if is_playing():
                     set_stop_requested(True)
@@ -184,7 +193,14 @@ def handle_scene_change():
 
 def handle_obs_exit():
     """Handle OBS exit event."""
+    global _deactivation_timer
+    
     log("OBS exiting - initiating cleanup")
+    
+    # Cancel any pending timers
+    if _deactivation_timer:
+        obs.timer_remove(delayed_deactivation)
+        _deactivation_timer = None
     
     # Signal all threads to stop
     set_stop_threads(True)
