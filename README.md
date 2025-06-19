@@ -15,6 +15,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **Modular Architecture**: Clean, maintainable code structure with separated concerns
 - **Stop Control**: Manual stop button with complete resource cleanup
 - **Scene Management**: Automatic start/stop based on scene activation
+- **Transition Support**: Proper handling of scene transitions with configurable delays
 
 ## Requirements
 
@@ -47,6 +48,14 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 6. Switch to your scene to begin random playback
 7. Click "⏹ Stop Playback" to manually stop playback
 8. Switch away from scene to automatically stop playback
+
+## Scene Transitions
+
+The script properly handles OBS scene transitions:
+- **Transitioning TO the scene**: Video starts playing immediately as the transition begins
+- **Transitioning FROM the scene**: Video continues playing until the transition completes
+- Works with any transition duration (tested up to 5+ seconds)
+- Supports both regular mode and Studio Mode (preview/program)
 
 ## Multi-Instance Setup
 
@@ -91,7 +100,7 @@ ytfast_modules/
     metadata.py             # Metadata extraction (AcoustID, iTunes, parsing)
     normalize.py            # Audio normalization
     playback.py             # Playback control
-    scene.py                # Scene management
+    scene.py                # Scene management and transition handling
 ```
 
 ### Documentation
@@ -124,14 +133,28 @@ Each phase builds upon the previous one, ensuring a systematic and maintainable 
 
 ## Current Status
 
-Version 2.3.1 - Scene management with playback restart fix:
+Version 2.3.7 - Scene management with full transition support:
 - ✅ Phases 1-10: Complete foundation, processing, and playback
-- ✅ Phase 11: Scene management with stop button and resource cleanup
+- ✅ Phase 11: Scene management with stop button, resource cleanup, and transition handling
 - ✅ Modular code structure with separated concerns
 - ✅ Windows-optimized with platform-specific code removed
 - ⏳ Phase 12: Final polish and optimization to be implemented
 
 ## Recent Updates
+
+### v2.3.7 - Transition Support
+- Added proper scene transition handling using correct OBS events
+- Transition detection with duration-aware delays
+- Support for both regular mode and Studio Mode
+- Fixed API compatibility issues with non-existent events
+
+### v2.3.6 - Transition Handling Attempt
+- Initial attempt at transition support (fixed in v2.3.7)
+
+### v2.3.5 - Title Flash Fix
+- Removed status messages ("Ready", "⏹ Stopped") that caused UI flashing
+- Text source now stays empty when scene is inactive
+- Cleaner visual experience during scene switches
 
 ### v2.3.1 - Scene Return Fix
 - Fixed issue where playback wouldn't restart when returning to scene
