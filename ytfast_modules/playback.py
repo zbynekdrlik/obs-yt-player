@@ -98,11 +98,14 @@ def playback_controller():
         if current_count != _last_cached_count:
             if _last_cached_count == 0 and current_count > 0:
                 log(f"First video available! Starting playback with {current_count} video(s)")
-                _first_run = False
+                # Don't return here! Continue to process the state
             elif current_count > _last_cached_count:
                 log(f"New video added to cache. Total videos: {current_count}")
             _last_cached_count = current_count
             _waiting_for_videos_logged = False
+            # Reset first run flag when videos become available
+            if current_count > 0:
+                _first_run = True
         
         if not cached_videos:
             # Log waiting message only once
