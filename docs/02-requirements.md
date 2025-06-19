@@ -33,6 +33,8 @@ It is authoritative; later Phase prompts reference this spec.
 - Scene name == script filename without extension (e.g. `ytfast.py` → scene `ytfast`).  
 - Media Source `video`, Text Source `title`.  
 - Random no‑repeat playback; handle stop button & scene transitions.
+- **Transition handling**: Start playback immediately when transitioning TO scene, continue playing until transition completes when leaving scene.
+- Support both regular mode and Studio Mode (preview/program).
 
 ## Threading
 - All OBS API calls **must** run on main thread (`obs.timer_add`).  
