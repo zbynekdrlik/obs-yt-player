@@ -184,8 +184,23 @@ def handle_playing_state():
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
         log("Media playing but state out of sync - updating state")
+        # Check if we actually have valid playback info
+        current_video_id = get_current_playback_video_id()
+        current_path = get_current_video_path()
+        
+        if not current_video_id or not current_path:
+            # We don't have valid playback info, so stop and restart
+            log("No valid playback info - stopping and restarting")
+            source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+            if source:
+                obs.obs_source_media_stop(source)
+                obs.obs_source_release(source)
+            # Now start fresh
+            start_next_video()
+            return
+        
+        # We have valid info, just update state
         set_playing(True)
-        # We don't know which video is playing, so we can't set the current video info
         return
     
     duration = get_media_duration(MEDIA_SOURCE_NAME)
