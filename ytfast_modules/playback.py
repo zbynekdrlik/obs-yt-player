@@ -19,7 +19,7 @@ from state import (
     get_current_playback_video_id, set_current_playback_video_id,
     get_cached_videos, get_cached_video_info,
     get_played_videos, add_played_video, clear_played_videos,
-    is_scene_active
+    is_scene_active, is_sync_on_startup_done
 )
 
 # Module-level variables
@@ -27,12 +27,16 @@ _playback_timer = None
 _last_progress_log = {}
 _playback_retry_count = 0
 _max_retry_attempts = 3
+_startup_delay_count = 0
+_max_startup_delay = 10  # Wait up to 10 seconds for cache to be ready
 
 def playback_controller():
     """
     Main playback controller - runs on main thread via timer.
     Manages video playback state and transitions.
     """
+    global _startup_delay_count
+    
     try:
         # Check if scene is active
         if not is_scene_active():
@@ -44,7 +48,23 @@ def playback_controller():
         # Check if we have videos to play
         cached_videos = get_cached_videos()
         if not cached_videos:
-            return
+            # During startup, wait for cache to be populated
+            if not is_sync_on_startup_done() or _startup_delay_count < _max_startup_delay:
+                if _startup_delay_count == 0:
+                    log("Waiting for cache to be populated...")
+                _startup_delay_count += 1
+                return
+            else:
+                # After startup delay, if still no videos, log once
+                if _startup_delay_count == _max_startup_delay:
+                    log("No videos found in cache after waiting")
+                    _startup_delay_count += 1
+                return
+        else:
+            # We have videos now
+            if _startup_delay_count > 0:
+                log(f"Cache ready with {len(cached_videos)} videos")
+                _startup_delay_count = 0
         
         # Get current media state
         media_state = get_media_state(MEDIA_SOURCE_NAME)
@@ -106,6 +126,10 @@ def handle_none_state():
     if is_scene_active() and not is_playing():
         log("Scene active, starting playback")
         start_next_video()
+    elif is_scene_active() and is_playing():
+        # This shouldn't happen - playing but no media?
+        log("WARNING: Playing state but no media loaded")
+        set_playing(False)
 
 def get_media_state(source_name):
     """
