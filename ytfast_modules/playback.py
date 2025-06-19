@@ -390,7 +390,16 @@ def update_text_source(song, artist):
     try:
         source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
         if source:
-            text = f"{song} - {artist}" if song and artist else ""
+            # Never pass empty text, always have something
+            if song and artist:
+                text = f"{song} - {artist}"
+            elif song:
+                text = song
+            elif artist:
+                text = artist
+            else:
+                text = "Loading..."
+                
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "text", text)
             
@@ -398,8 +407,7 @@ def update_text_source(song, artist):
             obs.obs_data_release(settings)
             obs.obs_source_release(source)
             
-            if text:
-                log(f"Updated text source: {text}")
+            log(f"Updated text source: {text}")
             return True
         else:
             log(f"WARNING: Text source '{TEXT_SOURCE_NAME}' not found")
@@ -443,16 +451,24 @@ def start_next_video():
         start_next_video()
         return
     
+    # Extract metadata with fallbacks
+    song = video_info.get('song', 'Unknown Song')
+    artist = video_info.get('artist', 'Unknown Artist')
+    
+    # Log if metadata is missing
+    if song == 'Unknown Song' or artist == 'Unknown Artist':
+        log(f"WARNING: Missing metadata for video {video_id} - Song: '{song}', Artist: '{artist}'")
+    
     # Update sources
     if update_media_source(video_info['path']):
-        update_text_source(video_info['song'], video_info['artist'])
+        update_text_source(song, artist)
         
         # Update playback state
         set_playing(True)
         set_current_video_path(video_info['path'])
         set_current_playback_video_id(video_id)
         
-        log(f"Started playback: {video_info['song']} - {video_info['artist']}")
+        log(f"Started playback: {song} - {artist}")
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
@@ -468,7 +484,8 @@ def clear_stopped_message():
     global _clear_stopped_timer
     obs.timer_remove(clear_stopped_message)
     _clear_stopped_timer = None
-    update_text_source("", "")
+    # Don't clear to empty - show a default message
+    update_text_source("Ready", "")
 
 def stop_current_playback():
     """
@@ -497,14 +514,8 @@ def stop_current_playback():
             obs.obs_data_release(settings)
             obs.obs_source_release(source)
         
-        # Clear text with status message
-        source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
-        if source:
-            settings = obs.obs_data_create()
-            obs.obs_data_set_string(settings, "text", "⏹ Stopped")
-            obs.obs_source_update(source, settings)
-            obs.obs_data_release(settings)
-            obs.obs_source_release(source)
+        # Show stopped message
+        update_text_source("⏹ Stopped", "")
         
         # Update state
         set_playing(False)
