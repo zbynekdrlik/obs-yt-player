@@ -31,6 +31,7 @@ _waiting_for_videos_logged = False
 _last_cached_count = 0
 _first_run = True
 _sources_verified = False
+_initial_state_checked = False
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -74,7 +75,7 @@ def playback_controller():
     Main playback controller - runs on main thread via timer.
     Manages video playback state and transitions.
     """
-    global _waiting_for_videos_logged, _last_cached_count, _first_run
+    global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
     
     try:
         # Verify sources exist
@@ -132,6 +133,19 @@ def playback_controller():
             state_name = state_names.get(media_state, f"UNKNOWN({media_state})")
             log(f"DEBUG: Media state = {state_name}, is_playing = {is_playing()}, scene_active = {is_scene_active()}")
         
+        # Handle initial state mismatch (media playing but script thinks it's not)
+        if not _initial_state_checked:
+            _initial_state_checked = True
+            if media_state == obs.OBS_MEDIA_STATE_PLAYING and not is_playing():
+                log("Media source is already playing - synchronizing state")
+                # Stop the current playback to start fresh
+                source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+                if source:
+                    obs.obs_source_media_stop(source)
+                    obs.obs_source_release(source)
+                media_state = obs.OBS_MEDIA_STATE_NONE
+                log("Stopped existing playback, starting fresh")
+        
         # Handle different states
         if media_state == obs.OBS_MEDIA_STATE_PLAYING:
             handle_playing_state()
@@ -152,6 +166,13 @@ def playback_controller():
 
 def handle_playing_state():
     """Handle currently playing video state."""
+    # If media is playing but we don't think we're playing, sync the state
+    if not is_playing():
+        log("Media playing but state out of sync - updating state")
+        set_playing(True)
+        # We don't know which video is playing, so we can't set the current video info
+        return
+    
     duration = get_media_duration(MEDIA_SOURCE_NAME)
     current_time = get_media_time(MEDIA_SOURCE_NAME)
     
@@ -195,7 +216,7 @@ def handle_none_state():
             start_next_video()
     elif is_scene_active() and is_playing():
         # This shouldn't happen - playing but no media?
-        log("WARNING: Playing state but no media loaded")
+        log("WARNING: Playing state but no media loaded - resetting state")
         set_playing(False)
 
 def get_media_state(source_name):
@@ -443,9 +464,12 @@ def stop_current_playback():
 
 def start_playback_controller():
     """Start the playback controller timer."""
-    global _playback_timer
+    global _playback_timer, _initial_state_checked
     
     try:
+        # Reset initial state check
+        _initial_state_checked = False
+        
         # Remove existing timer if any
         if _playback_timer:
             obs.timer_remove(_playback_timer)
