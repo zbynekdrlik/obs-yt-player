@@ -484,8 +484,11 @@ def clear_stopped_message():
     global _clear_stopped_timer
     obs.timer_remove(clear_stopped_message)
     _clear_stopped_timer = None
-    # Don't clear to empty - show a default message
-    update_text_source("Ready", "")
+    
+    # Only show "Ready" if scene is not active (we're not about to start playing)
+    if not is_scene_active():
+        update_text_source("Ready", "")
+    # Otherwise leave it blank - a new video will start soon
 
 def stop_current_playback():
     """
