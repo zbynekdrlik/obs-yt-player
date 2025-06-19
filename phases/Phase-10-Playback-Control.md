@@ -4,7 +4,8 @@
 Implement random video playback through OBS Media Source with metadata display, handling playback end detection and scene transitions.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., from 1.9.0 to 1.10.0)
+**This phase adds new features** → Increment MINOR version from current version
+**Remember**: Increment version with EVERY code change during development, not just once per phase.
 
 ## Requirements Reference
 This phase implements playback logic from `02-requirements.md`:
@@ -15,328 +16,445 @@ This phase implements playback logic from `02-requirements.md`:
 
 ## Implementation Details
 
-### 1. Playback State Management
+### 1. Module-Level Variables
 ```python
-# Add to global variables section:
-current_playback_video_id = None  # Track currently playing video ID
+# Module-level variables for proper timer management
+_playback_timer = None
+_last_progress_log = {}
+_playback_retry_count = 0
+_max_retry_attempts = 3
+_waiting_for_videos_logged = False
+_last_cached_count = 0
+_first_run = True
+_sources_verified = False
+_initial_state_checked = False
 ```
 
-### 2. Video Selection Logic
+### 2. Dynamic Video Availability
+The playback controller continuously monitors for videos and handles these scenarios:
+- **Empty cache startup**: Waits for first video to be downloaded
+- **Dynamic addition**: Detects and announces new videos as they're processed
+- **Automatic start**: Begins playback as soon as first video is available
+- **State synchronization**: Handles cases where media is already playing on startup
+
+```python
+def playback_controller():
+    """
+    Continuously monitors for videos and manages playback.
+    Handles dynamic video availability - starts when first video ready.
+    """
+    # Track changes in video count
+    if current_count != _last_cached_count:
+        if _last_cached_count == 0 and current_count > 0:
+            log(f"First video available! Starting playback with {current_count} video(s)")
+        elif current_count > _last_cached_count:
+            log(f"New video added to cache. Total videos: {current_count}")
+```
+
+### 3. Video Selection Logic (Enhanced)
 ```python
 def select_next_video():
     """
     Select next video for playback using random no-repeat logic.
-    Returns video_id or None if no videos available.
+    Handles single video scenario without adding to played list.
     """
-    with state_lock:
-        # Get list of available videos
-        available_videos = list(cached_videos.keys())
-        
-        if not available_videos:
-            log("No videos available for playback")
-            return None
-        
-        # If all videos have been played, reset the played list
-        if len(played_videos) >= len(available_videos):
-            played_videos.clear()
-            log("Reset played videos list")
-        
-        # Find unplayed videos
-        unplayed = [vid for vid in available_videos if vid not in played_videos]
-        
-        if not unplayed:
-            # This shouldn't happen due to reset above, but just in case
-            played_videos.clear()
-            unplayed = available_videos
-        
-        # Select random video from unplayed
-        selected = random.choice(unplayed)
-        played_videos.append(selected)
-        
-        video_info = cached_videos[selected]
-        log(f"Selected: {video_info['artist']} - {video_info['song']}")
-        
+    # Special handling for single video
+    if len(available_videos) == 1:
+        selected = available_videos[0]
+        # Don't add to played list if it's the only video
         return selected
+    
+    # Multi-video logic with no-repeat
+    # ... rest of implementation
 ```
 
-### 3. Media Source Update Functions
+### 4. Media Source Update Functions (With Error Handling)
 ```python
 def update_media_source(video_path):
     """
     Update OBS Media Source with new video.
-    Must be called from main thread.
+    Includes validation and error handling.
     """
-    source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-    if source:
-        settings = obs.obs_data_create()
-        obs.obs_data_set_string(settings, "local_file", video_path)
-        obs.obs_data_set_bool(settings, "restart_on_activate", True)
-        obs.obs_data_set_bool(settings, "close_when_inactive", True)
+    try:
+        # Validate file exists
+        if not os.path.exists(video_path):
+            log(f"ERROR: Video file not found: {video_path}")
+            return False
         
-        obs.obs_source_update(source, settings)
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
-        
-        log(f"Updated media source: {os.path.basename(video_path)}")
-        return True
-    else:
-        log(f"Media source '{MEDIA_SOURCE_NAME}' not found")
+        source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+        if source:
+            settings = obs.obs_data_create()
+            obs.obs_data_set_string(settings, "local_file", video_path)
+            obs.obs_data_set_bool(settings, "restart_on_activate", True)
+            obs.obs_data_set_bool(settings, "close_when_inactive", True)
+            obs.obs_data_set_bool(settings, "hw_decode", True)
+            
+            obs.obs_source_update(source, settings)
+            obs.obs_data_release(settings)
+            obs.obs_source_release(source)
+            
+            log(f"Updated media source: {os.path.basename(video_path)}")
+            return True
+        else:
+            log(f"ERROR: Media source '{MEDIA_SOURCE_NAME}' not found")
+            return False
+            
+    except Exception as e:
+        log(f"ERROR updating media source: {e}")
         return False
 
-def update_text_source(artist, song):
+def update_text_source(song, artist):
     """
     Update OBS Text Source with metadata.
     Must be called from main thread.
+    Format: Song - Artist
     """
-    source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
-    if source:
-        text = f"{artist} - {song}"
-        settings = obs.obs_data_create()
-        obs.obs_data_set_string(settings, "text", text)
-        
-        obs.obs_source_update(source, settings)
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
-        
-        log(f"Updated text source: {text}")
-        return True
-    else:
-        log(f"Text source '{TEXT_SOURCE_NAME}' not found")
+    try:
+        source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+        if source:
+            text = f"{song} - {artist}" if song and artist else ""
+            settings = obs.obs_data_create()
+            obs.obs_data_set_string(settings, "text", text)
+            
+            obs.obs_source_update(source, settings)
+            obs.obs_data_release(settings)
+            obs.obs_source_release(source)
+            
+            if text:
+                log(f"Updated text source: {text}")
+            return True
+        else:
+            log(f"WARNING: Text source '{TEXT_SOURCE_NAME}' not found")
+            return False
+            
+    except Exception as e:
+        log(f"ERROR updating text source: {e}")
         return False
 ```
 
-### 4. Playback End Detection
+### 5. Source Verification
 ```python
-def get_media_state(source_name):
-    """
-    Get current state of media source.
-    Returns one of: OBS_MEDIA_STATE_NONE, OBS_MEDIA_STATE_PLAYING,
-                    OBS_MEDIA_STATE_STOPPED, OBS_MEDIA_STATE_ENDED
-    """
-    source = obs.obs_get_source_by_name(source_name)
-    if source:
-        state = obs.obs_source_media_get_state(source)
-        obs.obs_source_release(source)
-        return state
-    return obs.OBS_MEDIA_STATE_NONE
-
-def get_media_duration(source_name):
-    """
-    Get duration of current media in milliseconds.
-    """
-    source = obs.obs_get_source_by_name(source_name)
-    if source:
-        duration = obs.obs_source_media_get_duration(source)
-        obs.obs_source_release(source)
-        return duration
-    return 0
-
-def get_media_time(source_name):
-    """
-    Get current playback time in milliseconds.
-    """
-    source = obs.obs_get_source_by_name(source_name)
-    if source:
-        time = obs.obs_source_media_get_time(source)
-        obs.obs_source_release(source)
-        return time
-    return 0
+def verify_sources():
+    """Verify that required sources exist and log their status."""
+    global _sources_verified
+    
+    # Check scene, media source, and text source
+    # Log verification results once or when sources are missing
+    # This helps users identify setup issues
 ```
 
-### 5. Main Playback Controller
+### 6. Playback State Detection (Enhanced)
+```python
+def is_video_near_end(duration, current_time, threshold_percent=95):
+    """
+    Check if video is near end using percentage threshold.
+    More robust than fixed millisecond checks.
+    """
+    if duration <= 0:
+        return False
+    percent_complete = (current_time / duration) * 100
+    return percent_complete >= threshold_percent
+
+def log_playback_progress(video_id, current_time, duration):
+    """
+    Log playback progress at intervals without spamming.
+    Uses smart caching to prevent log flooding.
+    """
+    global _last_progress_log
+    
+    # Log every 30 seconds
+    progress_key = f"{video_id}_{int(current_time/30000)}"
+    if progress_key not in _last_progress_log:
+        _last_progress_log[progress_key] = True
+        percent = int((current_time/duration) * 100)
+        
+        # Get video info for better logging
+        video_info = get_cached_video_info(video_id)
+        if video_info:
+            log(f"Playing: {video_info['song']} - {video_info['artist']} "
+                f"[{percent}% - {int(current_time/1000)}s / {int(duration/1000)}s]")
+```
+
+### 7. Main Playback Controller (State-Based)
 ```python
 def playback_controller():
     """
-    Main playback controller - runs on main thread via timer.
+    Main playback controller with state-based handling.
+    Runs on main thread via timer.
     """
-    global is_playing, current_video_path, current_playback_video_id
-    
-    # Check if scene is active
-    if not scene_active:
-        if is_playing:
-            log("Scene inactive, stopping playback")
-            stop_current_playback()
+    try:
+        # Verify sources exist
+        if not verify_sources():
+            return
+        
+        # Check if scene is active
+        if not is_scene_active():
+            if is_playing():
+                log("Scene inactive, stopping playback")
+                stop_current_playback()
+            return
+        
+        # Check if we have videos to play
+        cached_videos = get_cached_videos()
+        if not cached_videos:
+            # Log waiting message only once
+            if not _waiting_for_videos_logged:
+                log("Waiting for videos to be downloaded and processed...")
+                _waiting_for_videos_logged = True
+            return
+        
+        # Get current media state
+        media_state = get_media_state(MEDIA_SOURCE_NAME)
+        
+        # Handle initial state mismatch
+        if not _initial_state_checked:
+            _initial_state_checked = True
+            if media_state == obs.OBS_MEDIA_STATE_PLAYING and not is_playing():
+                log("Media source is already playing - synchronizing state")
+                # Stop and restart for clean state
+        
+        # Handle different states
+        if media_state == obs.OBS_MEDIA_STATE_PLAYING:
+            handle_playing_state()
+        elif media_state == obs.OBS_MEDIA_STATE_ENDED:
+            handle_ended_state()
+        elif media_state == obs.OBS_MEDIA_STATE_STOPPED:
+            handle_stopped_state()
+        elif media_state == obs.OBS_MEDIA_STATE_NONE:
+            handle_none_state()
+            
+    except Exception as e:
+        log(f"ERROR in playback controller: {e}")
+```
+
+### 8. State Handlers
+```python
+def handle_playing_state():
+    """Handle currently playing video state."""
+    # Sync state if needed
+    if not is_playing():
+        log("Media playing but state out of sync - updating state")
+        set_playing(True)
         return
     
-    # Check if we have videos to play
-    with state_lock:
-        if not cached_videos:
-            return
+    duration = get_media_duration(MEDIA_SOURCE_NAME)
+    current_time = get_media_time(MEDIA_SOURCE_NAME)
     
-    # Get current media state
-    media_state = get_media_state(MEDIA_SOURCE_NAME)
-    
-    # Handle different states
-    if media_state == obs.OBS_MEDIA_STATE_PLAYING:
-        # Video is playing, check if near end
-        duration = get_media_duration(MEDIA_SOURCE_NAME)
-        current_time = get_media_time(MEDIA_SOURCE_NAME)
+    if duration > 0 and current_time > 0:
+        # Log progress without spamming
+        video_id = get_current_playback_video_id()
+        if video_id:
+            log_playback_progress(video_id, current_time, duration)
         
-        if duration > 0 and current_time > 0:
-            time_remaining = duration - current_time
-            # Log progress every 30 seconds
-            if int(current_time / 1000) % 30 == 0:
-                log(f"Playing: {int(current_time/1000)}s / {int(duration/1000)}s")
-            
-            # Check if within last 500ms
-            if time_remaining < 500:
-                log("Video ending, preparing next...")
-                start_next_video()
-                
-    elif media_state == obs.OBS_MEDIA_STATE_ENDED or media_state == obs.OBS_MEDIA_STATE_STOPPED:
-        # Video ended or was stopped
-        if is_playing:
-            log("Playback ended, starting next video")
-            start_next_video()
-            
-    elif media_state == obs.OBS_MEDIA_STATE_NONE:
-        # No media loaded
-        if scene_active and not is_playing:
-            log("Scene active, starting playback")
+        # Check if video is near end (95% complete)
+        if is_video_near_end(duration, current_time, 95):
+            log("Video near end, preparing next...")
             start_next_video()
 
+def handle_stopped_state():
+    """Handle video stopped state with retry logic."""
+    if is_playing():
+        log("Playback stopped, attempting to resume or skip")
+        global _playback_retry_count
+        if _playback_retry_count < _max_retry_attempts:
+            _playback_retry_count += 1
+            log(f"Retry attempt {_playback_retry_count}")
+            start_next_video()
+        else:
+            log("Max retries reached, stopping playback")
+            stop_current_playback()
+```
+
+### 9. Enhanced Video Start Function
+```python
 def start_next_video():
     """
-    Start playing the next video.
+    Start playing the next video with validation and retry logic.
     Must be called from main thread.
     """
-    global is_playing, current_video_path, current_playback_video_id
+    global _playback_retry_count, _last_progress_log
+    
+    log("start_next_video called")
+    
+    # Reset retry count on successful transition
+    _playback_retry_count = 0
+    
+    # Clear progress log for new video
+    _last_progress_log.clear()
     
     # Select next video
     video_id = select_next_video()
     if not video_id:
-        is_playing = False
+        set_playing(False)
         return
     
     # Get video info
-    with state_lock:
-        video_info = cached_videos.get(video_id)
-        if not video_info:
-            return
+    video_info = get_cached_video_info(video_id)
+    if not video_info:
+        log(f"ERROR: No info for video {video_id}")
+        return
+    
+    # Validate video file exists
+    if not os.path.exists(video_info['path']):
+        log(f"ERROR: Video file missing: {video_info['path']}")
+        # Try another video
+        start_next_video()
+        return
     
     # Update sources
     if update_media_source(video_info['path']):
-        update_text_source(video_info['artist'], video_info['song'])
+        update_text_source(video_info['song'], video_info['artist'])
         
-        # Update playback state
-        is_playing = True
-        current_video_path = video_info['path']
-        current_playback_video_id = video_id
+        # Update playback state using accessors
+        set_playing(True)
+        set_current_video_path(video_info['path'])
+        set_current_playback_video_id(video_id)
         
-        log(f"Started playback: {video_info['artist']} - {video_info['song']}")
+        log(f"Started playback: {video_info['song']} - {video_info['artist']}")
     else:
-        is_playing = False
-
-def stop_current_playback():
-    """
-    Stop current playback and clear sources.
-    Must be called from main thread.
-    """
-    global is_playing, current_video_path, current_playback_video_id
-    
-    # Stop media source
-    source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-    if source:
-        obs.obs_source_media_stop(source)
-        obs.obs_source_release(source)
-    
-    # Clear text
-    update_text_source("", "")
-    
-    # Update state
-    is_playing = False
-    current_video_path = None
-    current_playback_video_id = None
-    
-    log("Playback stopped")
+        # Failed to update media source, try another video
+        log("Failed to start video, trying another...")
+        if _playback_retry_count < _max_retry_attempts:
+            _playback_retry_count += 1
+            start_next_video()
+        else:
+            log("Max retries reached, stopping")
+            set_playing(False)
 ```
 
-### 6. Update Script Load/Unload
-Update script_load to start playback timer:
+### 10. Timer Management
 ```python
-def script_load(settings):
-    # ... existing code ...
+def start_playback_controller():
+    """Start the playback controller timer with proper cleanup."""
+    global _playback_timer, _initial_state_checked
     
-    # Start playback controller timer
-    obs.timer_add(playback_controller, PLAYBACK_CHECK_INTERVAL)
-    
-    log("Script loaded successfully")
-```
+    try:
+        # Reset initial state check
+        _initial_state_checked = False
+        
+        # Remove existing timer if any
+        if _playback_timer:
+            obs.timer_remove(_playback_timer)
+        
+        # Add new timer
+        _playback_timer = playback_controller
+        obs.timer_add(_playback_timer, PLAYBACK_CHECK_INTERVAL)
+        log("Playback controller started")
+        
+    except Exception as e:
+        log(f"ERROR starting playback controller: {e}")
 
-Update script_unload to properly stop:
-```python
-def script_unload():
-    # ... existing code ...
+def stop_playback_controller():
+    """Stop the playback controller timer."""
+    global _playback_timer
     
-    # Stop playback
-    if is_playing:
-        stop_current_playback()
-    
-    # ... rest of existing code ...
-```
-
-### 7. Handle Scene Changes
-Update on_frontend_event to handle scene changes:
-```python
-def on_frontend_event(event):
-    """Handle OBS frontend events."""
-    global scene_active
-    
-    if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
-        # Check if our scene is active
-        current_scene = obs.obs_frontend_get_current_scene()
-        if current_scene:
-            scene_name = obs.obs_source_get_name(current_scene)
-            was_active = scene_active
-            scene_active = (scene_name == SCENE_NAME)
+    try:
+        if _playback_timer:
+            obs.timer_remove(_playback_timer)
+            _playback_timer = None
+            log("Playback controller stopped")
             
-            # Log scene transition
-            if scene_active and not was_active:
-                log(f"Scene activated: {scene_name}")
-            elif not scene_active and was_active:
-                log(f"Scene deactivated, was: {scene_name}")
-                
-            obs.obs_source_release(current_scene)
+    except Exception as e:
+        log(f"ERROR stopping playback controller: {e}")
 ```
 
-## Key Considerations
-- All OBS API calls must be on main thread (via timer)
-- Random selection without immediate repeats
-- Detect playback end to auto-advance
-- Stop playback when scene inactive
-- Handle edge cases (no videos, all played)
-- Progress logging for long videos
-- Clean state management
+## Key Features Implemented
+1. **Text Format**: Changed to "Song - Artist" format for better readability
+2. **State Synchronization**: Added handling for media already playing on startup
+3. **Source Verification**: Automatic verification of required OBS sources
+4. **Cache Scanning**: Fixed to handle video IDs with underscores
+5. **Error Handling**: Comprehensive error handling with recovery strategies
+6. **Percentage-Based Detection**: More reliable than fixed millisecond thresholds
+7. **Progress Logging**: Smart caching prevents log spam
+8. **File Validation**: Checks files exist before attempting playback
+9. **Retry Logic**: Handles transient failures gracefully
+10. **Timer Management**: Proper cleanup prevents multiple timers
+11. **Exception Safety**: All functions wrapped in try-catch blocks
+12. **Dynamic Video Availability**: Continuously monitors and starts playback when videos become available
 
 ## Implementation Checklist
-- [ ] Update `SCRIPT_VERSION` (increment MINOR version)
-- [ ] Add current_playback_video_id global
-- [ ] Implement select_next_video with no-repeat logic
-- [ ] Implement media source update functions
-- [ ] Implement playback state detection
-- [ ] Implement main playback_controller
-- [ ] Implement start_next_video
-- [ ] Implement stop_current_playback
-- [ ] Add playback timer in script_load
-- [ ] Update scene change handling
-- [ ] Ensure all OBS calls on main thread
+- [x] Update `SCRIPT_VERSION` (increment MINOR version, then PATCH for each fix)
+- [x] Use state accessors instead of globals
+- [x] Implement select_next_video with proper state management
+- [x] Add file validation to media source updates
+- [x] Implement percentage-based completion detection
+- [x] Add smart progress logging
+- [x] Implement state-based playback controller
+- [x] Add retry logic for failures
+- [x] Implement proper timer management
+- [x] Add comprehensive error handling
+- [x] Ensure all OBS calls on main thread
+- [x] Handle dynamic video availability
+- [x] Support empty cache startup
+- [x] Announce new videos as they're added
+- [x] Change text format to "Song - Artist"
+- [x] Add source verification
+- [x] Fix cache scanning for complex video IDs
+- [x] Add state synchronization
 
 ## Testing Before Commit
-1. Start with empty scene - verify no playback
-2. Switch to player scene - verify playback starts
-3. Let video play to end - verify auto-advance
-4. Switch away from scene - verify playback stops
-5. Switch back to scene - verify playback resumes
-6. Test with only one video - verify it replays
-7. Test with multiple videos - verify no immediate repeats
-8. Check metadata updates with each video
-9. Test with missing media/text source
-10. Verify progress logging for long videos
-11. **Verify version was incremented**
-12. **Test with various video lengths**
+1. **Basic Functionality**
+   - [ ] Start with empty scene - verify no playback
+   - [ ] Switch to player scene - verify playback starts
+   - [ ] Let video play to end - verify auto-advance
+   - [ ] Switch away from scene - verify playback stops
+   - [ ] Switch back to scene - verify playback resumes
+
+2. **Dynamic Video Availability**
+   - [ ] Start with empty cache - verify "Waiting for videos..." message
+   - [ ] Let first video download - verify auto-start with "First video available!"
+   - [ ] Let more videos download - verify "New video added to cache" messages
+   - [ ] Verify new videos join playback pool automatically
+
+3. **Edge Cases**
+   - [ ] Test with only one video - verify it replays
+   - [ ] Test with multiple videos - verify no immediate repeats
+   - [ ] Check metadata updates with each video (Song - Artist format)
+   - [ ] Test with missing media/text source
+   - [ ] Delete a video file while playing - verify recovery
+   - [ ] Test with video IDs containing underscores
+
+4. **State Synchronization**
+   - [ ] Start playback manually, then reload script - verify state sync
+   - [ ] Verify "Media source is already playing - synchronizing state" message
+   - [ ] Confirm clean restart after synchronization
+
+5. **Source Verification**
+   - [ ] Test with missing scene - verify error message
+   - [ ] Test with missing media source - verify warning
+   - [ ] Test with missing text source - verify warning
+   - [ ] Verify source verification output in logs
+
+6. **Robustness**
+   - [ ] Rapid scene switches don't cause crashes
+   - [ ] Progress logging appears at 30s intervals
+   - [ ] **Verify incremented version in logs**
+   - [ ] Test with videos of various lengths
+   - [ ] Memory usage remains stable
+   - [ ] Script reload doesn't create duplicate timers
+
+7. **Logs to Verify**
+   ```
+   [ytfast.py] [timestamp] Script version X.Y.Z loaded
+   [ytfast.py] [timestamp] Playback controller started
+   [ytfast.py] [timestamp] === SOURCE VERIFICATION ===
+   [ytfast.py] [timestamp] Scene 'ytfast': ✓ EXISTS
+   [ytfast.py] [timestamp] Media Source 'video': ✓ EXISTS (type: ffmpeg_source)
+   [ytfast.py] [timestamp] Text Source 'title': ✓ EXISTS
+   [ytfast.py] [timestamp] ==========================
+   [ytfast.py] [timestamp] Waiting for videos to be downloaded and processed...
+   [ytfast.py] [timestamp] First video available! Starting playback with 1 video(s)
+   [ytfast.py] [timestamp] Selected: Song Title - Artist Name
+   [ytfast.py] [timestamp] Updated media source: filename.mp4
+   [ytfast.py] [timestamp] Updated text source: Song Title - Artist Name
+   [ytfast.py] [timestamp] Started playback: Song Title - Artist Name
+   [ytfast.py] [timestamp] New video added to cache. Total videos: 2
+   [ytfast.py] [timestamp] Playing: Song Title - Artist Name [50% - 60s / 120s]
+   [ytfast.py] [timestamp] Video near end, preparing next...
+   ```
 
 ## Commit
-After successful testing, commit with message:  
-> *"Add random playback control with auto-advance (Phase 10)"*
+After successful testing and user approval with logs, commit with message:  
+> *"Implement enhanced playback control with Song-Artist format and state sync (Phase 10)"*
 
 *After verification, proceed to Phase 11.*

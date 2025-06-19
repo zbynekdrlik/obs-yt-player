@@ -4,7 +4,8 @@
 Implement proper scene transition handling and stop button functionality to ensure clean playback control and resource management.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., from 1.10.0 to 1.11.0)
+**This phase adds new features** → Increment MINOR version from current version
+**Remember**: Increment version with EVERY code change during development, not just once per phase.
 
 ## Requirements Reference
 This phase implements scene management from `02-requirements.md`:

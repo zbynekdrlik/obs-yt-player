@@ -22,38 +22,73 @@ def scan_existing_cache():
     
     log("Scanning cache for existing videos...")
     found_count = 0
+    debug_count = 0
     
     # Look for normalized videos
     for file_path in cache_path.glob("*_normalized.mp4"):
+        debug_count += 1
         try:
             # Extract video ID from filename
             # Format: song_artist_videoId_normalized.mp4
+            # Video IDs can contain underscores, so we need careful parsing
             filename = file_path.stem  # Remove .mp4
-            parts = filename.rsplit('_', 2)  # Split from right
             
-            if len(parts) >= 3 and parts[2] == 'normalized':
-                video_id = parts[1]
+            # Must end with _normalized
+            if not filename.endswith('_normalized'):
+                continue
                 
-                # Validate YouTube ID format
-                if not validate_youtube_id(video_id):
-                    continue
-                
-                # Try to extract metadata from filename
-                metadata_parts = parts[0].split('_', 1)
-                if len(metadata_parts) == 2:
-                    song, artist = metadata_parts
+            # Remove _normalized suffix
+            without_suffix = filename[:-11]  # len('_normalized') = 11
+            
+            # Find video ID by searching from the end
+            # YouTube IDs are 11 characters and can contain letters, numbers, - and _
+            parts = without_suffix.split('_')
+            
+            # Try to find a valid YouTube ID from the end
+            video_id = None
+            for i in range(len(parts) - 1, -1, -1):
+                # Try combining parts to form an 11-character ID
+                for j in range(i, len(parts)):
+                    potential_id = '_'.join(parts[i:j+1])
+                    if validate_youtube_id(potential_id):
+                        video_id = potential_id
+                        # Everything before this is song_artist
+                        remaining = '_'.join(parts[:i])
+                        break
+                if video_id:
+                    break
+            
+            if not video_id:
+                log(f"Could not extract video ID from: {filename}")
+                continue
+            
+            # Try to extract metadata from remaining part
+            # The remaining part is song_artist
+            if remaining:
+                # Try to split into song and artist
+                # The last part before video ID should be artist
+                remaining_parts = remaining.rsplit('_', 1)
+                if len(remaining_parts) == 2:
+                    song, artist = remaining_parts
                 else:
-                    song = parts[0]
+                    song = remaining
                     artist = "Unknown Artist"
-                
-                # Add to cached videos
-                add_cached_video(video_id, {
-                    'path': str(file_path),
-                    'song': song.replace('_', ' '),
-                    'artist': artist.replace('_', ' '),
-                    'normalized': True
-                })
-                found_count += 1
+            else:
+                song = "Unknown Song"
+                artist = "Unknown Artist"
+            
+            # Add to cached videos
+            add_cached_video(video_id, {
+                'path': str(file_path),
+                'song': song.replace('_', ' '),
+                'artist': artist.replace('_', ' '),
+                'normalized': True
+            })
+            found_count += 1
+            
+            # Debug log for first few files
+            if debug_count <= 3:
+                log(f"Scanned: {filename} -> ID: {video_id}, Song: {song}, Artist: {artist}")
                         
         except Exception as e:
             log(f"Error scanning file {file_path}: {e}")
