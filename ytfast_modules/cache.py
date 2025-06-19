@@ -10,7 +10,8 @@ from logger import log
 from state import (
     get_cache_dir, get_cached_videos, add_cached_video, 
     remove_cached_video, get_playlist_video_ids,
-    is_video_being_processed, get_cached_video_info
+    is_video_being_processed, get_cached_video_info,
+    get_current_playback_video_id
 )
 from utils import validate_youtube_id
 
@@ -103,13 +104,15 @@ def cleanup_removed_videos():
     
     # Find videos to remove
     videos_to_remove = []
+    current_playing_id = get_current_playback_video_id()
+    
     for video_id in cached_videos:
         if video_id not in playlist_ids:
             # Check if it's currently playing
-            if not is_video_being_processed(video_id):
-                videos_to_remove.append(video_id)
-            else:
+            if video_id == current_playing_id:
                 log(f"Skipping removal of currently playing video: {video_id}")
+            else:
+                videos_to_remove.append(video_id)
     
     # Remove videos
     for video_id in videos_to_remove:
