@@ -5,6 +5,7 @@ Implement proper scene transition handling and stop button functionality to ensu
 
 ## Version Increment
 **This phase adds new features** → Increment MINOR version from current version (2.2.6 → 2.3.0)
+**Bug fix** → Increment PATCH version (2.3.0 → 2.3.1)
 **Remember**: Increment version with EVERY code change during development, not just once per phase.
 
 ## Requirements Reference
@@ -165,6 +166,29 @@ def cleanup_removed_videos():
                 videos_to_remove.append(video_id)
 ```
 
+### 7. Scene Return Fix (v2.3.1)
+Fixed issue where playback wouldn't restart when returning to scene:
+```python
+def handle_playing_state():
+    """Handle currently playing video state."""
+    if not is_playing():
+        log("Media playing but state out of sync - updating state")
+        # Check if we actually have valid playback info
+        current_video_id = get_current_playback_video_id()
+        current_path = get_current_video_path()
+        
+        if not current_video_id or not current_path:
+            # We don't have valid playback info, so stop and restart
+            log("No valid playback info - stopping and restarting")
+            source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+            if source:
+                obs.obs_source_media_stop(source)
+                obs.obs_source_release(source)
+            # Now start fresh
+            start_next_video()
+            return
+```
+
 ## Key Improvements Implemented
 1. **State-Based Stop Request**: Thread-safe flag checked by playback controller
 2. **Complete Source Cleanup**: Media file path cleared to prevent resource locks
@@ -176,6 +200,7 @@ def cleanup_removed_videos():
 8. **Timer Management**: Proper cleanup of all timers
 9. **Resource Protection**: Currently playing video protected from deletion
 10. **Priority-Based Control**: Stop requests handled before other operations
+11. **Scene Return Fix**: Playback properly restarts when returning to scene
 
 ## Implementation Checklist
 - [x] Update `SCRIPT_VERSION` to 2.3.0
@@ -189,6 +214,7 @@ def cleanup_removed_videos():
 - [x] Implement complete source cleanup
 - [x] Add user feedback messages
 - [x] Handle all edge cases
+- [x] Fix scene return playback issue (v2.3.1)
 
 ## Testing Before Commit
 1. **Stop Button Tests**
@@ -199,7 +225,7 @@ def cleanup_removed_videos():
 
 2. **Scene Management**
    - [ ] Switch scenes during playback - verify stop
-   - [ ] Return to scene - verify restart
+   - [ ] Return to scene - **verify playback restarts** (v2.3.1 fix)
    - [ ] Rapid scene switching - verify no glitches
    - [ ] Scene switch while stop is processing
 
@@ -222,18 +248,20 @@ def cleanup_removed_videos():
    - [ ] Stop with missing sources
    - [ ] Stop during network issues
    - [ ] Memory usage over extended use
-   - [ ] **Verify version 2.3.0 in logs**
+   - [ ] **Verify version 2.3.1 in logs**
    - [ ] All timers properly cleaned up
 
 7. **Log Verification**
    ```
-   [ytfast.py] [timestamp] Script version 2.3.0 loaded
+   [ytfast.py] [timestamp] Script version 2.3.1 loaded
    [ytfast.py] [timestamp] Manual stop requested via button
    [ytfast.py] [timestamp] Playback stopped and all sources cleared
    [ytfast.py] [timestamp] Scene deactivated (was on: other_scene)
    [ytfast.py] [timestamp] Scene inactive, stopping playback
-   [ytfast.py] [timestamp] OBS exiting - initiating cleanup
-   [ytfast.py] [timestamp] Skipping removal of currently playing video: video_id
+   [ytfast.py] [timestamp] Scene activated: ytfast
+   [ytfast.py] [timestamp] No valid playback info - stopping and restarting
+   [ytfast.py] [timestamp] start_next_video called
+   [ytfast.py] [timestamp] Started playback: Song - Artist
    ```
 
 ## Known Limitations
@@ -250,6 +278,6 @@ def cleanup_removed_videos():
 
 ## Commit
 After successful testing and user approval with logs, commit with message:  
-> *"Implement scene management and stop button with enhanced cleanup (Phase 11, v2.3.0)"*
+> *"Implement scene management and stop button with enhanced cleanup (Phase 11, v2.3.1)"*
 
 *After verification, proceed to Phase 12.*
