@@ -20,6 +20,7 @@ _scene_active = False
 _is_playing = False
 _stop_threads = False
 _sync_on_startup_done = False
+_stop_requested = False  # New flag for stop button
 
 # Playback state
 _current_video_path = None
@@ -119,6 +120,23 @@ def set_sync_on_startup_done(done):
     global _sync_on_startup_done
     with _state_lock:
         _sync_on_startup_done = done
+
+def is_stop_requested():
+    """Check if stop has been requested (e.g., via stop button)."""
+    with _state_lock:
+        return _stop_requested
+
+def set_stop_requested(requested):
+    """Set stop request flag."""
+    global _stop_requested
+    with _state_lock:
+        _stop_requested = requested
+
+def clear_stop_request():
+    """Clear the stop request flag."""
+    global _stop_requested
+    with _state_lock:
+        _stop_requested = False
 
 # ===== PLAYBACK STATE ACCESSORS =====
 def get_current_video_path():
