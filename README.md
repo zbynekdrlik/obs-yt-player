@@ -13,6 +13,8 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **OBS Integration**: Seamless integration with OBS Studio scenes and sources
 - **Multi-Instance Support**: Rename script to run multiple instances with separate caches
 - **Modular Architecture**: Clean, maintainable code structure with separated concerns
+- **Stop Control**: Manual stop button with complete resource cleanup
+- **Scene Management**: Automatic start/stop based on scene activation
 
 ## Requirements
 
@@ -43,6 +45,8 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 4. The script will sync playlist once on startup
 5. Click "Sync Playlist Now" to manually update the playlist
 6. Switch to your scene to begin random playback
+7. Click "⏹ Stop Playback" to manually stop playback
+8. Switch away from scene to automatically stop playback
 
 ## Multi-Instance Setup
 
@@ -113,18 +117,29 @@ The project is organized into logical implementation phases:
 
 ### Playback & Control
 10. **Phase 10**: Playback Control - Random playback, media source control
-11. **Phase 11**: Scene Management - Handle scene transitions, stop on exit
+11. **Phase 11**: Scene Management - Handle scene transitions, stop button, cleanup on exit
 12. **Phase 12**: Final Polish - Testing, optimization, documentation
 
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
 ## Current Status
 
-Version 2.1.0 - Windows-only release:
-- ✅ Phases 1-9: Complete foundation and processing pipeline
+Version 2.3.0 - Scene management and stop control:
+- ✅ Phases 1-10: Complete foundation, processing, and playback
+- ✅ Phase 11: Scene management with stop button and resource cleanup
 - ✅ Modular code structure with separated concerns
 - ✅ Windows-optimized with platform-specific code removed
-- ⏳ Phase 10-12: Playback control and final polish to be implemented
+- ⏳ Phase 12: Final polish and optimization to be implemented
+
+## Recent Updates
+
+### v2.3.0 - Phase 11 Implementation
+- Added manual Stop Playback button with visual feedback
+- Enhanced scene management with automatic stop on scene exit
+- Complete source cleanup to prevent resource locks
+- OBS exit event handling for graceful shutdown
+- Resource protection for currently playing videos
+- Thread-safe stop request state management
 
 ## License
 
