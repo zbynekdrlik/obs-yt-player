@@ -19,7 +19,7 @@ from state import (
     get_current_playback_video_id, set_current_playback_video_id,
     get_cached_videos, get_cached_video_info,
     get_played_videos, add_played_video, clear_played_videos,
-    is_scene_active, is_sync_on_startup_done
+    is_scene_active
 )
 
 # Module-level variables
@@ -27,15 +27,15 @@ _playback_timer = None
 _last_progress_log = {}
 _playback_retry_count = 0
 _max_retry_attempts = 3
-_startup_delay_count = 0
-_max_startup_delay = 10  # Wait up to 10 seconds for cache to be ready
+_waiting_for_videos_logged = False
+_last_cached_count = 0
 
 def playback_controller():
     """
     Main playback controller - runs on main thread via timer.
     Manages video playback state and transitions.
     """
-    global _startup_delay_count
+    global _waiting_for_videos_logged, _last_cached_count
     
     try:
         # Check if scene is active
@@ -43,28 +43,32 @@ def playback_controller():
             if is_playing():
                 log("Scene inactive, stopping playback")
                 stop_current_playback()
+            # Reset waiting flag when scene is inactive
+            _waiting_for_videos_logged = False
             return
         
         # Check if we have videos to play
         cached_videos = get_cached_videos()
+        current_count = len(cached_videos)
+        
+        # Track changes in video count
+        if current_count != _last_cached_count:
+            if _last_cached_count == 0 and current_count > 0:
+                log(f"First video available! Starting playback with {current_count} video(s)")
+            elif current_count > _last_cached_count:
+                log(f"New video added to cache. Total videos: {current_count}")
+            _last_cached_count = current_count
+            _waiting_for_videos_logged = False
+        
         if not cached_videos:
-            # During startup, wait for cache to be populated
-            if not is_sync_on_startup_done() or _startup_delay_count < _max_startup_delay:
-                if _startup_delay_count == 0:
-                    log("Waiting for cache to be populated...")
-                _startup_delay_count += 1
-                return
-            else:
-                # After startup delay, if still no videos, log once
-                if _startup_delay_count == _max_startup_delay:
-                    log("No videos found in cache after waiting")
-                    _startup_delay_count += 1
-                return
-        else:
-            # We have videos now
-            if _startup_delay_count > 0:
-                log(f"Cache ready with {len(cached_videos)} videos")
-                _startup_delay_count = 0
+            # Log waiting message only once
+            if not _waiting_for_videos_logged:
+                log("Waiting for videos to be downloaded and processed...")
+                _waiting_for_videos_logged = True
+            return
+        
+        # Reset waiting flag since we have videos
+        _waiting_for_videos_logged = False
         
         # Get current media state
         media_state = get_media_state(MEDIA_SOURCE_NAME)
@@ -124,8 +128,10 @@ def handle_stopped_state():
 def handle_none_state():
     """Handle no media loaded state."""
     if is_scene_active() and not is_playing():
-        log("Scene active, starting playback")
-        start_next_video()
+        # Only start if we have videos available
+        if get_cached_videos():
+            log("Scene active and videos available, starting playback")
+            start_next_video()
     elif is_scene_active() and is_playing():
         # This shouldn't happen - playing but no media?
         log("WARNING: Playing state but no media loaded")
@@ -198,6 +204,14 @@ def select_next_video():
     
     available_videos = list(cached_videos.keys())
     played_videos = get_played_videos()
+    
+    # If we only have one video, always play it
+    if len(available_videos) == 1:
+        selected = available_videos[0]
+        # Don't add to played list if it's the only video
+        video_info = cached_videos[selected]
+        log(f"Selected (only video): {video_info['artist']} - {video_info['song']}")
+        return selected
     
     # If all videos have been played, reset the played list
     if len(played_videos) >= len(available_videos):
