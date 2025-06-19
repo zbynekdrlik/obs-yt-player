@@ -124,7 +124,7 @@ Each phase builds upon the previous one, ensuring a systematic and maintainable 
 
 ## Current Status
 
-Version 2.3.0 - Scene management and stop control:
+Version 2.3.1 - Scene management with playback restart fix:
 - ✅ Phases 1-10: Complete foundation, processing, and playback
 - ✅ Phase 11: Scene management with stop button and resource cleanup
 - ✅ Modular code structure with separated concerns
@@ -132,6 +132,11 @@ Version 2.3.0 - Scene management and stop control:
 - ⏳ Phase 12: Final polish and optimization to be implemented
 
 ## Recent Updates
+
+### v2.3.1 - Scene Return Fix
+- Fixed issue where playback wouldn't restart when returning to scene
+- Improved state synchronization when media source reports inconsistent state
+- Enhanced error handling for edge cases
 
 ### v2.3.0 - Phase 11 Implementation
 - Added manual Stop Playback button with visual feedback
