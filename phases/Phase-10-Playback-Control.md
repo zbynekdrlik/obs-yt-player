@@ -22,49 +22,48 @@ _playback_timer = None
 _last_progress_log = {}
 _playback_retry_count = 0
 _max_retry_attempts = 3
+_waiting_for_videos_logged = False
+_last_cached_count = 0
 ```
 
-### 2. Video Selection Logic (Enhanced)
+### 2. Dynamic Video Availability
+The playback controller continuously monitors for videos and handles these scenarios:
+- **Empty cache startup**: Waits for first video to be downloaded
+- **Dynamic addition**: Detects and announces new videos as they're processed
+- **Automatic start**: Begins playback as soon as first video is available
+
+```python
+def playback_controller():
+    """
+    Continuously monitors for videos and manages playback.
+    Handles dynamic video availability - starts when first video ready.
+    """
+    # Track changes in video count
+    if current_count != _last_cached_count:
+        if _last_cached_count == 0 and current_count > 0:
+            log(f"First video available! Starting playback with {current_count} video(s)")
+        elif current_count > _last_cached_count:
+            log(f"New video added to cache. Total videos: {current_count}")
+```
+
+### 3. Video Selection Logic (Enhanced)
 ```python
 def select_next_video():
     """
     Select next video for playback using random no-repeat logic.
-    Uses state accessors for thread-safe operation.
+    Handles single video scenario without adding to played list.
     """
-    cached_videos = get_cached_videos()
+    # Special handling for single video
+    if len(available_videos) == 1:
+        selected = available_videos[0]
+        # Don't add to played list if it's the only video
+        return selected
     
-    if not cached_videos:
-        log("No videos available for playback")
-        return None
-    
-    available_videos = list(cached_videos.keys())
-    played_videos = get_played_videos()
-    
-    # If all videos have been played, reset the played list
-    if len(played_videos) >= len(available_videos):
-        clear_played_videos()
-        played_videos = []
-        log("Reset played videos list")
-    
-    # Find unplayed videos
-    unplayed = [vid for vid in available_videos if vid not in played_videos]
-    
-    if not unplayed:
-        # This shouldn't happen due to reset above, but just in case
-        clear_played_videos()
-        unplayed = available_videos
-    
-    # Select random video from unplayed
-    selected = random.choice(unplayed)
-    add_played_video(selected)
-    
-    video_info = cached_videos[selected]
-    log(f"Selected: {video_info['artist']} - {video_info['song']}")
-    
-    return selected
+    # Multi-video logic with no-repeat
+    # ... rest of implementation
 ```
 
-### 3. Media Source Update Functions (With Error Handling)
+### 4. Media Source Update Functions (With Error Handling)
 ```python
 def update_media_source(video_path):
     """
@@ -100,7 +99,7 @@ def update_media_source(video_path):
         return False
 ```
 
-### 4. Playback State Detection (Enhanced)
+### 5. Playback State Detection (Enhanced)
 ```python
 def is_video_near_end(duration, current_time, threshold_percent=95):
     """
@@ -132,7 +131,7 @@ def log_playback_progress(video_id, current_time, duration):
                 f"[{percent}% - {int(current_time/1000)}s / {int(duration/1000)}s]")
 ```
 
-### 5. Main Playback Controller (State-Based)
+### 6. Main Playback Controller (State-Based)
 ```python
 def playback_controller():
     """
@@ -169,7 +168,7 @@ def playback_controller():
         log(f"ERROR in playback controller: {e}")
 ```
 
-### 6. State Handlers
+### 7. State Handlers
 ```python
 def handle_playing_state():
     """Handle currently playing video state."""
@@ -201,7 +200,7 @@ def handle_stopped_state():
             stop_current_playback()
 ```
 
-### 7. Enhanced Video Start Function
+### 8. Enhanced Video Start Function
 ```python
 def start_next_video():
     """
@@ -256,7 +255,7 @@ def start_next_video():
             set_playing(False)
 ```
 
-### 8. Timer Management
+### 9. Timer Management
 ```python
 def start_playback_controller():
     """Start the playback controller timer with proper cleanup."""
@@ -298,6 +297,8 @@ def stop_playback_controller():
 6. **Retry Logic**: Handles transient failures gracefully
 7. **Timer Management**: Proper cleanup prevents multiple timers
 8. **Exception Safety**: All functions wrapped in try-catch blocks
+9. **Dynamic Video Availability**: Continuously monitors and starts playback when videos become available
+10. **Incremental Updates**: Announces new videos as they're added to the cache
 
 ## Implementation Checklist
 - [x] Update `SCRIPT_VERSION` to 2.2.0 (MINOR increment)
@@ -311,6 +312,9 @@ def stop_playback_controller():
 - [x] Implement proper timer management
 - [x] Add comprehensive error handling
 - [x] Ensure all OBS calls on main thread
+- [x] Handle dynamic video availability
+- [x] Support empty cache startup
+- [x] Announce new videos as they're added
 
 ## Testing Before Commit
 1. **Basic Functionality**
@@ -320,33 +324,42 @@ def stop_playback_controller():
    - [ ] Switch away from scene - verify playback stops
    - [ ] Switch back to scene - verify playback resumes
 
-2. **Edge Cases**
+2. **Dynamic Video Availability**
+   - [ ] Start with empty cache - verify "Waiting for videos..." message
+   - [ ] Let first video download - verify auto-start with "First video available!"
+   - [ ] Let more videos download - verify "New video added to cache" messages
+   - [ ] Verify new videos join playback pool automatically
+
+3. **Edge Cases**
    - [ ] Test with only one video - verify it replays
    - [ ] Test with multiple videos - verify no immediate repeats
    - [ ] Check metadata updates with each video
    - [ ] Test with missing media/text source
    - [ ] Delete a video file while playing - verify recovery
 
-3. **Robustness**
+4. **Robustness**
    - [ ] Rapid scene switches don't cause crashes
    - [ ] Progress logging appears at 30s intervals
-   - [ ] Verify version 2.2.0 in logs
+   - [ ] Verify version 2.2.2 in logs
    - [ ] Test with videos of various lengths
    - [ ] Memory usage remains stable
    - [ ] Script reload doesn't create duplicate timers
 
-4. **Logs to Verify**
+5. **Logs to Verify**
    ```
-   [ytfast.py] [timestamp] Script version 2.2.0 loaded
+   [ytfast.py] [timestamp] Script version 2.2.2 loaded
    [ytfast.py] [timestamp] Playback controller started
+   [ytfast.py] [timestamp] Waiting for videos to be downloaded and processed...
+   [ytfast.py] [timestamp] First video available! Starting playback with 1 video(s)
    [ytfast.py] [timestamp] Selected: Artist - Song
    [ytfast.py] [timestamp] Updated media source: filename.mp4
+   [ytfast.py] [timestamp] New video added to cache. Total videos: 2
    [ytfast.py] [timestamp] Playing: Artist - Song [50% - 60s / 120s]
    [ytfast.py] [timestamp] Video near end, preparing next...
    ```
 
 ## Commit
 After successful testing and user approval with logs, commit with message:  
-> *"Implement enhanced playback control with error recovery (Phase 10)"*
+> *"Implement enhanced playback control with error recovery and dynamic video availability (Phase 10)"*
 
 *After verification, proceed to Phase 11.*
