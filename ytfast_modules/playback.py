@@ -211,6 +211,10 @@ def handle_ended_state():
     if is_playing():
         log("Playback ended, starting next video")
         start_next_video()
+    elif is_scene_active() and get_cached_videos():
+        # Not playing but scene is active and we have videos - start playback
+        log("Scene active and videos available, starting playback")
+        start_next_video()
 
 def handle_stopped_state():
     """Handle video stopped state."""
