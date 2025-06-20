@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.7.7"  # Fixed timer loop issue in duration check callback
+SCRIPT_VERSION = "2.7.8"  # Improved startup cleanup to clear media before hiding
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
