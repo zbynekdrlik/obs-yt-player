@@ -39,6 +39,10 @@ It is authoritative; later Phase prompts reference this spec.
 - Random no‑repeat playback; handle scene transitions.
 - **Transition handling**: Start playback immediately when transitioning TO scene, continue playing until transition completes when leaving scene.
 - Support both regular mode and Studio Mode (preview/program).
+- **Title display timing**:
+  - Clear title 2 seconds before song ends (prevents text on black screen during fade)
+  - Show title 2 seconds after song starts (allows video to establish before text appears)
+  - Use OBS timers for precise timing control
 
 ## Threading
 - All OBS API calls **must** run on main thread (`obs.timer_add`).  

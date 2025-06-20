@@ -13,6 +13,7 @@ This phase implements playback logic from `02-requirements.md`:
 - Update Media Source `video` and Text Source `title`
 - Handle playback end detection
 - Only play when scene is active
+- **Title display timing**: Clear 2s before end, show 2s after start
 
 ## Implementation Details
 
@@ -28,9 +29,100 @@ _last_cached_count = 0
 _first_run = True
 _sources_verified = False
 _initial_state_checked = False
+_title_clear_timer = None
+_title_show_timer = None
+_pending_title_info = None
+_title_clear_scheduled = False
 ```
 
-### 2. Dynamic Video Availability
+### 2. Title Timing Implementation
+The script implements precise title display timing to prevent text appearing on black screens during transitions:
+
+```python
+# Title timing constants (in seconds)
+TITLE_CLEAR_BEFORE_END = 2.0  # Clear title 2 seconds before song ends
+TITLE_SHOW_AFTER_START = 2.0  # Show title 2 seconds after song starts
+
+def clear_title_before_end_callback():
+    """Callback to clear title before song ends."""
+    global _title_clear_timer, _title_clear_scheduled
+    # Remove the timer to prevent it from firing again
+    if _title_clear_timer:
+        obs.timer_remove(_title_clear_timer)
+        _title_clear_timer = None
+    _title_clear_scheduled = False
+    log("Clearing title before song end")
+    update_text_source("", "")
+
+def show_title_after_start_callback():
+    """Callback to show title after song starts."""
+    global _title_show_timer, _pending_title_info
+    # Remove the timer to prevent it from firing again
+    if _title_show_timer:
+        obs.timer_remove(_title_show_timer)
+        _title_show_timer = None
+    
+    if _pending_title_info:
+        song = _pending_title_info.get('song', 'Unknown Song')
+        artist = _pending_title_info.get('artist', 'Unknown Artist')
+        log(f"Showing title after delay: {song} - {artist}")
+        update_text_source(song, artist)
+        _pending_title_info = None
+
+def schedule_title_clear(duration_ms):
+    """Schedule clearing of title before song ends."""
+    global _title_clear_timer, _title_clear_scheduled
+    
+    # Cancel any existing timer
+    if _title_clear_timer:
+        obs.timer_remove(_title_clear_timer)
+        
+    # Calculate when to clear (duration - 2 seconds)
+    clear_time_ms = duration_ms - (TITLE_CLEAR_BEFORE_END * 1000)
+    
+    if clear_time_ms > 0:
+        # Schedule the clear
+        _title_clear_timer = clear_title_before_end_callback
+        obs.timer_add(_title_clear_timer, int(clear_time_ms))
+        _title_clear_scheduled = True
+        log(f"Scheduled title clear in {clear_time_ms/1000:.1f} seconds")
+
+def schedule_title_show(video_info):
+    """Schedule showing of title after song starts."""
+    global _title_show_timer, _pending_title_info
+    
+    # Cancel any existing timer
+    if _title_show_timer:
+        obs.timer_remove(_title_show_timer)
+    
+    # Store the title info for later
+    _pending_title_info = video_info
+    
+    # Clear title immediately
+    update_text_source("", "")
+    
+    # Schedule the show
+    _title_show_timer = show_title_after_start_callback
+    obs.timer_add(_title_show_timer, int(TITLE_SHOW_AFTER_START * 1000))
+    log(f"Scheduled title show in {TITLE_SHOW_AFTER_START} seconds")
+
+def cancel_title_timers():
+    """Cancel any pending title timers."""
+    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled
+    
+    if _title_clear_timer:
+        obs.timer_remove(_title_clear_timer)
+        _title_clear_timer = None
+        
+    if _title_show_timer:
+        obs.timer_remove(_title_show_timer)
+        _title_show_timer = None
+        
+    _pending_title_info = None
+    _title_clear_scheduled = False
+```
+
+### 3. Dynamic Video Availability
 The playback controller continuously monitors for videos and handles these scenarios:
 - **Empty cache startup**: Waits for first video to be downloaded
 - **Dynamic addition**: Detects and announces new videos as they're processed
@@ -51,7 +143,7 @@ def playback_controller():
             log(f"New video added to cache. Total videos: {current_count}")
 ```
 
-### 3. Video Selection Logic (Enhanced)
+### 4. Video Selection Logic (Enhanced)
 ```python
 def select_next_video():
     """
@@ -68,7 +160,7 @@ def select_next_video():
     # ... rest of implementation
 ```
 
-### 4. Media Source Update Functions (With Error Handling)
+### 5. Media Source Update Functions (With Error Handling)
 ```python
 def update_media_source(video_path):
     """
@@ -112,7 +204,16 @@ def update_text_source(song, artist):
     try:
         source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
         if source:
-            text = f"{song} - {artist}" if song and artist else ""
+            # Handle empty text for clearing
+            if song and artist:
+                text = f"{song} - {artist}"
+            elif song:
+                text = song
+            elif artist:
+                text = artist
+            else:
+                text = ""  # Allow empty when clearing
+                
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "text", text)
             
@@ -132,7 +233,7 @@ def update_text_source(song, artist):
         return False
 ```
 
-### 5. Source Verification
+### 6. Source Verification
 ```python
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -143,7 +244,7 @@ def verify_sources():
     # This helps users identify setup issues
 ```
 
-### 6. Playback State Detection (Enhanced)
+### 7. Playback State Detection (Enhanced)
 ```python
 def is_video_near_end(duration, current_time, threshold_percent=95):
     """
@@ -175,7 +276,7 @@ def log_playback_progress(video_id, current_time, duration):
                 f"[{percent}% - {int(current_time/1000)}s / {int(duration/1000)}s]")
 ```
 
-### 7. Main Playback Controller (State-Based)
+### 8. Main Playback Controller (State-Based)
 ```python
 def playback_controller():
     """
@@ -227,7 +328,7 @@ def playback_controller():
         log(f"ERROR in playback controller: {e}")
 ```
 
-### 8. State Handlers
+### 9. State Handlers
 ```python
 def handle_playing_state():
     """Handle currently playing video state."""
@@ -246,10 +347,14 @@ def handle_playing_state():
         if video_id:
             log_playback_progress(video_id, current_time, duration)
         
-        # Check if video is near end (95% complete)
-        if is_video_near_end(duration, current_time, 95):
-            log("Video near end, preparing next...")
-            start_next_video()
+        # Check if we need to schedule title clear
+        global _title_clear_timer, _title_clear_scheduled
+        if not _title_clear_scheduled and _title_clear_timer is None:
+            # Calculate remaining time
+            remaining_ms = duration - current_time
+            if remaining_ms > (TITLE_CLEAR_BEFORE_END * 1000) and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 1) * 1000):
+                # We're within the window where we should schedule the clear
+                schedule_title_clear_from_current(remaining_ms)
 
 def handle_stopped_state():
     """Handle video stopped state with retry logic."""
@@ -265,7 +370,7 @@ def handle_stopped_state():
             stop_current_playback()
 ```
 
-### 9. Enhanced Video Start Function
+### 10. Enhanced Video Start Function
 ```python
 def start_next_video():
     """
@@ -275,6 +380,9 @@ def start_next_video():
     global _playback_retry_count, _last_progress_log
     
     log("start_next_video called")
+    
+    # Cancel any pending title timers
+    cancel_title_timers()
     
     # Reset retry count on successful transition
     _playback_retry_count = 0
@@ -301,9 +409,10 @@ def start_next_video():
         start_next_video()
         return
     
-    # Update sources
+    # Update media source first
     if update_media_source(video_info['path']):
-        update_text_source(video_info['song'], video_info['artist'])
+        # Schedule title display (will clear immediately and show after delay)
+        schedule_title_show(video_info)
         
         # Update playback state using accessors
         set_playing(True)
@@ -311,6 +420,11 @@ def start_next_video():
         set_current_playback_video_id(video_id)
         
         log(f"Started playback: {video_info['song']} - {video_info['artist']}")
+        
+        # Try to get duration and schedule title clear
+        duration = get_media_duration(MEDIA_SOURCE_NAME)
+        if duration > 0:
+            schedule_title_clear(duration)
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
@@ -322,7 +436,7 @@ def start_next_video():
             set_playing(False)
 ```
 
-### 10. Timer Management
+### 11. Timer Management
 ```python
 def start_playback_controller():
     """Start the playback controller timer with proper cleanup."""
@@ -349,6 +463,9 @@ def stop_playback_controller():
     global _playback_timer
     
     try:
+        # Cancel any pending title timers
+        cancel_title_timers()
+        
         if _playback_timer:
             obs.timer_remove(_playback_timer)
             _playback_timer = None
@@ -356,6 +473,18 @@ def stop_playback_controller():
             
     except Exception as e:
         log(f"ERROR stopping playback controller: {e}")
+
+def stop_current_playback():
+    """
+    Enhanced stop with complete cleanup.
+    Must be called from main thread.
+    """
+    global _last_progress_log, _playback_retry_count
+    
+    # Cancel any pending title timers
+    cancel_title_timers()
+    
+    # ... rest of stop implementation
 ```
 
 ## Key Features Implemented
@@ -371,6 +500,7 @@ def stop_playback_controller():
 10. **Timer Management**: Proper cleanup prevents multiple timers
 11. **Exception Safety**: All functions wrapped in try-catch blocks
 12. **Dynamic Video Availability**: Continuously monitors and starts playback when videos become available
+13. **Title Display Timing**: Precise control of when titles appear and disappear to avoid text on black screens
 
 ## Implementation Checklist
 - [x] Update `SCRIPT_VERSION` (increment MINOR version, then PATCH for each fix)
@@ -391,6 +521,9 @@ def stop_playback_controller():
 - [x] Add source verification
 - [x] Fix cache scanning for complex video IDs
 - [x] Add state synchronization
+- [x] Implement title display timing (clear 2s before end, show 2s after start)
+- [x] Add timer callbacks with proper cleanup
+- [x] Prevent timer callback repetition
 
 ## Testing Before Commit
 1. **Basic Functionality**
@@ -406,7 +539,15 @@ def stop_playback_controller():
    - [ ] Let more videos download - verify "New video added to cache" messages
    - [ ] Verify new videos join playback pool automatically
 
-3. **Edge Cases**
+3. **Title Display Timing**
+   - [ ] Verify title appears 2 seconds after song starts
+   - [ ] Verify "Scheduled title show in 2.0 seconds" log message
+   - [ ] Verify title clears 2 seconds before song ends
+   - [ ] Verify "Scheduled title clear in X.X seconds" log message
+   - [ ] Verify smooth transitions without text on black screens
+   - [ ] Verify timer callbacks only fire once
+
+4. **Edge Cases**
    - [ ] Test with only one video - verify it replays
    - [ ] Test with multiple videos - verify no immediate repeats
    - [ ] Check metadata updates with each video (Song - Artist format)
@@ -414,18 +555,18 @@ def stop_playback_controller():
    - [ ] Delete a video file while playing - verify recovery
    - [ ] Test with video IDs containing underscores
 
-4. **State Synchronization**
+5. **State Synchronization**
    - [ ] Start playback manually, then reload script - verify state sync
    - [ ] Verify "Media source is already playing - synchronizing state" message
    - [ ] Confirm clean restart after synchronization
 
-5. **Source Verification**
+6. **Source Verification**
    - [ ] Test with missing scene - verify error message
    - [ ] Test with missing media source - verify warning
    - [ ] Test with missing text source - verify warning
    - [ ] Verify source verification output in logs
 
-6. **Robustness**
+7. **Robustness**
    - [ ] Rapid scene switches don't cause crashes
    - [ ] Progress logging appears at 30s intervals
    - [ ] **Verify incremented version in logs**
@@ -433,7 +574,7 @@ def stop_playback_controller():
    - [ ] Memory usage remains stable
    - [ ] Script reload doesn't create duplicate timers
 
-7. **Logs to Verify**
+8. **Logs to Verify**
    ```
    [ytfast.py] [timestamp] Script version X.Y.Z loaded
    [ytfast.py] [timestamp] Playback controller started
@@ -446,15 +587,20 @@ def stop_playback_controller():
    [ytfast.py] [timestamp] First video available! Starting playback with 1 video(s)
    [ytfast.py] [timestamp] Selected: Song Title - Artist Name
    [ytfast.py] [timestamp] Updated media source: filename.mp4
-   [ytfast.py] [timestamp] Updated text source: Song Title - Artist Name
+   [ytfast.py] [timestamp] Scheduled title show in 2.0 seconds
    [ytfast.py] [timestamp] Started playback: Song Title - Artist Name
+   [ytfast.py] [timestamp] Scheduled title clear in XXX.X seconds
+   [ytfast.py] [timestamp] Showing title after delay: Song Title - Artist Name
+   [ytfast.py] [timestamp] Updated text source: Song Title - Artist Name
    [ytfast.py] [timestamp] New video added to cache. Total videos: 2
    [ytfast.py] [timestamp] Playing: Song Title - Artist Name [50% - 60s / 120s]
-   [ytfast.py] [timestamp] Video near end, preparing next...
+   [ytfast.py] [timestamp] Scheduled title clear in X.X seconds (remaining: X.Xs)
+   [ytfast.py] [timestamp] Clearing title before song end
+   [ytfast.py] [timestamp] Playback ended, starting next video
    ```
 
 ## Commit
 After successful testing and user approval with logs, commit with message:  
-> *"Implement enhanced playback control with Song-Artist format and state sync (Phase 10)"*
+> *"Implement enhanced playback control with Song-Artist format, state sync, and title timing (Phase 10)"*
 
 *After verification, proceed to Phase 11.*
