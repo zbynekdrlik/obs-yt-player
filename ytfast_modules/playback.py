@@ -39,6 +39,7 @@ _title_show_timer = None
 _pending_title_info = None
 _title_clear_scheduled = False  # Track if title clear is already scheduled
 _media_source_hidden = False  # Track if we've hidden the source on startup
+_duration_check_timer = None  # Timer for delayed duration check
 
 # Opacity transition variables
 _opacity_timer = None
@@ -317,7 +318,7 @@ def show_title_after_start_callback():
 
 def cancel_title_timers():
     """Cancel any pending title timers."""
-    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled, _opacity_timer
+    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled, _opacity_timer, _duration_check_timer
     
     if _title_clear_timer:
         obs.timer_remove(_title_clear_timer)
@@ -330,6 +331,10 @@ def cancel_title_timers():
     if _opacity_timer:
         obs.timer_remove(_opacity_timer)
         _opacity_timer = None
+    
+    if _duration_check_timer:
+        obs.timer_remove(_duration_check_timer)
+        _duration_check_timer = None
         
     _pending_title_info = None
     _title_clear_scheduled = False
@@ -763,18 +768,34 @@ def update_text_source(song, artist):
         if song or artist:  # Only fade in if there's content
             fade_in_text()
 
-def schedule_title_clear_with_delay(video_path):
+def delayed_duration_check_callback():
+    """Callback that runs once to check duration and schedule title clear."""
+    global _duration_check_timer
+    
+    # Remove the timer reference so it doesn't get called again
+    if _duration_check_timer:
+        obs.timer_remove(_duration_check_timer)
+        _duration_check_timer = None
+    
+    duration = get_media_duration(MEDIA_SOURCE_NAME)
+    if duration > 0:
+        schedule_title_clear(duration)
+        log(f"Got duration after delay: {duration/1000:.1f}s")
+    else:
+        log("WARNING: Still no duration after delay")
+
+def schedule_title_clear_with_delay():
     """Schedule title clear after a short delay to ensure accurate duration."""
-    def delayed_schedule():
-        duration = get_media_duration(MEDIA_SOURCE_NAME)
-        if duration > 0:
-            schedule_title_clear(duration)
-            log(f"Got duration after delay: {duration/1000:.1f}s")
-        else:
-            log("WARNING: Still no duration after delay")
+    global _duration_check_timer
+    
+    # Cancel any existing timer
+    if _duration_check_timer:
+        obs.timer_remove(_duration_check_timer)
+        _duration_check_timer = None
     
     # Schedule the duration check after 200ms
-    obs.timer_add(delayed_schedule, 200)
+    _duration_check_timer = delayed_duration_check_callback
+    obs.timer_add(_duration_check_timer, 200)
 
 def start_next_video():
     """
@@ -837,7 +858,7 @@ def start_next_video():
         log(f"Started playback: {song} - {artist}")
         
         # Schedule title clear with a delay to ensure accurate duration
-        schedule_title_clear_with_delay(video_info['path'])
+        schedule_title_clear_with_delay()
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
