@@ -9,9 +9,9 @@ import urllib.error
 import urllib.parse
 from typing import Optional, Tuple
 
-from . import state
-from .logger import log
-from .config import SCRIPT_NAME
+import state
+from logger import log
+from config import SCRIPT_NAME
 
 # Gemini API configuration
 GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
