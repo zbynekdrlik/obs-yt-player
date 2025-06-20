@@ -19,8 +19,7 @@ from state import (
     get_current_playback_video_id, set_current_playback_video_id,
     get_cached_videos, get_cached_video_info,
     get_played_videos, add_played_video, clear_played_videos,
-    is_scene_active, is_stop_requested, clear_stop_request,
-    should_stop_threads
+    is_scene_active, should_stop_threads
 )
 
 # Module-level variables
@@ -79,14 +78,7 @@ def playback_controller():
     global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
     
     try:
-        # Priority 1: Check for stop request
-        if is_stop_requested():
-            clear_stop_request()
-            if is_playing():
-                stop_current_playback()
-            return
-        
-        # Priority 2: Check if we're shutting down
+        # Priority 1: Check if we're shutting down
         if should_stop_threads():
             if is_playing():
                 stop_current_playback()
@@ -96,7 +88,7 @@ def playback_controller():
         if not verify_sources():
             return
         
-        # Priority 3: Check if scene is active
+        # Priority 2: Check if scene is active
         if not is_scene_active():
             if is_playing():
                 log("Scene inactive, stopping playback")
@@ -483,7 +475,6 @@ def stop_current_playback():
     """
     Enhanced stop with complete cleanup.
     Must be called from main thread.
-    REMOVED: Status messages and timers that cause the flashing issue
     """
     global _last_progress_log, _playback_retry_count
     
@@ -507,8 +498,7 @@ def stop_current_playback():
             obs.obs_data_release(settings)
             obs.obs_source_release(source)
         
-        # Clear text source - but don't show any status messages
-        # This prevents the "Stopped" / "Ready" messages from appearing
+        # Clear text source
         update_text_source("", "")
         
         # Update state

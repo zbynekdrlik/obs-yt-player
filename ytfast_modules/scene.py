@@ -9,7 +9,7 @@ from config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
 from logger import log
 from state import (
     set_scene_active, is_scene_active, is_playing, 
-    set_stop_requested, set_stop_threads
+    set_stop_threads
 )
 
 # Module-level variables for transition tracking
@@ -80,9 +80,7 @@ def delayed_deactivation():
     if _pending_deactivation:
         log("Deactivating scene after transition delay")
         set_scene_active(False)
-        # Request stop if playing
-        if is_playing():
-            set_stop_requested(True)
+        # Playback controller will handle stopping when scene is inactive
         _pending_deactivation = False
 
 def on_frontend_event(event):
@@ -184,9 +182,7 @@ def handle_scene_change():
                 # Instant scene change or very short transition
                 log(f"Scene deactivated (was on: {scene_name})")
                 set_scene_active(False)
-                # Request stop if playing
-                if is_playing():
-                    set_stop_requested(True)
+                # Playback controller will handle stopping
                     
     finally:
         obs.obs_source_release(current_scene)
@@ -204,10 +200,6 @@ def handle_obs_exit():
     
     # Signal all threads to stop
     set_stop_threads(True)
-    
-    # Request playback stop
-    if is_playing():
-        set_stop_requested(True)
     
     # Allow brief time for cleanup
     time.sleep(0.1)
