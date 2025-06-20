@@ -1,14 +1,14 @@
 # Phase-13‑Gemini‑Metadata
 
 ## Overview
-This phase adds Google Gemini API as a metadata fallback source when AcoustID and title parsing fail. The Gemini LLM will analyze YouTube video URLs to extract artist and song information intelligently.
+This phase adds Google Gemini API as the PRIMARY metadata source when configured. The Gemini LLM provides the most accurate metadata extraction by intelligently analyzing YouTube video URLs and titles.
 
 ## Requirements from 02‑Requirements.md
-- Extends the metadata retrieval cascade:
-  1. Primary: AcoustID
-  2. Secondary: iTunes (if AcoustID fails)
-  3. Tertiary: Title parsing
-  4. **NEW** Quaternary: Gemini API (when all else fails or returns "Unknown Artist")
+- Makes Gemini the primary metadata source:
+  1. **NEW** Primary: Gemini API (when configured with API key)
+  2. Secondary: AcoustID
+  3. Tertiary: iTunes
+  4. Quaternary: Title parsing
 - Maintain all existing universal song title cleaning
 - Log all Gemini API interactions
 
@@ -137,42 +137,42 @@ def clean_gemini_song_title(song: str) -> str:
 
 #### Update `ytfast_modules/metadata.py`:
 
-Add Gemini as the final fallback in the metadata extraction cascade:
+Gemini is now the FIRST metadata source checked:
 
 ```python
 # At the top, import the new module
 from . import gemini_metadata
 
-# In get_video_metadata function, after title parsing:
+# In get_video_metadata function:
 
-    # Existing code...
-    if not metadata['artist'] or not metadata['song']:
-        # Title parsing fallback
-        artist, song = parse_title_fallback(video_title)
-        if artist and song:
-            metadata['artist'] = artist
-            metadata['song'] = song
-            metadata['source'] = 'title_parsing'
-    
-    # NEW: Gemini fallback for Unknown Artist or failed extraction
+def get_video_metadata(filepath, title, video_id=None):
+    """
+    Main metadata extraction function.
+    Tries Gemini first (if configured), then AcoustID, iTunes, and title parsing.
+    Always returns (song, artist, source) - never None.
+    """
+    # NEW: Try Gemini FIRST if API key is configured
     gemini_api_key = state.get_state('gemini_api_key')
-    if gemini_api_key and (not metadata['artist'] or metadata['artist'] == 'Unknown Artist'):
-        log(f"Attempting Gemini metadata extraction for '{video_title}'")
-        artist, song = gemini_metadata.extract_metadata_with_gemini(
-            video_id, video_title, gemini_api_key
+    if gemini_api_key and video_id:
+        log(f"Attempting Gemini metadata extraction for '{title}'")
+        gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(
+            video_id, title, gemini_api_key
         )
-        if artist and song:
-            metadata['artist'] = artist
-            metadata['song'] = apply_title_cleaning(song)  # Apply universal cleaning
-            metadata['source'] = 'Gemini'
-            log(f"Metadata from Gemini: {metadata['artist']} - {metadata['song']}")
+        if gemini_artist and gemini_song:
+            # Apply universal cleaning to Gemini results
+            song = clean_featuring_from_song(gemini_song)
+            artist = gemini_artist
+            log(f"Metadata from Gemini: {artist} - {song}")
+            return song, artist, 'Gemini'
+    
+    # If Gemini fails or not configured, continue with existing cascade...
 ```
 
 #### Update `ytfast_modules/config.py`:
 
 ```python
-# Add to version (increment MINOR for new feature)
-SCRIPT_VERSION = "2.5.0"
+# Add to version (increment PATCH for iteration)
+SCRIPT_VERSION = "2.5.1"
 
 # Add Gemini configuration
 GEMINI_ENABLED_DEFAULT = False  # User must opt-in with API key
@@ -216,19 +216,16 @@ def script_update(settings):
 ## Testing Requirements
 
 Before merging:
-1. **Without API Key**: Verify script works normally without Gemini
-2. **With Invalid Key**: Ensure graceful failure, fallback to "Unknown Artist"
-3. **With Valid Key**: Test on videos that currently show "Unknown Artist"
-4. **Rate Limits**: Verify exponential backoff works
-5. **Network Issues**: Test timeout handling
+1. **Without API Key**: Verify script falls back to AcoustID → iTunes → parsing
+2. **With Invalid Key**: Ensure graceful failure and fallback
+3. **With Valid Key**: Test that Gemini runs FIRST for all videos
+4. **Complex Titles**: Verify improved accuracy on Planetshakers videos
+5. **Performance**: Ensure quick responses (10s timeout)
 
 ### Expected Log Output:
 ```
-[ytfast.py] [timestamp] Script version 2.5.0 loaded
+[ytfast.py] [timestamp] Script version 2.5.1 loaded
 [ytfast.py] [timestamp] Gemini API key configured
-[Unknown Script] [timestamp] [ytfast] No suitable AcoustID matches found
-[Unknown Script] [timestamp] [ytfast] No suitable iTunes matches found  
-[Unknown Script] [timestamp] [ytfast] No reliable artist/song could be parsed
 [Unknown Script] [timestamp] [ytfast] Attempting Gemini metadata extraction for 'Praise On It | Winning Team | Planetshakers Official Music Video'
 [Unknown Script] [timestamp] [ytfast] Gemini response: {"artist": "Planetshakers", "song": "Praise On It"}
 [Unknown Script] [timestamp] [ytfast] Gemini extracted: Planetshakers - Praise On It
@@ -236,11 +233,11 @@ Before merging:
 ```
 
 ## Benefits
-- Resolves "Unknown Artist" issues for complex titles
-- Intelligent parsing using LLM understanding
-- Optional feature - no impact if not configured
-- Minimal API calls - only used as last resort
-- Respects rate limits with exponential backoff
+- **Primary accuracy**: Most accurate metadata extraction method
+- **Complex title handling**: Excels at parsing difficult titles
+- **Intelligent parsing**: Uses LLM understanding of context
+- **Fast results**: No need to fingerprint or search multiple APIs
+- **Optional feature**: Falls back to existing methods if not configured
 
 ## Privacy & Security
 - API key stored securely in OBS (password field)
