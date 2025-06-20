@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.7.6"  # Added media source hide/show to prevent pre-loaded video on startup
+SCRIPT_VERSION = "2.7.7"  # Fixed timer loop issue in duration check callback
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
