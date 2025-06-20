@@ -13,8 +13,8 @@ import urllib.parse
 from config import ACOUSTID_API_KEY, ACOUSTID_ENABLED, SCRIPT_VERSION
 from logger import log
 from utils import get_fpcalc_path, format_duration
-from . import gemini_metadata
-from . import state
+import gemini_metadata
+import state
 
 def get_video_metadata(filepath, title, video_id=None):
     """
@@ -23,7 +23,7 @@ def get_video_metadata(filepath, title, video_id=None):
     Always returns (song, artist, source) - never None.
     """
     # NEW: Try Gemini FIRST if API key is configured
-    gemini_api_key = state.get_state('gemini_api_key')
+    gemini_api_key = state.get_gemini_api_key()
     if gemini_api_key and video_id:
         log(f"Attempting Gemini metadata extraction for '{title}'")
         gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(
