@@ -38,6 +38,7 @@ _title_clear_timer = None
 _title_show_timer = None
 _pending_title_info = None
 _title_clear_scheduled = False  # Track if title clear is already scheduled
+_media_source_hidden = False  # Track if we've hidden the source on startup
 
 # Opacity transition variables
 _opacity_timer = None
@@ -51,6 +52,62 @@ _opacity_filter_created = False
 # Title timing constants (in seconds)
 TITLE_CLEAR_BEFORE_END = 3.5  # Clear title 3.5 seconds before song ends
 TITLE_SHOW_AFTER_START = 1.5  # Show title 1.5 seconds after song starts
+
+def hide_media_source():
+    """Hide the media source to prevent unwanted playback on startup."""
+    global _media_source_hidden
+    
+    scene_source = obs.obs_get_source_by_name(SCENE_NAME)
+    if scene_source:
+        scene = obs.obs_scene_from_source(scene_source)
+        if scene:
+            scene_item = obs.obs_scene_find_source(scene, MEDIA_SOURCE_NAME)
+            if scene_item:
+                obs.obs_sceneitem_set_visible(scene_item, False)
+                _media_source_hidden = True
+                log("Media source hidden on startup")
+        obs.obs_source_release(scene_source)
+
+def show_media_source():
+    """Show the media source when ready to play."""
+    global _media_source_hidden
+    
+    if not _media_source_hidden:
+        return  # Already visible
+        
+    scene_source = obs.obs_get_source_by_name(SCENE_NAME)
+    if scene_source:
+        scene = obs.obs_scene_from_source(scene_source)
+        if scene:
+            scene_item = obs.obs_scene_find_source(scene, MEDIA_SOURCE_NAME)
+            if scene_item:
+                obs.obs_sceneitem_set_visible(scene_item, True)
+                _media_source_hidden = False
+                log("Media source shown")
+        obs.obs_source_release(scene_source)
+
+def clear_media_on_startup():
+    """Clear any pre-loaded media and hide source on script startup."""
+    # First, hide the media source
+    hide_media_source()
+    
+    # Then clear any loaded content
+    source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+    if source:
+        # Stop any playback
+        obs.obs_source_media_stop(source)
+        
+        # Clear the file
+        settings = obs.obs_data_create()
+        obs.obs_data_set_string(settings, "local_file", "")
+        obs.obs_data_set_bool(settings, "unload_when_not_showing", True)
+        obs.obs_data_set_bool(settings, "close_when_inactive", False)
+        
+        obs.obs_source_update(source, settings)
+        obs.obs_data_release(settings)
+        obs.obs_source_release(source)
+        
+        log("Cleared pre-loaded media on startup")
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -706,6 +763,19 @@ def update_text_source(song, artist):
         if song or artist:  # Only fade in if there's content
             fade_in_text()
 
+def schedule_title_clear_with_delay(video_path):
+    """Schedule title clear after a short delay to ensure accurate duration."""
+    def delayed_schedule():
+        duration = get_media_duration(MEDIA_SOURCE_NAME)
+        if duration > 0:
+            schedule_title_clear(duration)
+            log(f"Got duration after delay: {duration/1000:.1f}s")
+        else:
+            log("WARNING: Still no duration after delay")
+    
+    # Schedule the duration check after 200ms
+    obs.timer_add(delayed_schedule, 200)
+
 def start_next_video():
     """
     Start playing the next video.
@@ -753,6 +823,9 @@ def start_next_video():
     
     # Update media source first
     if update_media_source(video_info['path']):
+        # Show the media source if it was hidden
+        show_media_source()
+        
         # Schedule title display (will clear immediately and show after delay)
         schedule_title_show(video_info)
         
@@ -763,10 +836,8 @@ def start_next_video():
         
         log(f"Started playback: {song} - {artist}")
         
-        # Try to get duration and schedule title clear
-        duration = get_media_duration(MEDIA_SOURCE_NAME)
-        if duration > 0:
-            schedule_title_clear(duration)
+        # Schedule title clear with a delay to ensure accurate duration
+        schedule_title_clear_with_delay(video_info['path'])
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
@@ -833,6 +904,9 @@ def start_playback_controller():
     global _playback_timer, _initial_state_checked
     
     try:
+        # Clear any pre-loaded media and hide source on startup
+        clear_media_on_startup()
+        
         # Reset initial state check
         _initial_state_checked = False
         
