@@ -13,6 +13,8 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **OBS Integration**: Seamless integration with OBS Studio scenes and sources
 - **Multi-Instance Support**: Rename script to run multiple instances with separate caches
 - **Modular Architecture**: Clean, maintainable code structure with separated concerns
+- **Scene Management**: Automatic start/stop based on scene activation
+- **Transition Support**: Proper handling of scene transitions with configurable delays
 
 ## Requirements
 
@@ -43,6 +45,15 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 4. The script will sync playlist once on startup
 5. Click "Sync Playlist Now" to manually update the playlist
 6. Switch to your scene to begin random playback
+7. Switch away from scene to automatically stop playback
+
+## Scene Transitions
+
+The script properly handles OBS scene transitions:
+- **Transitioning TO the scene**: Video starts playing immediately as the transition begins
+- **Transitioning FROM the scene**: Video continues playing until the transition completes
+- Works with any transition duration (tested up to 5+ seconds)
+- Supports both regular mode and Studio Mode (preview/program)
 
 ## Multi-Instance Setup
 
@@ -87,7 +98,7 @@ ytfast_modules/
     metadata.py             # Metadata extraction (AcoustID, iTunes, parsing)
     normalize.py            # Audio normalization
     playback.py             # Playback control
-    scene.py                # Scene management
+    scene.py                # Scene management and transition handling
 ```
 
 ### Documentation
@@ -113,18 +124,51 @@ The project is organized into logical implementation phases:
 
 ### Playback & Control
 10. **Phase 10**: Playback Control - Random playback, media source control
-11. **Phase 11**: Scene Management - Handle scene transitions, stop on exit
+11. **Phase 11**: Scene Management - Handle scene transitions, cleanup on exit
 12. **Phase 12**: Final Polish - Testing, optimization, documentation
 
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
 ## Current Status
 
-Version 2.1.0 - Windows-only release:
-- ✅ Phases 1-9: Complete foundation and processing pipeline
+Version 2.3.8 - Scene management with full transition support:
+- ✅ Phases 1-10: Complete foundation, processing, and playback
+- ✅ Phase 11: Scene management with resource cleanup and transition handling
 - ✅ Modular code structure with separated concerns
 - ✅ Windows-optimized with platform-specific code removed
-- ⏳ Phase 10-12: Playback control and final polish to be implemented
+- ⏳ Phase 12: Final polish and optimization to be implemented
+
+## Recent Updates
+
+### v2.3.8 - Stop Button Removed
+- Removed manual stop button functionality for cleaner interface
+- Playback control is now fully automatic based on scene activation
+
+### v2.3.7 - Transition Support
+- Added proper scene transition handling using correct OBS events
+- Transition detection with duration-aware delays
+- Support for both regular mode and Studio Mode
+- Fixed API compatibility issues with non-existent events
+
+### v2.3.6 - Transition Handling Attempt
+- Initial attempt at transition support (fixed in v2.3.7)
+
+### v2.3.5 - Title Flash Fix
+- Removed status messages ("Ready", "⏹ Stopped") that caused UI flashing
+- Text source now stays empty when scene is inactive
+- Cleaner visual experience during scene switches
+
+### v2.3.1 - Scene Return Fix
+- Fixed issue where playback wouldn't restart when returning to scene
+- Improved state synchronization when media source reports inconsistent state
+- Enhanced error handling for edge cases
+
+### v2.3.0 - Phase 11 Implementation
+- Enhanced scene management with automatic stop on scene exit
+- Complete source cleanup to prevent resource locks
+- OBS exit event handling for graceful shutdown
+- Resource protection for currently playing videos
+- Thread-safe state management
 
 ## License
 

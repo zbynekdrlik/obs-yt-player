@@ -1,306 +1,268 @@
-# Phase 11 – Scene Management & Stop Button
+# Phase 11 – Scene Management
 
 ## Goal
-Implement proper scene transition handling and stop button functionality to ensure clean playback control and resource management.
+Implement proper scene transition handling functionality to ensure clean playback control and resource management.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version from current version
+**This phase adds new features** → Increment MINOR version from current version (2.2.6 → 2.3.0)
+**Bug fixes and enhancements** → Increment PATCH versions:
+- v2.3.1: Scene return fix
+- v2.3.5: Title flash fix
+- v2.3.6-2.3.7: Transition handling
+- v2.3.8: Removed stop button functionality
+
 **Remember**: Increment version with EVERY code change during development, not just once per phase.
 
 ## Requirements Reference
 This phase implements scene management from `02-requirements.md`:
 - Handle scene transitions properly
 - Stop playback when leaving scene
-- Add manual stop control
 - Clean up resources on scene exit
+- Support transition-aware playback (start on transition begin, stop after transition end)
 
-## Implementation Details
+## Implementation Summary
 
-### 1. Enhanced Stop Button
-Add stop button to script properties:
-```python
-def script_properties():
-    """Define script properties shown in OBS UI."""
-    props = obs.obs_properties_create()
-    
-    # Playlist URL text field
-    obs.obs_properties_add_text(
-        props, 
-        "playlist_url", 
-        "YouTube Playlist URL", 
-        obs.OBS_TEXT_DEFAULT
-    )
-    
-    # Cache directory text field
-    obs.obs_properties_add_text(
-        props,
-        "cache_dir",
-        "Cache Directory",
-        obs.OBS_TEXT_DEFAULT
-    )
-    
-    # Sync Now button
-    obs.obs_properties_add_button(
-        props,
-        "sync_now",
-        "Sync Playlist Now",
-        sync_now_callback
-    )
-    
-    # Stop Playback button
-    obs.obs_properties_add_button(
-        props,
-        "stop_playback",
-        "Stop Playback",
-        stop_playback_callback
-    )
-    
-    return props
-
-def stop_playback_callback(props, prop):
-    """Callback for Stop Playback button."""
-    log("Manual stop requested")
-    
-    # Use timer to ensure it runs on main thread
-    obs.timer_add(stop_playback_once, 100)
-    return True
-
-def stop_playback_once():
-    """Stop playback once from timer."""
-    obs.timer_remove(stop_playback_once)
-    
-    if is_playing:
-        stop_current_playback()
-        log("Playback stopped by user")
-    else:
-        log("No active playback to stop")
-```
-
-### 2. Improved Scene Transition Handling
+### 1. Enhanced Scene Management
+Scene module with OBS exit handling:
 ```python
 def on_frontend_event(event):
     """Handle OBS frontend events."""
-    global scene_active
-    
-    if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
-        handle_scene_change()
-    elif event == obs.OBS_FRONTEND_EVENT_EXIT:
-        # Clean shutdown when OBS is closing
-        log("OBS exiting, cleaning up...")
-        cleanup_on_exit()
+    try:
+        if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
+            handle_scene_change()
+        elif event == obs.OBS_FRONTEND_EVENT_EXIT:
+            handle_obs_exit()
+        elif event == obs.OBS_FRONTEND_EVENT_FINISHED_LOADING:
+            log("OBS finished loading")
+            verify_initial_state()
+    except Exception as e:
+        log(f"ERROR in frontend event handler: {e}")
 
-def handle_scene_change():
-    """Handle scene change events."""
-    global scene_active
-    
-    # Get current scene
-    current_scene = obs.obs_frontend_get_current_scene()
-    if not current_scene:
-        return
-    
-    scene_name = obs.obs_source_get_name(current_scene)
-    was_active = scene_active
-    scene_active = (scene_name == SCENE_NAME)
-    
-    # Handle activation
-    if scene_active and not was_active:
-        log(f"Scene activated: {scene_name}")
-        # Playback will start automatically via playback_controller
-        
-    # Handle deactivation
-    elif not scene_active and was_active:
-        log(f"Scene deactivated, was on: {scene_name}")
-        # Stop playback immediately
-        if is_playing:
-            # Use timer to ensure it runs on main thread
-            obs.timer_add(stop_on_scene_exit, 100)
-    
-    obs.obs_source_release(current_scene)
-
-def stop_on_scene_exit():
-    """Stop playback when exiting scene."""
-    obs.timer_remove(stop_on_scene_exit)
-    
-    if not scene_active and is_playing:
-        stop_current_playback()
-        log("Stopped playback on scene exit")
+def handle_obs_exit():
+    """Handle OBS exit event."""
+    log("OBS exiting - initiating cleanup")
+    set_stop_threads(True)
+    time.sleep(0.1)  # Allow brief time for cleanup
 ```
 
-### 3. Cleanup Functions
+### 2. Enhanced Playback Controller
+Priority-based request handling:
 ```python
-def cleanup_on_exit():
-    """Clean up resources when OBS exits."""
-    global stop_threads
-    
-    # Signal all threads to stop
-    stop_threads = True
-    
-    # Stop any active playback
-    if is_playing:
-        stop_current_playback()
-    
-    # Clear sources
-    clear_all_sources()
-    
-    log("Cleanup completed")
+def playback_controller():
+    """Main playback controller with scene management."""
+    try:
+        # Priority 1: Check if we're shutting down
+        if should_stop_threads():
+            if is_playing():
+                stop_current_playback()
+            return
+        
+        # Priority 2: Check scene active
+        if not is_scene_active():
+            if is_playing():
+                log("Scene inactive, stopping playback")
+                stop_current_playback()
+            return
+        
+        # ... rest of playback logic ...
+```
 
-def clear_all_sources():
-    """Clear all source content."""
-    # Clear media source
-    source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-    if source:
-        settings = obs.obs_data_create()
-        obs.obs_data_set_string(settings, "local_file", "")
-        obs.obs_source_update(source, settings)
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
+### 3. Complete Source Cleanup (v2.3.5)
+Enhanced stop function without status messages to prevent UI flashing:
+```python
+def stop_current_playback():
+    """Enhanced stop with complete cleanup."""
+    if not is_playing():
+        log("No active playback to stop")
+        return
     
-    # Clear text source
-    source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
-    if source:
-        settings = obs.obs_data_create()
-        obs.obs_data_set_string(settings, "text", "")
-        obs.obs_source_update(source, settings)
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
+    try:
+        # Clear media source completely
+        source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+        if source:
+            obs.obs_source_media_stop(source)
+            
+            # Clear the file path - THIS IS IMPORTANT
+            settings = obs.obs_data_create()
+            obs.obs_data_set_string(settings, "local_file", "")
+            obs.obs_data_set_bool(settings, "unload_when_not_showing", True)
+            
+            obs.obs_source_update(source, settings)
+            obs.obs_data_release(settings)
+            obs.obs_source_release(source)
+        
+        # Clear text source - no status messages to prevent flashing
+        update_text_source("", "")
+        
+        # Update state
+        set_playing(False)
+        set_current_video_path(None)
+        set_current_playback_video_id(None)
 ```
 
 ### 4. Resource Protection
+Updated cache cleanup to protect playing videos:
 ```python
-def is_video_being_processed(video_id):
-    """Check if video is currently being downloaded/processed."""
-    # This will be called before deleting files
-    return video_id == current_playback_video_id
-
 def cleanup_removed_videos():
     """Remove videos that are no longer in playlist."""
-    with state_lock:
-        # Find videos to remove
-        videos_to_remove = []
-        for video_id in cached_videos:
-            if video_id not in playlist_video_ids:
-                # Check if it's currently playing
-                if not is_video_being_processed(video_id):
-                    videos_to_remove.append(video_id)
-                else:
-                    log(f"Skipping removal of currently playing video: {video_id}")
-        
-        # Remove videos
-        for video_id in videos_to_remove:
-            video_info = cached_videos[video_id]
-            try:
-                os.remove(video_info['path'])
-                del cached_videos[video_id]
-                log(f"Removed: {video_info['artist']} - {video_info['song']}")
-            except Exception as e:
-                log(f"Error removing video {video_id}: {e}")
-        
-        if videos_to_remove:
-            log(f"Cleaned up {len(videos_to_remove)} removed videos")
+    current_playing_id = get_current_playback_video_id()
+    
+    for video_id in cached_videos:
+        if video_id not in playlist_ids:
+            # Check if it's currently playing
+            if video_id == current_playing_id:
+                log(f"Skipping removal of currently playing video: {video_id}")
+            else:
+                videos_to_remove.append(video_id)
 ```
 
-### 5. Update Playback Controller
-Enhance the playback controller with better state management:
+### 5. Scene Return Fix (v2.3.1)
+Fixed issue where playback wouldn't restart when returning to scene:
 ```python
-def playback_controller():
-    """Main playback controller - runs on main thread via timer."""
-    global is_playing, current_video_path, current_playback_video_id
-    
-    # Skip if we're shutting down
-    if stop_threads:
-        return
-    
-    # Check if scene is active
-    if not scene_active:
-        if is_playing:
-            log("Scene inactive, stopping playback")
-            stop_current_playback()
-        return
-    
-    # Check if we have videos to play
-    with state_lock:
-        if not cached_videos:
-            if is_playing:
-                # No videos available anymore
-                stop_current_playback()
+def handle_playing_state():
+    """Handle currently playing video state."""
+    if not is_playing():
+        log("Media playing but state out of sync - updating state")
+        # Check if we actually have valid playback info
+        current_video_id = get_current_playback_video_id()
+        current_path = get_current_video_path()
+        
+        if not current_video_id or not current_path:
+            # We don't have valid playback info, so stop and restart
+            log("No valid playback info - stopping and restarting")
+            source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+            if source:
+                obs.obs_source_media_stop(source)
+                obs.obs_source_release(source)
+            # Now start fresh
+            start_next_video()
             return
-    
-    # Rest of existing playback_controller code...
 ```
 
-### 6. Update Stop Current Playback
-Enhance stop function with better cleanup:
+### 6. Transition Handling (v2.3.6-2.3.7)
+Added proper scene transition support using available OBS events:
 ```python
-def stop_current_playback():
-    """Stop current playback and clear sources."""
-    global is_playing, current_video_path, current_playback_video_id
+def handle_scene_change():
+    """Handle scene change events with transition awareness."""
+    global _last_scene_change_time, _pending_deactivation, _deactivation_timer
     
-    if not is_playing:
-        return
+    current_time = time.time() * 1000  # Convert to milliseconds
+    time_since_last_change = current_time - _last_scene_change_time
+    _last_scene_change_time = current_time
     
-    # Stop media source
-    source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-    if source:
-        # Stop playback
-        obs.obs_source_media_stop(source)
+    # Get transition duration
+    transition_duration = obs.obs_frontend_get_transition_duration()
+    
+    # Check if this is likely a transition
+    is_likely_transition = (time_since_last_change < 100) or is_studio_mode_active()
+    
+    if is_active:
+        # Scene becoming active - start immediately
+        log(f"Scene activated: {scene_name}")
+        set_scene_active(True)
+        # Playback controller will handle starting
         
-        # Clear the file path
-        settings = obs.obs_data_create()
-        obs.obs_data_set_string(settings, "local_file", "")
-        obs.obs_source_update(source, settings)
-        obs.obs_data_release(settings)
-        
-        obs.obs_source_release(source)
-    
-    # Clear text
-    update_text_source("", "")
-    
-    # Update state
-    is_playing = False
-    current_video_path = None
-    current_playback_video_id = None
-    
-    log("Playback stopped and sources cleared")
+    else:
+        # Scene becoming inactive
+        if is_likely_transition and transition_duration > 300:
+            # This is likely a transition - delay the deactivation
+            log(f"Scene transitioning out, delaying stop for {transition_duration}ms")
+            _pending_deactivation = True
+            
+            # Set timer for deactivation after transition completes
+            if _deactivation_timer:
+                obs.timer_remove(delayed_deactivation)
+            _deactivation_timer = delayed_deactivation
+            obs.timer_add(_deactivation_timer, int(transition_duration))
 ```
 
-## Key Considerations
-- All source updates must be on main thread
-- Protect currently playing video from deletion
-- Clean scene transitions without glitches
-- Proper resource cleanup on exit
-- Manual stop button for user control
-- Clear sources when stopping
-- Handle edge cases gracefully
+## Key Improvements Implemented
+1. **Complete Source Cleanup**: Media file path cleared to prevent resource locks
+2. **No Status Messages** (v2.3.5): Removed "Ready" and "⏹ Stopped" to prevent UI flashing
+3. **Thread Safety**: All state changes through thread-safe accessors
+4. **Clean Dependencies**: No circular imports between modules
+5. **Comprehensive Error Handling**: Try-except blocks in all critical paths
+6. **Graceful Shutdown**: Proper cleanup on OBS exit
+7. **Timer Management**: Proper cleanup of all timers
+8. **Resource Protection**: Currently playing video protected from deletion
+9. **Scene Return Fix** (v2.3.1): Playback properly restarts when returning to scene
+10. **Transition Support** (v2.3.6-2.3.7): Start immediately on transition to scene, continue until transition completes when leaving
+11. **Simplified Interface** (v2.3.8): Removed manual stop button for cleaner, automatic control
 
 ## Implementation Checklist
-- [ ] Update `SCRIPT_VERSION` (increment MINOR version)
-- [ ] Add Stop Playback button to properties
-- [ ] Implement stop_playback_callback
-- [ ] Enhance scene change handling
-- [ ] Add cleanup_on_exit function
-- [ ] Add clear_all_sources function
-- [ ] Protect playing video from deletion
-- [ ] Update cleanup_removed_videos
-- [ ] Enhance playback_controller checks
-- [ ] Improve stop_current_playback
-- [ ] Handle OBS exit event
+- [x] Update `SCRIPT_VERSION` to 2.3.0
+- [x] Enhance scene change handling
+- [x] Add OBS exit event handling
+- [x] Protect playing video from deletion
+- [x] Update playback controller with priorities
+- [x] Implement complete source cleanup
+- [x] Handle all edge cases
+- [x] Fix scene return playback issue (v2.3.1)
+- [x] Remove status messages to fix UI flashing (v2.3.5)
+- [x] Add transition detection and handling (v2.3.6-2.3.7)
+- [x] Remove stop button functionality (v2.3.8)
 
 ## Testing Before Commit
-1. Test Stop button during playback
-2. Test Stop button when not playing
-3. Switch scenes during playback - verify stop
-4. Return to scene - verify restart
-5. Close OBS during playback - verify cleanup
-6. Test cleanup with playing video in removed list
-7. Verify sources cleared on stop
-8. Test rapid scene switching
-9. Test stop during video transition
-10. Verify no resource leaks
-11. **Verify version was incremented**
-12. **Check all timers cleaned up**
+1. **Scene Management**
+   - [x] Switch scenes during playback - verify stop
+   - [x] Return to scene - **verify playback restarts** (v2.3.1 fix)
+   - [x] Rapid scene switching - verify no glitches
+
+2. **Transition Handling** (v2.3.6-2.3.7)
+   - [x] Test with 5+ second transitions
+   - [x] Verify video starts immediately when transitioning TO scene
+   - [x] Verify video continues playing during fade-out
+   - [x] Test in Studio Mode (preview/program)
+   - [x] Test with different transition types
+
+3. **OBS Exit**
+   - [x] Close OBS during playback - verify cleanup
+   - [x] Check logs for "OBS exiting" message
+   - [x] Verify no error messages on exit
+
+4. **Resource Protection**
+   - [x] Test cleanup with playing video in removed list
+   - [x] Verify playing video not deleted
+   - [x] Check file locks are released
+
+5. **User Experience**
+   - [x] Verify no "⏹ Stopped" or "Ready" messages (v2.3.5)
+   - [x] Verify clean transitions without UI flashing
+   - [x] Check text source updates properly
+
+6. **Edge Cases**
+   - [x] Stop with missing sources
+   - [x] Stop during network issues
+   - [x] Memory usage over extended use
+   - [x] **Verify version 2.3.8 in logs**
+   - [x] All timers properly cleaned up
+
+7. **Log Verification**
+   ```
+   [ytfast.py] [timestamp] Script version 2.3.8 loaded
+   [ytfast.py] [timestamp] Playback stopped and all sources cleared
+   [ytfast.py] [timestamp] Scene transitioning out, delaying stop for 5000ms
+   [ytfast.py] [timestamp] Deactivating scene after transition delay
+   [ytfast.py] [timestamp] Scene activated: ytfast
+   [ytfast.py] [timestamp] No valid playback info - stopping and restarting
+   [ytfast.py] [timestamp] start_next_video called
+   [ytfast.py] [timestamp] Started playback: Song - Artist
+   ```
+
+## Known Limitations
+- Transition detection relies on timing and Studio Mode detection
+- No manual playback control (by design for simplicity)
+
+## Future Enhancements
+- Add Play/Pause buttons if needed
+- Support keyboard shortcuts
+- Add playback status indicator
+- Save stopped state across reloads
+- Add progress bar to text source
+- Detect transition events more precisely when OBS API supports it
 
 ## Commit
-After successful testing, commit with message:  
-> *"Add scene management and stop button (Phase 11)"*
+After successful testing and user approval with logs, commit with message:  
+> *"Complete Phase 11: Scene management with transition support and simplified interface (v2.3.8)"*
 
 *After verification, proceed to Phase 12.*

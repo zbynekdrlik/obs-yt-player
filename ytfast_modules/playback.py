@@ -19,7 +19,7 @@ from state import (
     get_current_playback_video_id, set_current_playback_video_id,
     get_cached_videos, get_cached_video_info,
     get_played_videos, add_played_video, clear_played_videos,
-    is_scene_active
+    is_scene_active, should_stop_threads
 )
 
 # Module-level variables
@@ -78,11 +78,17 @@ def playback_controller():
     global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
     
     try:
+        # Priority 1: Check if we're shutting down
+        if should_stop_threads():
+            if is_playing():
+                stop_current_playback()
+            return
+        
         # Verify sources exist
         if not verify_sources():
             return
         
-        # Check if scene is active
+        # Priority 2: Check if scene is active
         if not is_scene_active():
             if is_playing():
                 log("Scene inactive, stopping playback")
@@ -169,8 +175,23 @@ def handle_playing_state():
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
         log("Media playing but state out of sync - updating state")
+        # Check if we actually have valid playback info
+        current_video_id = get_current_playback_video_id()
+        current_path = get_current_video_path()
+        
+        if not current_video_id or not current_path:
+            # We don't have valid playback info, so stop and restart
+            log("No valid playback info - stopping and restarting")
+            source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+            if source:
+                obs.obs_source_media_stop(source)
+                obs.obs_source_release(source)
+            # Now start fresh
+            start_next_video()
+            return
+        
+        # We have valid info, just update state
         set_playing(True)
-        # We don't know which video is playing, so we can't set the current video info
         return
     
     duration = get_media_duration(MEDIA_SOURCE_NAME)
@@ -182,10 +203,7 @@ def handle_playing_state():
         if video_id:
             log_playback_progress(video_id, current_time, duration)
         
-        # Check if video is near end (95% complete)
-        if is_video_near_end(duration, current_time, 95):
-            log("Video near end, preparing next...")
-            start_next_video()
+        # REMOVED: Early switching logic - let videos play until they naturally end
 
 def handle_ended_state():
     """Handle video ended state."""
@@ -360,7 +378,16 @@ def update_text_source(song, artist):
     try:
         source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
         if source:
-            text = f"{song} - {artist}" if song and artist else ""
+            # Never pass empty text, always have something
+            if song and artist:
+                text = f"{song} - {artist}"
+            elif song:
+                text = song
+            elif artist:
+                text = artist
+            else:
+                text = ""  # Allow empty when clearing
+                
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "text", text)
             
@@ -413,16 +440,24 @@ def start_next_video():
         start_next_video()
         return
     
+    # Extract metadata with fallbacks
+    song = video_info.get('song', 'Unknown Song')
+    artist = video_info.get('artist', 'Unknown Artist')
+    
+    # Log if metadata is missing
+    if song == 'Unknown Song' or artist == 'Unknown Artist':
+        log(f"WARNING: Missing metadata for video {video_id} - Song: '{song}', Artist: '{artist}'")
+    
     # Update sources
     if update_media_source(video_info['path']):
-        update_text_source(video_info['song'], video_info['artist'])
+        update_text_source(song, artist)
         
         # Update playback state
         set_playing(True)
         set_current_video_path(video_info['path'])
         set_current_playback_video_id(video_id)
         
-        log(f"Started playback: {video_info['song']} - {video_info['artist']}")
+        log(f"Started playback: {song} - {artist}")
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
@@ -435,19 +470,32 @@ def start_next_video():
 
 def stop_current_playback():
     """
-    Stop current playback and clear sources.
+    Enhanced stop with complete cleanup.
     Must be called from main thread.
     """
-    global _last_progress_log
+    global _last_progress_log, _playback_retry_count
+    
+    if not is_playing():
+        log("No active playback to stop")
+        return
     
     try:
-        # Stop media source
+        # Clear media source completely
         source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
         if source:
+            # Stop playback
             obs.obs_source_media_stop(source)
+            
+            # Clear the file path - THIS IS IMPORTANT
+            settings = obs.obs_data_create()
+            obs.obs_data_set_string(settings, "local_file", "")
+            obs.obs_data_set_bool(settings, "unload_when_not_showing", True)
+            
+            obs.obs_source_update(source, settings)
+            obs.obs_data_release(settings)
             obs.obs_source_release(source)
         
-        # Clear text
+        # Clear text source
         update_text_source("", "")
         
         # Update state
@@ -455,10 +503,11 @@ def stop_current_playback():
         set_current_video_path(None)
         set_current_playback_video_id(None)
         
-        # Clear progress tracking
+        # Clear tracking
         _last_progress_log.clear()
+        _playback_retry_count = 0
         
-        log("Playback stopped")
+        log("Playback stopped and all sources cleared")
         
     except Exception as e:
         log(f"ERROR stopping playback: {e}")
