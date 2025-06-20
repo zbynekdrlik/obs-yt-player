@@ -10,7 +10,7 @@ from pathlib import Path
 
 from config import (
     PLAYBACK_CHECK_INTERVAL, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME,
-    SCENE_NAME
+    SCENE_NAME, TITLE_FADE_DURATION, TITLE_FADE_STEPS, TITLE_FADE_INTERVAL
 )
 from logger import log
 from state import (
@@ -37,6 +37,14 @@ _title_clear_timer = None
 _title_show_timer = None
 _pending_title_info = None
 _title_clear_scheduled = False  # Track if title clear is already scheduled
+
+# Opacity transition variables
+_opacity_timer = None
+_current_opacity = 100.0
+_target_opacity = 100.0
+_opacity_step = 0.0
+_fade_direction = None  # 'in' or 'out'
+_pending_text = None
 
 # Title timing constants (in seconds)
 TITLE_CLEAR_BEFORE_END = 2.0  # Clear title 2 seconds before song ends
@@ -79,6 +87,98 @@ def verify_sources():
     
     return scene_exists and media_exists and text_exists
 
+def update_text_opacity(opacity):
+    """Update the opacity of the text source."""
+    try:
+        # Get the scene
+        scene_source = obs.obs_get_source_by_name(SCENE_NAME)
+        if not scene_source:
+            return
+        
+        scene = obs.obs_scene_from_source(scene_source)
+        if not scene:
+            obs.obs_source_release(scene_source)
+            return
+        
+        # Find the text source in the scene
+        text_item = obs.obs_scene_find_source(scene, TEXT_SOURCE_NAME)
+        if text_item:
+            # Set opacity (0-100 to 0-255 range)
+            alpha = int((opacity / 100.0) * 255)
+            obs.obs_sceneitem_set_source_alpha(text_item, alpha)
+        
+        obs.obs_source_release(scene_source)
+        
+    except Exception as e:
+        log(f"ERROR updating text opacity: {e}")
+
+def opacity_transition_callback():
+    """Callback for opacity transition timer."""
+    global _opacity_timer, _current_opacity, _target_opacity, _opacity_step, _fade_direction, _pending_text
+    
+    # Update current opacity
+    _current_opacity += _opacity_step
+    
+    # Clamp opacity to valid range
+    if _fade_direction == 'in':
+        _current_opacity = min(_current_opacity, _target_opacity)
+    else:
+        _current_opacity = max(_current_opacity, _target_opacity)
+    
+    # Update the actual opacity
+    update_text_opacity(_current_opacity)
+    
+    # Check if we've reached the target
+    if abs(_current_opacity - _target_opacity) < 0.1:
+        # Remove timer
+        if _opacity_timer:
+            obs.timer_remove(_opacity_timer)
+            _opacity_timer = None
+        
+        _current_opacity = _target_opacity
+        update_text_opacity(_current_opacity)
+        
+        # If fading out and reached 0, update the text
+        if _fade_direction == 'out' and _current_opacity == 0 and _pending_text is not None:
+            update_text_source_content(_pending_text['song'], _pending_text['artist'])
+            _pending_text = None
+            # Now fade in
+            fade_in_text()
+        
+        log(f"Title fade {_fade_direction} complete (opacity: {_current_opacity}%)")
+
+def start_opacity_transition(target, direction):
+    """Start an opacity transition."""
+    global _opacity_timer, _target_opacity, _opacity_step, _fade_direction, _current_opacity
+    
+    # Cancel any existing transition
+    if _opacity_timer:
+        obs.timer_remove(_opacity_timer)
+        _opacity_timer = None
+    
+    _target_opacity = target
+    _fade_direction = direction
+    
+    # Calculate step size
+    opacity_range = abs(_target_opacity - _current_opacity)
+    if opacity_range > 0:
+        _opacity_step = opacity_range / TITLE_FADE_STEPS
+        if direction == 'out':
+            _opacity_step = -_opacity_step
+        
+        # Start the timer
+        _opacity_timer = opacity_transition_callback
+        obs.timer_add(_opacity_timer, TITLE_FADE_INTERVAL)
+        log(f"Starting title fade {direction} (current: {_current_opacity}% -> target: {_target_opacity}%)")
+
+def fade_in_text():
+    """Fade in the text source."""
+    start_opacity_transition(100.0, 'in')
+
+def fade_out_text():
+    """Fade out the text source."""
+    start_opacity_transition(0.0, 'out')
+
 def clear_title_before_end_callback():
     """Callback to clear title before song ends."""
     global _title_clear_timer, _title_clear_scheduled
@@ -87,8 +187,8 @@ def clear_title_before_end_callback():
         obs.timer_remove(_title_clear_timer)
         _title_clear_timer = None
     _title_clear_scheduled = False
-    log("Clearing title before song end")
-    update_text_source("", "")
+    log("Fading out title before song end")
+    fade_out_text()
 
 def show_title_after_start_callback():
     """Callback to show title after song starts."""
@@ -102,12 +202,13 @@ def show_title_after_start_callback():
         song = _pending_title_info.get('song', 'Unknown Song')
         artist = _pending_title_info.get('artist', 'Unknown Artist')
         log(f"Showing title after delay: {song} - {artist}")
-        update_text_source(song, artist)
+        update_text_source_content(song, artist)
+        fade_in_text()
         _pending_title_info = None
 
 def cancel_title_timers():
     """Cancel any pending title timers."""
-    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled
+    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled, _opacity_timer
     
     if _title_clear_timer:
         obs.timer_remove(_title_clear_timer)
@@ -116,6 +217,10 @@ def cancel_title_timers():
     if _title_show_timer:
         obs.timer_remove(_title_show_timer)
         _title_show_timer = None
+    
+    if _opacity_timer:
+        obs.timer_remove(_opacity_timer)
+        _opacity_timer = None
         
     _pending_title_info = None
     _title_clear_scheduled = False
@@ -136,11 +241,11 @@ def schedule_title_clear(duration_ms):
         _title_clear_timer = clear_title_before_end_callback
         obs.timer_add(_title_clear_timer, int(clear_time_ms))
         _title_clear_scheduled = True
-        log(f"Scheduled title clear in {clear_time_ms/1000:.1f} seconds")
+        log(f"Scheduled title fade out in {clear_time_ms/1000:.1f} seconds")
 
 def schedule_title_show(video_info):
     """Schedule showing of title after song starts."""
-    global _title_show_timer, _pending_title_info
+    global _title_show_timer, _pending_title_info, _current_opacity
     
     # Cancel any existing timer
     if _title_show_timer:
@@ -149,8 +254,12 @@ def schedule_title_show(video_info):
     # Store the title info for later
     _pending_title_info = video_info
     
-    # Clear title immediately
-    update_text_source("", "")
+    # Set opacity to 0 immediately (no fade needed as it's a new video)
+    _current_opacity = 0.0
+    update_text_opacity(0.0)
+    
+    # Clear text immediately
+    update_text_source_content("", "")
     
     # Schedule the show
     _title_show_timer = show_title_after_start_callback
@@ -314,7 +423,7 @@ def schedule_title_clear_from_current(remaining_ms):
         _title_clear_timer = clear_title_before_end_callback
         obs.timer_add(_title_clear_timer, int(clear_in_ms))
         _title_clear_scheduled = True
-        log(f"Scheduled title clear in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
+        log(f"Scheduled title fade out in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
 
 def handle_ended_state():
     """Handle video ended state."""
@@ -488,9 +597,9 @@ def update_media_source(video_path):
         log(f"ERROR updating media source: {e}")
         return False
 
-def update_text_source(song, artist):
+def update_text_source_content(song, artist):
     """
-    Update OBS Text Source with metadata.
+    Update OBS Text Source content only (not opacity).
     Must be called from main thread.
     Format: Song - Artist
     """
@@ -515,7 +624,7 @@ def update_text_source(song, artist):
             obs.obs_source_release(source)
             
             if text:
-                log(f"Updated text source: {text}")
+                log(f"Updated text content: {text}")
             return True
         else:
             log(f"WARNING: Text source '{TEXT_SOURCE_NAME}' not found")
@@ -524,6 +633,23 @@ def update_text_source(song, artist):
     except Exception as e:
         log(f"ERROR updating text source: {e}")
         return False
+
+def update_text_source(song, artist):
+    """
+    Update text and trigger fade effect.
+    This is called when we want to change the text with a transition.
+    """
+    global _pending_text
+    
+    # If opacity is not 0, fade out first then update
+    if _current_opacity > 0:
+        _pending_text = {'song': song, 'artist': artist}
+        fade_out_text()
+    else:
+        # Already at 0, just update and fade in
+        update_text_source_content(song, artist)
+        if song or artist:  # Only fade in if there's content
+            fade_in_text()
 
 def start_next_video():
     """
@@ -601,7 +727,7 @@ def stop_current_playback():
     Enhanced stop with complete cleanup.
     Must be called from main thread.
     """
-    global _last_progress_log, _playback_retry_count
+    global _last_progress_log, _playback_retry_count, _current_opacity
     
     # Cancel any pending title timers
     cancel_title_timers()
@@ -626,8 +752,12 @@ def stop_current_playback():
             obs.obs_data_release(settings)
             obs.obs_source_release(source)
         
-        # Clear text source
-        update_text_source("", "")
+        # Fade out text before clearing
+        if _current_opacity > 0:
+            fade_out_text()
+        
+        # Clear text source content
+        update_text_source_content("", "")
         
         # Update state
         set_playing(False)
