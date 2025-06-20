@@ -13,7 +13,6 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **OBS Integration**: Seamless integration with OBS Studio scenes and sources
 - **Multi-Instance Support**: Rename script to run multiple instances with separate caches
 - **Modular Architecture**: Clean, maintainable code structure with separated concerns
-- **Stop Control**: Manual stop button with complete resource cleanup
 - **Scene Management**: Automatic start/stop based on scene activation
 - **Transition Support**: Proper handling of scene transitions with configurable delays
 
@@ -46,8 +45,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 4. The script will sync playlist once on startup
 5. Click "Sync Playlist Now" to manually update the playlist
 6. Switch to your scene to begin random playback
-7. Click "⏹ Stop Playback" to manually stop playback
-8. Switch away from scene to automatically stop playback
+7. Switch away from scene to automatically stop playback
 
 ## Scene Transitions
 
@@ -126,21 +124,25 @@ The project is organized into logical implementation phases:
 
 ### Playback & Control
 10. **Phase 10**: Playback Control - Random playback, media source control
-11. **Phase 11**: Scene Management - Handle scene transitions, stop button, cleanup on exit
+11. **Phase 11**: Scene Management - Handle scene transitions, cleanup on exit
 12. **Phase 12**: Final Polish - Testing, optimization, documentation
 
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
 ## Current Status
 
-Version 2.3.7 - Scene management with full transition support:
+Version 2.3.8 - Scene management with full transition support:
 - ✅ Phases 1-10: Complete foundation, processing, and playback
-- ✅ Phase 11: Scene management with stop button, resource cleanup, and transition handling
+- ✅ Phase 11: Scene management with resource cleanup and transition handling
 - ✅ Modular code structure with separated concerns
 - ✅ Windows-optimized with platform-specific code removed
 - ⏳ Phase 12: Final polish and optimization to be implemented
 
 ## Recent Updates
+
+### v2.3.8 - Stop Button Removed
+- Removed manual stop button functionality for cleaner interface
+- Playback control is now fully automatic based on scene activation
 
 ### v2.3.7 - Transition Support
 - Added proper scene transition handling using correct OBS events
@@ -162,12 +164,11 @@ Version 2.3.7 - Scene management with full transition support:
 - Enhanced error handling for edge cases
 
 ### v2.3.0 - Phase 11 Implementation
-- Added manual Stop Playback button with visual feedback
 - Enhanced scene management with automatic stop on scene exit
 - Complete source cleanup to prevent resource locks
 - OBS exit event handling for graceful shutdown
 - Resource protection for currently playing videos
-- Thread-safe stop request state management
+- Thread-safe state management
 
 ## License
 

@@ -32,7 +32,7 @@ It is authoritative; later Phase prompts reference this spec.
 ## Playback Logic
 - Scene name == script filename without extension (e.g. `ytfast.py` → scene `ytfast`).  
 - Media Source `video`, Text Source `title`.  
-- Random no‑repeat playback; handle stop button & scene transitions.
+- Random no‑repeat playback; handle scene transitions.
 - **Transition handling**: Start playback immediately when transitioning TO scene, continue playing until transition completes when leaving scene.
 - Support both regular mode and Studio Mode (preview/program).
 
@@ -53,7 +53,7 @@ It is authoritative; later Phase prompts reference this spec.
 - Log script version on startup.
 
 ## Versioning
-- Maintain version constant in script (`SCRIPT_VERSION = "X.Y.Z"`)
+- Maintain version constant in script (`SCRIPT_VERSION = "X.Y.Z"`)  
 - Increment version with each development iteration:
   - **MAJOR**: New phases, significant feature additions
   - **MINOR**: Enhancements within existing phases
