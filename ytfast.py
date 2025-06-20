@@ -27,8 +27,7 @@ from logger import log
 from state import (
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
-    is_tools_ready, set_stop_threads,
-    set_stop_requested, is_playing
+    is_tools_ready, set_stop_threads
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
@@ -70,14 +69,6 @@ def script_properties():
         "sync_now",
         "Sync Playlist Now",
         sync_now_callback
-    )
-    
-    # Stop Playback button
-    obs.obs_properties_add_button(
-        props,
-        "stop_playback",
-        "⏹ Stop Playback",
-        stop_playback_callback
     )
     
     return props
@@ -129,10 +120,6 @@ def script_unload():
     # Signal threads to stop
     set_stop_threads(True)
     
-    # Request stop if playing
-    if is_playing():
-        set_stop_requested(True)
-    
     # Stop all worker threads
     stop_worker_threads()
     
@@ -160,14 +147,6 @@ def sync_now_callback(props, prop):
     
     # Trigger playlist sync
     trigger_manual_sync()
-    return True
-
-def stop_playback_callback(props, prop):
-    """Callback for Stop Playback button."""
-    log("Manual stop requested via button")
-    
-    # Set stop request flag - playback controller will handle it
-    set_stop_requested(True)
     return True
 
 # ===== WORKER THREAD MANAGEMENT =====
