@@ -40,6 +40,7 @@ _pending_title_info = None
 _title_clear_scheduled = False  # Track if title clear is already scheduled
 _media_source_hidden = False  # Track if we've hidden the source on startup
 _duration_check_timer = None  # Timer for delayed duration check
+_startup_cleared = False  # Track if we've done startup cleanup
 
 # Opacity transition variables
 _opacity_timer = None
@@ -66,7 +67,7 @@ def hide_media_source():
             if scene_item:
                 obs.obs_sceneitem_set_visible(scene_item, False)
                 _media_source_hidden = True
-                log("Media source hidden on startup")
+                log("Media source hidden")
         obs.obs_source_release(scene_source)
 
 def show_media_source():
@@ -89,6 +90,13 @@ def show_media_source():
 
 def clear_media_on_startup():
     """Clear any pre-loaded media and hide source on script startup."""
+    global _startup_cleared
+    
+    if _startup_cleared:
+        return  # Already done
+    
+    _startup_cleared = True
+    
     # First clear any loaded content BEFORE hiding
     source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
     if source:
@@ -118,6 +126,11 @@ def clear_media_on_startup():
         obs.obs_source_update(source, settings)
         obs.obs_data_release(settings)
         obs.obs_source_release(source)
+    
+    # Reset state variables
+    set_playing(False)
+    set_current_video_path(None)
+    set_current_playback_video_id(None)
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -397,6 +410,9 @@ def playback_controller():
     global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
     
     try:
+        # Ensure startup cleanup happened
+        clear_media_on_startup()
+        
         # Priority 1: Check if we're shutting down
         if should_stop_threads():
             if is_playing():
@@ -929,12 +945,16 @@ def stop_current_playback():
     except Exception as e:
         log(f"ERROR stopping playback: {e}")
 
+# Call startup cleanup immediately when module is imported
+# This happens before any timers are started
+clear_media_on_startup()
+
 def start_playback_controller():
     """Start the playback controller timer."""
     global _playback_timer, _initial_state_checked
     
     try:
-        # Clear any pre-loaded media and hide source on startup
+        # Ensure cleanup happened (in case module wasn't imported properly)
         clear_media_on_startup()
         
         # Reset initial state check
