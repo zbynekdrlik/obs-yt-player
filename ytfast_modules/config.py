@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.6.1"  # Fixed title timing implementation - properly added timer functions
+SCRIPT_VERSION = "2.6.2"  # Fixed timer callbacks to prevent repeated firing
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))

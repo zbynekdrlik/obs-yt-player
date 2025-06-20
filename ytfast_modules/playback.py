@@ -36,6 +36,7 @@ _initial_state_checked = False
 _title_clear_timer = None
 _title_show_timer = None
 _pending_title_info = None
+_title_clear_scheduled = False  # Track if title clear is already scheduled
 
 # Title timing constants (in seconds)
 TITLE_CLEAR_BEFORE_END = 2.0  # Clear title 2 seconds before song ends
@@ -80,15 +81,22 @@ def verify_sources():
 
 def clear_title_before_end_callback():
     """Callback to clear title before song ends."""
-    global _title_clear_timer
-    _title_clear_timer = None
+    global _title_clear_timer, _title_clear_scheduled
+    # Remove the timer to prevent it from firing again
+    if _title_clear_timer:
+        obs.timer_remove(_title_clear_timer)
+        _title_clear_timer = None
+    _title_clear_scheduled = False
     log("Clearing title before song end")
     update_text_source("", "")
 
 def show_title_after_start_callback():
     """Callback to show title after song starts."""
     global _title_show_timer, _pending_title_info
-    _title_show_timer = None
+    # Remove the timer to prevent it from firing again
+    if _title_show_timer:
+        obs.timer_remove(_title_show_timer)
+        _title_show_timer = None
     
     if _pending_title_info:
         song = _pending_title_info.get('song', 'Unknown Song')
@@ -99,7 +107,7 @@ def show_title_after_start_callback():
 
 def cancel_title_timers():
     """Cancel any pending title timers."""
-    global _title_clear_timer, _title_show_timer, _pending_title_info
+    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled
     
     if _title_clear_timer:
         obs.timer_remove(_title_clear_timer)
@@ -110,10 +118,11 @@ def cancel_title_timers():
         _title_show_timer = None
         
     _pending_title_info = None
+    _title_clear_scheduled = False
 
 def schedule_title_clear(duration_ms):
     """Schedule clearing of title before song ends."""
-    global _title_clear_timer
+    global _title_clear_timer, _title_clear_scheduled
     
     # Cancel any existing timer
     if _title_clear_timer:
@@ -126,6 +135,7 @@ def schedule_title_clear(duration_ms):
         # Schedule the clear
         _title_clear_timer = clear_title_before_end_callback
         obs.timer_add(_title_clear_timer, int(clear_time_ms))
+        _title_clear_scheduled = True
         log(f"Scheduled title clear in {clear_time_ms/1000:.1f} seconds")
 
 def schedule_title_show(video_info):
@@ -281,8 +291,8 @@ def handle_playing_state():
             log_playback_progress(video_id, current_time, duration)
         
         # Check if we need to schedule title clear
-        global _title_clear_timer
-        if _title_clear_timer is None:
+        global _title_clear_timer, _title_clear_scheduled
+        if not _title_clear_scheduled and _title_clear_timer is None:
             # Calculate remaining time
             remaining_ms = duration - current_time
             if remaining_ms > (TITLE_CLEAR_BEFORE_END * 1000) and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 1) * 1000):
@@ -291,7 +301,7 @@ def handle_playing_state():
 
 def schedule_title_clear_from_current(remaining_ms):
     """Schedule title clear based on remaining time."""
-    global _title_clear_timer
+    global _title_clear_timer, _title_clear_scheduled
     
     # Cancel any existing timer
     if _title_clear_timer:
@@ -303,6 +313,7 @@ def schedule_title_clear_from_current(remaining_ms):
     if clear_in_ms > 0:
         _title_clear_timer = clear_title_before_end_callback
         obs.timer_add(_title_clear_timer, int(clear_in_ms))
+        _title_clear_scheduled = True
         log(f"Scheduled title clear in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
 
 def handle_ended_state():
