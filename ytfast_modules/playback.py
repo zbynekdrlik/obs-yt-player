@@ -49,8 +49,8 @@ _pending_text = None
 _opacity_filter_created = False
 
 # Title timing constants (in seconds)
-TITLE_CLEAR_BEFORE_END = 2.0  # Clear title 2 seconds before song ends
-TITLE_SHOW_AFTER_START = 2.0  # Show title 2 seconds after song starts
+TITLE_CLEAR_BEFORE_END = 1.0  # Clear title 1 second before song ends
+TITLE_SHOW_AFTER_START = 1.0  # Show title 1 second after song starts
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -285,7 +285,7 @@ def schedule_title_clear(duration_ms):
     if _title_clear_timer:
         obs.timer_remove(_title_clear_timer)
         
-    # Calculate when to clear (duration - 2 seconds)
+    # Calculate when to clear (duration - 1 second)
     clear_time_ms = duration_ms - (TITLE_CLEAR_BEFORE_END * 1000)
     
     if clear_time_ms > 0:
