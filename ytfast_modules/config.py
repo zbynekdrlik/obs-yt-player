@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.5.0"  # Added Google Gemini API as optional metadata source
+SCRIPT_VERSION = "2.5.1"  # Gemini API now primary metadata source (not fallback)
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
