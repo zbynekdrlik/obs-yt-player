@@ -28,7 +28,7 @@ from state import (
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
     is_tools_ready, set_stop_threads,
-    set_state  # Import set_state for storing Gemini API key
+    set_gemini_api_key  # Use the correct function name
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
@@ -115,10 +115,10 @@ def script_update(settings):
     
     # Store Gemini API key in state if provided
     if gemini_key:
-        set_state('gemini_api_key', gemini_key)
+        set_gemini_api_key(gemini_key)
         log("Gemini API key configured")
     else:
-        set_state('gemini_api_key', None)
+        set_gemini_api_key(None)
     
     log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}")
 
