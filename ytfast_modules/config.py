@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.5.4"  # Fixed all relative imports to use absolute imports
+SCRIPT_VERSION = "2.5.5"  # Updated Gemini API endpoint to use gemini-2.0-flash model
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
