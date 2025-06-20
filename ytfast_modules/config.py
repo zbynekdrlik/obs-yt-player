@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.5.2"  # Fixed import error for Gemini API key state management
+SCRIPT_VERSION = "2.5.3"  # Fixed all import errors for Gemini metadata feature
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
