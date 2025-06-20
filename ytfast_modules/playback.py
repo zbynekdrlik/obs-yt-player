@@ -33,6 +33,13 @@ _last_cached_count = 0
 _first_run = True
 _sources_verified = False
 _initial_state_checked = False
+_title_clear_timer = None
+_title_show_timer = None
+_pending_title_info = None
+
+# Title timing constants (in seconds)
+TITLE_CLEAR_BEFORE_END = 2.0  # Clear title 2 seconds before song ends
+TITLE_SHOW_AFTER_START = 2.0  # Show title 2 seconds after song starts
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -70,6 +77,75 @@ def verify_sources():
         _sources_verified = True
     
     return scene_exists and media_exists and text_exists
+
+def clear_title_before_end_callback():
+    """Callback to clear title before song ends."""
+    global _title_clear_timer
+    _title_clear_timer = None
+    log("Clearing title before song end")
+    update_text_source("", "")
+
+def show_title_after_start_callback():
+    """Callback to show title after song starts."""
+    global _title_show_timer, _pending_title_info
+    _title_show_timer = None
+    
+    if _pending_title_info:
+        song = _pending_title_info.get('song', 'Unknown Song')
+        artist = _pending_title_info.get('artist', 'Unknown Artist')
+        log(f"Showing title after delay: {song} - {artist}")
+        update_text_source(song, artist)
+        _pending_title_info = None
+
+def cancel_title_timers():
+    """Cancel any pending title timers."""
+    global _title_clear_timer, _title_show_timer, _pending_title_info
+    
+    if _title_clear_timer:
+        obs.timer_remove(_title_clear_timer)
+        _title_clear_timer = None
+        
+    if _title_show_timer:
+        obs.timer_remove(_title_show_timer)
+        _title_show_timer = None
+        
+    _pending_title_info = None
+
+def schedule_title_clear(duration_ms):
+    """Schedule clearing of title before song ends."""
+    global _title_clear_timer
+    
+    # Cancel any existing timer
+    if _title_clear_timer:
+        obs.timer_remove(_title_clear_timer)
+        
+    # Calculate when to clear (duration - 2 seconds)
+    clear_time_ms = duration_ms - (TITLE_CLEAR_BEFORE_END * 1000)
+    
+    if clear_time_ms > 0:
+        # Schedule the clear
+        _title_clear_timer = clear_title_before_end_callback
+        obs.timer_add(_title_clear_timer, int(clear_time_ms))
+        log(f"Scheduled title clear in {clear_time_ms/1000:.1f} seconds")
+
+def schedule_title_show(video_info):
+    """Schedule showing of title after song starts."""
+    global _title_show_timer, _pending_title_info
+    
+    # Cancel any existing timer
+    if _title_show_timer:
+        obs.timer_remove(_title_show_timer)
+    
+    # Store the title info for later
+    _pending_title_info = video_info
+    
+    # Clear title immediately
+    update_text_source("", "")
+    
+    # Schedule the show
+    _title_show_timer = show_title_after_start_callback
+    obs.timer_add(_title_show_timer, int(TITLE_SHOW_AFTER_START * 1000))
+    log(f"Scheduled title show in {TITLE_SHOW_AFTER_START} seconds")
 
 def playback_controller():
     """
@@ -204,7 +280,30 @@ def handle_playing_state():
         if video_id:
             log_playback_progress(video_id, current_time, duration)
         
-        # REMOVED: Early switching logic - let videos play until they naturally end
+        # Check if we need to schedule title clear
+        global _title_clear_timer
+        if _title_clear_timer is None:
+            # Calculate remaining time
+            remaining_ms = duration - current_time
+            if remaining_ms > (TITLE_CLEAR_BEFORE_END * 1000) and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 1) * 1000):
+                # We're within the window where we should schedule the clear
+                schedule_title_clear_from_current(remaining_ms)
+
+def schedule_title_clear_from_current(remaining_ms):
+    """Schedule title clear based on remaining time."""
+    global _title_clear_timer
+    
+    # Cancel any existing timer
+    if _title_clear_timer:
+        obs.timer_remove(_title_clear_timer)
+    
+    # Calculate when to clear
+    clear_in_ms = remaining_ms - (TITLE_CLEAR_BEFORE_END * 1000)
+    
+    if clear_in_ms > 0:
+        _title_clear_timer = clear_title_before_end_callback
+        obs.timer_add(_title_clear_timer, int(clear_in_ms))
+        log(f"Scheduled title clear in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
 
 def handle_ended_state():
     """Handle video ended state."""
@@ -424,6 +523,9 @@ def start_next_video():
     
     log("start_next_video called")
     
+    # Cancel any pending title timers
+    cancel_title_timers()
+    
     # Reset retry count on successful transition
     _playback_retry_count = 0
     
@@ -457,9 +559,10 @@ def start_next_video():
     if song == 'Unknown Song' or artist == 'Unknown Artist':
         log(f"WARNING: Missing metadata for video {video_id} - Song: '{song}', Artist: '{artist}'")
     
-    # Update sources
+    # Update media source first
     if update_media_source(video_info['path']):
-        update_text_source(song, artist)
+        # Schedule title display (will clear immediately and show after delay)
+        schedule_title_show(video_info)
         
         # Update playback state
         set_playing(True)
@@ -467,6 +570,11 @@ def start_next_video():
         set_current_playback_video_id(video_id)
         
         log(f"Started playback: {song} - {artist}")
+        
+        # Try to get duration and schedule title clear
+        duration = get_media_duration(MEDIA_SOURCE_NAME)
+        if duration > 0:
+            schedule_title_clear(duration)
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
@@ -483,6 +591,9 @@ def stop_current_playback():
     Must be called from main thread.
     """
     global _last_progress_log, _playback_retry_count
+    
+    # Cancel any pending title timers
+    cancel_title_timers()
     
     if not is_playing():
         log("No active playback to stop")
@@ -546,6 +657,9 @@ def stop_playback_controller():
     global _playback_timer
     
     try:
+        # Cancel any pending title timers
+        cancel_title_timers()
+        
         if _playback_timer:
             obs.timer_remove(_playback_timer)
             _playback_timer = None
