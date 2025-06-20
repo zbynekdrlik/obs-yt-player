@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.4.1"  # Fixed playback start issue and added duration formatting to metadata logs
+SCRIPT_VERSION = "2.5.0"  # Added Google Gemini API as optional metadata source
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -43,6 +43,9 @@ NORMALIZE_TIMEOUT = 300  # 5 minutes
 # AcoustID settings
 ACOUSTID_API_KEY = "RXS1uld515"
 ACOUSTID_ENABLED = True
+
+# Gemini API settings
+GEMINI_ENABLED_DEFAULT = False  # User must opt-in with API key
 
 # Tool download URLs (Windows-only)
 YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
