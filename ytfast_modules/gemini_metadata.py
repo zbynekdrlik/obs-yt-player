@@ -1,0 +1,114 @@
+"""
+Google Gemini API metadata extraction for YouTube videos.
+Uses Gemini to intelligently parse artist and song from video context.
+"""
+import json
+import time
+import urllib.request
+import urllib.error
+import urllib.parse
+from typing import Optional, Tuple
+
+from . import state
+from .logger import log
+from .config import SCRIPT_NAME
+
+# Gemini API configuration
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+GEMINI_TIMEOUT = 10  # seconds
+MAX_RETRIES = 2
+
+def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extract artist and song metadata using Google Gemini API.
+    
+    Args:
+        video_id: YouTube video ID
+        video_title: Original video title
+        api_key: Gemini API key (from OBS script properties)
+        
+    Returns:
+        Tuple of (artist, song) or (None, None) if extraction fails
+    """
+    if not api_key:
+        return None, None
+        
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    prompt = f"""Analyze this YouTube music video and extract the artist name and song title.
+
+Video URL: {video_url}
+Video Title: {video_title}
+
+Please respond with ONLY a JSON object in this exact format:
+{{"artist": "Artist Name", "song": "Song Title"}}
+
+Guidelines:
+- If featuring multiple artists, list the primary artist
+- Remove any extra information like (Official Video), [Live], (feat.), etc from the song title
+- If you cannot determine either field, use null
+- Base your response on the video title and any context available"""
+
+    request_body = {
+        "contents": [{
+            "parts": [{
+                "text": prompt
+            }]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,  # Low temperature for consistent results
+            "maxOutputTokens": 100
+        }
+    }
+    
+    for attempt in range(MAX_RETRIES):
+        try:
+            request = urllib.request.Request(
+                f"{GEMINI_API_ENDPOINT}?key={api_key}",
+                data=json.dumps(request_body).encode('utf-8'),
+                headers={
+                    'Content-Type': 'application/json'
+                }
+            )
+            
+            with urllib.request.urlopen(request, timeout=GEMINI_TIMEOUT) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                
+                # Extract the generated text
+                if 'candidates' in result and result['candidates']:
+                    text = result['candidates'][0]['content']['parts'][0]['text']
+                    log(f"Gemini response for '{video_title}': {text}")
+                    
+                    try:
+                        # Parse the JSON response
+                        metadata = json.loads(text.strip())
+                        artist = metadata.get('artist')
+                        song = metadata.get('song')
+                        
+                        if artist and song:
+                            log(f"Gemini extracted: {artist} - {song}")
+                            return artist, song
+                    except json.JSONDecodeError:
+                        log(f"Failed to parse Gemini JSON response: {text}")
+                        
+        except urllib.error.HTTPError as e:
+            log(f"Gemini API HTTP error (attempt {attempt + 1}): {e.code} - {e.reason}")
+            if e.code == 429:  # Rate limit
+                time.sleep(2 ** attempt)  # Exponential backoff
+        except urllib.error.URLError as e:
+            log(f"Gemini API URL error (attempt {attempt + 1}): {str(e)}")
+        except Exception as e:
+            log(f"Gemini API error (attempt {attempt + 1}): {str(e)}")
+            
+        if attempt < MAX_RETRIES - 1:
+            time.sleep(1)  # Brief pause between retries
+            
+    log(f"Gemini metadata extraction failed for '{video_title}'")
+    return None, None
+
+def clean_gemini_song_title(song: str) -> str:
+    """
+    Apply same cleaning rules as other metadata sources.
+    """
+    # This will be handled by the universal cleaner
+    return song
