@@ -7,6 +7,7 @@ import time
 import urllib.request
 import urllib.error
 import urllib.parse
+import re
 from typing import Optional, Tuple
 
 import state
@@ -80,16 +81,30 @@ Guidelines:
                     log(f"Gemini response for '{video_title}': {text}")
                     
                     try:
+                        # Clean up the response - remove markdown code blocks if present
+                        cleaned_text = text.strip()
+                        
+                        # Remove markdown code block markers
+                        if cleaned_text.startswith('```json'):
+                            cleaned_text = cleaned_text[7:]  # Remove ```json
+                        elif cleaned_text.startswith('```'):
+                            cleaned_text = cleaned_text[3:]  # Remove ```
+                        
+                        if cleaned_text.endswith('```'):
+                            cleaned_text = cleaned_text[:-3]  # Remove trailing ```
+                        
+                        cleaned_text = cleaned_text.strip()
+                        
                         # Parse the JSON response
-                        metadata = json.loads(text.strip())
+                        metadata = json.loads(cleaned_text)
                         artist = metadata.get('artist')
                         song = metadata.get('song')
                         
                         if artist and song:
                             log(f"Gemini extracted: {artist} - {song}")
                             return artist, song
-                    except json.JSONDecodeError:
-                        log(f"Failed to parse Gemini JSON response: {text}")
+                    except json.JSONDecodeError as e:
+                        log(f"Failed to parse Gemini JSON response: {text} (Error: {e})")
                         
         except urllib.error.HTTPError as e:
             log(f"Gemini API HTTP error (attempt {attempt + 1}): {e.code} - {e.reason}")
