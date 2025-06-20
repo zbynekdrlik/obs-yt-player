@@ -15,6 +15,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **Modular Architecture**: Clean, maintainable code structure with separated concerns
 - **Scene Management**: Automatic start/stop based on scene activation
 - **Transition Support**: Proper handling of scene transitions with configurable delays
+- **Google Gemini AI Integration**: Optional AI-powered metadata extraction for accurate artist/song identification
 
 ## Requirements
 
@@ -22,6 +23,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - OBS Studio with Python scripting support
 - Internet connection for initial video downloads
 - Sufficient disk space for video cache
+- (Optional) Google Gemini API key for enhanced metadata extraction
 
 ## Installation
 
@@ -34,6 +36,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 6. Configure the script properties:
    - Set your YouTube playlist URL
    - Cache directory (defaults to `<script_location>/<scriptname>-cache/`)
+   - (Optional) Google Gemini API key for better metadata extraction
 
 ## Usage
 
@@ -46,6 +49,34 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 5. Click "Sync Playlist Now" to manually update the playlist
 6. Switch to your scene to begin random playback
 7. Switch away from scene to automatically stop playback
+
+## Metadata Extraction
+
+The script uses a sophisticated metadata extraction system with multiple fallback sources:
+
+1. **Google Gemini AI** (Primary - Optional)
+   - Uses advanced AI to intelligently extract artist and song from video titles
+   - Handles complex titles with featuring artists, remixes, and special editions
+   - Requires API key (get free key at https://makersuite.google.com/app/apikey)
+   - Most accurate for worship/church music and international content
+
+2. **AcoustID** (Secondary)
+   - Audio fingerprinting technology
+   - Matches against MusicBrainz database
+   - Good for commercially released music
+
+3. **iTunes API** (Tertiary)
+   - Searches Apple's music catalog
+   - Fast and reliable for mainstream music
+
+4. **Smart Title Parser** (Fallback)
+   - Intelligent parsing of YouTube video titles
+   - Handles common patterns like "Artist - Song" and "Song | Artist"
+
+All sources apply universal song title cleaning to remove annotations like:
+- (Official Video), [Live], (feat. Artist)
+- (Official Audio), (Lyric Video)
+- And many more...
 
 ## Scene Transitions
 
@@ -95,7 +126,8 @@ ytfast_modules/
     cache.py                # Cache scanning/cleanup
     playlist.py             # Playlist synchronization
     download.py             # Video downloading
-    metadata.py             # Metadata extraction (AcoustID, iTunes, parsing)
+    metadata.py             # Metadata extraction (Gemini, AcoustID, iTunes, parsing)
+    gemini_metadata.py      # Google Gemini AI integration
     normalize.py            # Audio normalization
     playback.py             # Playback control
     scene.py                # Scene management and transition handling
@@ -127,18 +159,32 @@ The project is organized into logical implementation phases:
 11. **Phase 11**: Scene Management - Handle scene transitions, cleanup on exit
 12. **Phase 12**: Final Polish - Testing, optimization, documentation
 
+### Enhanced Features
+13. **Phase 13**: Google Gemini AI Integration - AI-powered metadata extraction
+
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
 ## Current Status
 
-Version 2.3.8 - Scene management with full transition support:
-- ✅ Phases 1-10: Complete foundation, processing, and playback
-- ✅ Phase 11: Scene management with resource cleanup and transition handling
+Version 2.5.5 - Google Gemini AI Integration:
+- ✅ Phases 1-11: Complete foundation, processing, playback, and scene management
+- ✅ Phase 13: Google Gemini AI integration for enhanced metadata extraction
 - ✅ Modular code structure with separated concerns
 - ✅ Windows-optimized with platform-specific code removed
 - ⏳ Phase 12: Final polish and optimization to be implemented
 
 ## Recent Updates
+
+### v2.5.5 - Gemini API Endpoint Update
+- Updated to use the latest `gemini-2.0-flash` model endpoint
+- Fixed 404 errors with deprecated API endpoints
+
+### v2.5.0 - Google Gemini AI Integration
+- Added optional Google Gemini AI for intelligent metadata extraction
+- Gemini is now the primary metadata source when API key is configured
+- Handles complex video titles with high accuracy
+- Particularly effective for worship/church music and international content
+- Falls back to AcoustID, iTunes, and parsing when Gemini is not available
 
 ### v2.3.8 - Stop Button Removed
 - Removed manual stop button functionality for cleaner interface
@@ -149,26 +195,6 @@ Version 2.3.8 - Scene management with full transition support:
 - Transition detection with duration-aware delays
 - Support for both regular mode and Studio Mode
 - Fixed API compatibility issues with non-existent events
-
-### v2.3.6 - Transition Handling Attempt
-- Initial attempt at transition support (fixed in v2.3.7)
-
-### v2.3.5 - Title Flash Fix
-- Removed status messages ("Ready", "⏹ Stopped") that caused UI flashing
-- Text source now stays empty when scene is inactive
-- Cleaner visual experience during scene switches
-
-### v2.3.1 - Scene Return Fix
-- Fixed issue where playback wouldn't restart when returning to scene
-- Improved state synchronization when media source reports inconsistent state
-- Enhanced error handling for edge cases
-
-### v2.3.0 - Phase 11 Implementation
-- Enhanced scene management with automatic stop on scene exit
-- Complete source cleanup to prevent resource locks
-- OBS exit event handling for graceful shutdown
-- Resource protection for currently playing videos
-- Thread-safe state management
 
 ## License
 
