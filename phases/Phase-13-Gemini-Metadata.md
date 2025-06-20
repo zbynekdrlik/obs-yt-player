@@ -1,21 +1,17 @@
-# Phase-13‑Gemini‑Metadata
+# Phase 13: Google Gemini AI Metadata Integration
 
 ## Overview
-This phase adds Google Gemini API as the PRIMARY metadata source when configured. The Gemini LLM provides the most accurate metadata extraction by intelligently analyzing YouTube video URLs and titles.
+This phase adds Google Gemini AI as the primary metadata extraction method, providing intelligent parsing of YouTube video titles to accurately extract artist and song information.
 
-## Requirements from 02‑Requirements.md
-- Makes Gemini the primary metadata source:
-  1. **NEW** Primary: Gemini API (when configured with API key)
-  2. Secondary: AcoustID
-  3. Tertiary: iTunes
-  4. Quaternary: Title parsing
-- Maintain all existing universal song title cleaning
-- Log all Gemini API interactions
+## Objectives
+- Integrate Google Gemini AI API for metadata extraction
+- Make Gemini the primary metadata source when configured
+- Maintain fallback to existing methods (AcoustID, iTunes, parsing)
+- Add UI for API key configuration
 
-## Technical Implementation
+## Implementation Details
 
-### Module: `ytfast_modules/gemini_metadata.py`
-
+### 1. New Module: `gemini_metadata.py`
 ```python
 """
 Google Gemini API metadata extraction for YouTube videos.
@@ -28,12 +24,12 @@ import urllib.error
 import urllib.parse
 from typing import Optional, Tuple
 
-from . import state
-from .logger import log
-from .config import SCRIPT_NAME
+import state
+from logger import log
+from config import SCRIPT_NAME
 
 # Gemini API configuration
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 GEMINI_TIMEOUT = 10  # seconds
 MAX_RETRIES = 2
 
@@ -124,27 +120,29 @@ Guidelines:
             
     log(f"Gemini metadata extraction failed for '{video_title}'")
     return None, None
-
-def clean_gemini_song_title(song: str) -> str:
-    """
-    Apply same cleaning rules as other metadata sources.
-    """
-    # This will be handled by the universal cleaner
-    return song
 ```
 
-### Integration Updates
-
-#### Update `ytfast_modules/metadata.py`:
-
-Gemini is now the FIRST metadata source checked:
-
+### 2. State Management Updates
+Added to `state.py`:
 ```python
-# At the top, import the new module
-from . import gemini_metadata
+# Configuration state
+_gemini_api_key = None  # Add Gemini API key state
 
-# In get_video_metadata function:
+def get_gemini_api_key():
+    """Get the Gemini API key."""
+    with _state_lock:
+        return _gemini_api_key
 
+def set_gemini_api_key(key):
+    """Set the Gemini API key."""
+    global _gemini_api_key
+    with _state_lock:
+        _gemini_api_key = key
+```
+
+### 3. Metadata Module Updates
+Modified `metadata.py` to use Gemini as primary source:
+```python
 def get_video_metadata(filepath, title, video_id=None):
     """
     Main metadata extraction function.
@@ -152,7 +150,7 @@ def get_video_metadata(filepath, title, video_id=None):
     Always returns (song, artist, source) - never None.
     """
     # NEW: Try Gemini FIRST if API key is configured
-    gemini_api_key = state.get_state('gemini_api_key')
+    gemini_api_key = state.get_gemini_api_key()
     if gemini_api_key and video_id:
         log(f"Attempting Gemini metadata extraction for '{title}'")
         gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(
@@ -165,84 +163,82 @@ def get_video_metadata(filepath, title, video_id=None):
             log(f"Metadata from Gemini: {artist} - {song}")
             return song, artist, 'Gemini'
     
-    # If Gemini fails or not configured, continue with existing cascade...
+    # If Gemini fails or not configured, try AcoustID
+    # ... rest of existing fallback chain ...
 ```
 
-#### Update `ytfast_modules/config.py`:
-
+### 4. UI Integration
+Added to `script_properties()` in `ytfast.py`:
 ```python
-# Add to version (increment PATCH for iteration)
-SCRIPT_VERSION = "2.5.1"
+# Add separator for optional features
+obs.obs_properties_add_text(
+    props,
+    "separator1",
+    "───── Optional Features ─────",
+    obs.OBS_TEXT_INFO
+)
 
-# Add Gemini configuration
-GEMINI_ENABLED_DEFAULT = False  # User must opt-in with API key
+# Gemini API key field (password type for security)
+obs.obs_properties_add_text(
+    props, 
+    "gemini_api_key", 
+    "Google Gemini API Key", 
+    obs.OBS_TEXT_PASSWORD
+)
+
+# Help text for Gemini
+obs.obs_properties_add_text(
+    props,
+    "gemini_help",
+    "For better metadata extraction. Get your free API key at:\nhttps://makersuite.google.com/app/apikey",
+    obs.OBS_TEXT_INFO
+)
 ```
 
-#### Update main script `ytfast.py`:
-
-Add Gemini API key to script properties:
-
+### 5. Download Module Updates
+Pass video_id to metadata extraction:
 ```python
-def script_properties():
-    props = obs.obs_properties_create()
-    
-    # Existing properties...
-    
-    # Add Gemini API section
-    obs.obs_properties_add_text(
-        props, "gemini_api_key", 
-        "Gemini API Key (optional - for better metadata)", 
-        obs.OBS_TEXT_PASSWORD
-    )
-    
-    obs.obs_properties_add_text(
-        props, "gemini_help",
-        "Get your API key from: https://makersuite.google.com/app/apikey",
-        obs.OBS_TEXT_INFO
-    )
-    
-    return props
-
-def script_update(settings):
-    # Existing code...
-    
-    # Store Gemini API key
-    gemini_key = obs.obs_data_get_string(settings, "gemini_api_key")
-    if gemini_key:
-        state.set_state('gemini_api_key', gemini_key)
-        log("Gemini API key configured")
-```
-
-## Testing Requirements
-
-Before merging:
-1. **Without API Key**: Verify script falls back to AcoustID → iTunes → parsing
-2. **With Invalid Key**: Ensure graceful failure and fallback
-3. **With Valid Key**: Test that Gemini runs FIRST for all videos
-4. **Complex Titles**: Verify improved accuracy on Planetshakers videos
-5. **Performance**: Ensure quick responses (10s timeout)
-
-### Expected Log Output:
-```
-[ytfast.py] [timestamp] Script version 2.5.1 loaded
-[ytfast.py] [timestamp] Gemini API key configured
-[Unknown Script] [timestamp] [ytfast] Attempting Gemini metadata extraction for 'Praise On It | Winning Team | Planetshakers Official Music Video'
-[Unknown Script] [timestamp] [ytfast] Gemini response: {"artist": "Planetshakers", "song": "Praise On It"}
-[Unknown Script] [timestamp] [ytfast] Gemini extracted: Planetshakers - Praise On It
-[Unknown Script] [timestamp] [ytfast] Metadata from Gemini: Planetshakers - Praise On It
+# Get metadata (from metadata module) - UPDATED to pass video_id
+song, artist, metadata_source = get_video_metadata(temp_path, title, video_id)
 ```
 
 ## Benefits
-- **Primary accuracy**: Most accurate metadata extraction method
-- **Complex title handling**: Excels at parsing difficult titles
-- **Intelligent parsing**: Uses LLM understanding of context
-- **Fast results**: No need to fingerprint or search multiple APIs
-- **Optional feature**: Falls back to existing methods if not configured
 
-## Privacy & Security
-- API key stored securely in OBS (password field)
-- Only video title and ID sent to Gemini
-- No video content downloaded by Gemini
-- User must explicitly opt-in with their own API key
+1. **Intelligent Extraction**: Uses AI to understand complex video titles
+2. **High Accuracy**: Particularly effective for worship/church music and international content
+3. **Handles Edge Cases**: Works with titles that have featuring artists, remixes, live versions
+4. **Optional Enhancement**: Doesn't break existing functionality when not configured
+5. **Clean Integration**: Fits seamlessly into existing metadata pipeline
 
-*Prev → Phase-12-Simple-Polish.md | Next → (Future phases)*
+## Testing Results
+
+Successfully tested with various video titles:
+- ✅ "Joy Of The Lord | Planetshakers Official Music Video"
+- ✅ "HOLYGHOST | Sons Of Sunday"  
+- ✅ "Let The Church Sing | Tauren Wells | Worship Together Session"
+- ✅ "Ask Me Why // Michael Bethany Ft. Dwan Hill + The Choir Room // Worship Together Session"
+- ✅ "No One & You Really Are (feat. Chandler Moore & Tiffany Hudson) | Elevation Worship"
+- ✅ "Marco Barrientos - Yo Sé (Video Oficial)"
+- ✅ "En este lugar | Lakewood Music con @AlexanderPappas"
+- ✅ "Fidelidad | Lakewood Music Español (con @IngridRosarioLive )"
+
+All extractions were accurate, with proper artist/song separation and removal of extra annotations.
+
+## Version History
+
+- v2.5.0 - Initial Gemini integration
+- v2.5.1 - Updated to make Gemini primary source (not fallback)
+- v2.5.2-v2.5.4 - Fixed import errors
+- v2.5.5 - Updated API endpoint to `gemini-2.0-flash`
+- v2.5.6 - Final testing and validation
+
+## Future Enhancements
+
+1. **Batch Processing**: Could batch multiple titles in one API call
+2. **Caching**: Cache Gemini results to avoid repeated API calls
+3. **Context Enhancement**: Could provide genre hints or playlist context
+4. **Error Reporting**: More detailed error messages for troubleshooting
+
+## Conclusion
+
+The Google Gemini AI integration significantly improves metadata extraction accuracy, especially for complex YouTube titles. It provides a superior user experience while maintaining backward compatibility with existing metadata sources.
