@@ -27,7 +27,8 @@ from logger import log
 from state import (
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
-    is_tools_ready, set_stop_threads
+    is_tools_ready, set_stop_threads,
+    set_gemini_api_key  # Use the correct function name
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
@@ -71,20 +72,53 @@ def script_properties():
         sync_now_callback
     )
     
+    # Add separator for optional features
+    obs.obs_properties_add_text(
+        props,
+        "separator1",
+        "───── Optional Features ─────",
+        obs.OBS_TEXT_INFO
+    )
+    
+    # Gemini API key field (password type for security)
+    obs.obs_properties_add_text(
+        props, 
+        "gemini_api_key", 
+        "Google Gemini API Key", 
+        obs.OBS_TEXT_PASSWORD
+    )
+    
+    # Help text for Gemini
+    obs.obs_properties_add_text(
+        props,
+        "gemini_help",
+        "For better metadata extraction. Get your free API key at:\nhttps://makersuite.google.com/app/apikey",
+        obs.OBS_TEXT_INFO
+    )
+    
     return props
 
 def script_defaults(settings):
     """Set default values for script properties."""
     obs.obs_data_set_default_string(settings, "playlist_url", DEFAULT_PLAYLIST_URL)
     obs.obs_data_set_default_string(settings, "cache_dir", DEFAULT_CACHE_DIR)
+    obs.obs_data_set_default_string(settings, "gemini_api_key", "")
 
 def script_update(settings):
     """Called when script properties are updated."""
     playlist_url = obs.obs_data_get_string(settings, "playlist_url")
     cache_dir = obs.obs_data_get_string(settings, "cache_dir")
+    gemini_key = obs.obs_data_get_string(settings, "gemini_api_key")
     
     set_playlist_url(playlist_url)
     set_cache_dir(cache_dir)
+    
+    # Store Gemini API key in state if provided
+    if gemini_key:
+        set_gemini_api_key(gemini_key)
+        log("Gemini API key configured")
+    else:
+        set_gemini_api_key(None)
     
     log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}")
 

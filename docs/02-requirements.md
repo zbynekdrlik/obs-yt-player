@@ -23,8 +23,12 @@ It is authoritative; later Phase prompts reference this spec.
 - Retain only newest duplicate; clean temp `.part` files.
 
 ## Metadata Retrieval
-- Primary: **AcoustID** (`RXS1uld515`).  
-- Fallback: parse YouTube title; log transformation.
+- Primary: **Google Gemini API** (optional, when configured with API key).
+  - Uses LLM to intelligently extract artist/song from video context
+  - Most accurate for complex titles
+- Secondary: **AcoustID** (`RXS1uld515`).
+- Tertiary: **iTunes API**.
+- Quaternary: Parse YouTube title.
 - Apply universal song title cleaning to ALL metadata sources
 - Remove annotations like (Live), [Official], (feat. Artist) from every result
 - Log all cleaning transformations for debugging

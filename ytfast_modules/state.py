@@ -12,6 +12,7 @@ _state_lock = threading.Lock()
 # Configuration state
 _playlist_url = DEFAULT_PLAYLIST_URL
 _cache_dir = DEFAULT_CACHE_DIR
+_gemini_api_key = None  # Add Gemini API key state
 
 # System state flags
 _tools_ready = False
@@ -65,6 +66,17 @@ def set_cache_dir(directory):
     global _cache_dir
     with _state_lock:
         _cache_dir = directory
+
+def get_gemini_api_key():
+    """Get the Gemini API key."""
+    with _state_lock:
+        return _gemini_api_key
+
+def set_gemini_api_key(key):
+    """Set the Gemini API key."""
+    global _gemini_api_key
+    with _state_lock:
+        _gemini_api_key = key
 
 # ===== STATE FLAG ACCESSORS =====
 def is_tools_ready():

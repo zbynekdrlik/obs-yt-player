@@ -181,8 +181,8 @@ def process_videos_worker():
                 log(f"Failed to download: {title}")
                 continue
             
-            # Get metadata (from metadata module)
-            song, artist, metadata_source = get_video_metadata(temp_path, title)
+            # Get metadata (from metadata module) - UPDATED to pass video_id
+            song, artist, metadata_source = get_video_metadata(temp_path, title, video_id)
             
             # Log metadata source with detailed results
             log(f"Metadata from {metadata_source}: {artist} - {song}")
