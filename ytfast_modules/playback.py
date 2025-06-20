@@ -10,7 +10,8 @@ from pathlib import Path
 
 from config import (
     PLAYBACK_CHECK_INTERVAL, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME,
-    SCENE_NAME, TITLE_FADE_DURATION, TITLE_FADE_STEPS, TITLE_FADE_INTERVAL
+    SCENE_NAME, TITLE_FADE_DURATION, TITLE_FADE_STEPS, TITLE_FADE_INTERVAL,
+    OPACITY_FILTER_NAME
 )
 from logger import log
 from state import (
@@ -45,6 +46,7 @@ _target_opacity = 100.0
 _opacity_step = 0.0
 _fade_direction = None  # 'in' or 'out'
 _pending_text = None
+_opacity_filter_created = False
 
 # Title timing constants (in seconds)
 TITLE_CLEAR_BEFORE_END = 2.0  # Clear title 2 seconds before song ends
@@ -87,27 +89,77 @@ def verify_sources():
     
     return scene_exists and media_exists and text_exists
 
+def ensure_opacity_filter():
+    """Ensure the opacity filter exists on the text source."""
+    global _opacity_filter_created
+    
+    if _opacity_filter_created:
+        return True
+    
+    # Get the text source
+    text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+    if not text_source:
+        return False
+    
+    # Check if filter already exists
+    existing_filter = obs.obs_source_get_filter_by_name(text_source, OPACITY_FILTER_NAME)
+    if existing_filter:
+        obs.obs_source_release(existing_filter)
+        obs.obs_source_release(text_source)
+        _opacity_filter_created = True
+        return True
+    
+    # Create color correction filter for opacity control
+    filter_settings = obs.obs_data_create()
+    obs.obs_data_set_int(filter_settings, "opacity", 100)
+    
+    opacity_filter = obs.obs_source_create_private(
+        "color_filter", 
+        OPACITY_FILTER_NAME, 
+        filter_settings
+    )
+    
+    if opacity_filter:
+        obs.obs_source_filter_add(text_source, opacity_filter)
+        obs.obs_source_release(opacity_filter)
+        _opacity_filter_created = True
+        log(f"Created opacity filter for text source")
+    
+    obs.obs_data_release(filter_settings)
+    obs.obs_source_release(text_source)
+    
+    return _opacity_filter_created
+
 def update_text_opacity(opacity):
-    """Update the opacity of the text source."""
+    """Update the opacity of the text source using color filter."""
     try:
-        # Get the scene
-        scene_source = obs.obs_get_source_by_name(SCENE_NAME)
-        if not scene_source:
+        # Get the text source
+        text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+        if not text_source:
             return
         
-        scene = obs.obs_scene_from_source(scene_source)
-        if not scene:
-            obs.obs_source_release(scene_source)
-            return
+        # Get the opacity filter
+        opacity_filter = obs.obs_source_get_filter_by_name(text_source, OPACITY_FILTER_NAME)
+        if not opacity_filter:
+            obs.obs_source_release(text_source)
+            # Try to create the filter
+            if ensure_opacity_filter():
+                # Try again
+                opacity_filter = obs.obs_source_get_filter_by_name(text_source, OPACITY_FILTER_NAME)
+                if not opacity_filter:
+                    return
+            else:
+                return
         
-        # Find the text source in the scene
-        text_item = obs.obs_scene_find_source(scene, TEXT_SOURCE_NAME)
-        if text_item:
-            # Set opacity (0-100 to 0-255 range)
-            alpha = int((opacity / 100.0) * 255)
-            obs.obs_sceneitem_set_source_alpha(text_item, alpha)
+        # Update the opacity value
+        filter_settings = obs.obs_source_get_settings(opacity_filter)
+        obs.obs_data_set_int(filter_settings, "opacity", int(opacity))
+        obs.obs_source_update(opacity_filter, filter_settings)
         
-        obs.obs_source_release(scene_source)
+        # Clean up
+        obs.obs_data_release(filter_settings)
+        obs.obs_source_release(opacity_filter)
+        obs.obs_source_release(text_source)
         
     except Exception as e:
         log(f"ERROR updating text opacity: {e}")
@@ -283,6 +335,9 @@ def playback_controller():
         # Verify sources exist
         if not verify_sources():
             return
+        
+        # Ensure opacity filter exists
+        ensure_opacity_filter()
         
         # Priority 2: Check if scene is active
         if not is_scene_active():
