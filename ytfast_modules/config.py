@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.5.6"  # Fixed Gemini JSON parsing to handle markdown code blocks
+SCRIPT_VERSION = "2.6.0"  # Added title timing adjustments - clear 2s before end, show 2s after start
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
