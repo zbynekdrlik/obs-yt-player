@@ -12,7 +12,7 @@ import urllib.parse
 
 from config import ACOUSTID_API_KEY, ACOUSTID_ENABLED, SCRIPT_VERSION
 from logger import log
-from utils import get_fpcalc_path
+from utils import get_fpcalc_path, format_duration
 
 def get_video_metadata(filepath, title):
     """
@@ -81,7 +81,9 @@ def get_acoustid_metadata(filepath):
             log(f"Missing fingerprint or duration in fpcalc output")
             return None, None
             
-        log(f"Generated fingerprint, duration: {duration}s")
+        # Format duration for logging
+        duration_formatted = format_duration(duration)
+        log(f"Generated fingerprint, duration: {duration_formatted}")
         
         # Query AcoustID API
         return query_acoustid(fingerprint, duration)
@@ -109,7 +111,8 @@ def query_acoustid(fingerprint, duration):
         full_url = f"{url}?{query_string}"
         
         # Log the request details for debugging (but not the full fingerprint)
-        log(f"AcoustID request - duration: {duration}s, fingerprint length: {len(fingerprint)}")
+        duration_formatted = format_duration(duration)
+        log(f"AcoustID request - duration: {duration_formatted}, fingerprint length: {len(fingerprint)}")
         
         # Make request with User-Agent
         req = urllib.request.Request(full_url)

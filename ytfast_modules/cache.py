@@ -15,6 +15,26 @@ from state import (
 )
 from utils import validate_youtube_id
 
+def validate_video_file(file_path):
+    """Check if video file is valid and playable."""
+    try:
+        if not os.path.exists(file_path):
+            return False
+        
+        # Check minimum file size (1MB)
+        file_size = os.path.getsize(file_path)
+        if file_size < 1024 * 1024:
+            return False
+            
+        # Check if it's a valid video file by extension
+        valid_extensions = ['.mp4', '.webm', '.mkv']
+        if not any(file_path.lower().endswith(ext) for ext in valid_extensions):
+            return False
+            
+        return True
+    except Exception:
+        return False
+
 def scan_existing_cache():
     """Scan cache directory for existing normalized videos."""
     cache_path = Path(get_cache_dir())
@@ -24,10 +44,18 @@ def scan_existing_cache():
     log("Scanning cache for existing videos...")
     found_count = 0
     debug_count = 0
+    skipped_count = 0
     
     # Look for normalized videos
     for file_path in cache_path.glob("*_normalized.mp4"):
         debug_count += 1
+        
+        # Validate the video file
+        if not validate_video_file(str(file_path)):
+            log(f"Skipping invalid video file: {file_path.name}")
+            skipped_count += 1
+            continue
+            
         try:
             # Extract video ID from filename
             # Format: song_artist_videoId_normalized.mp4
@@ -96,6 +124,8 @@ def scan_existing_cache():
     
     if found_count > 0:
         log(f"Found {found_count} existing videos in cache")
+    if skipped_count > 0:
+        log(f"Skipped {skipped_count} invalid video files")
 
 def cleanup_removed_videos():
     """Remove videos that are no longer in playlist."""

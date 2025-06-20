@@ -21,6 +21,7 @@ from state import (
     get_played_videos, add_played_video, clear_played_videos,
     is_scene_active, should_stop_threads
 )
+from utils import format_duration
 
 # Module-level variables
 _playback_timer = None
@@ -210,6 +211,10 @@ def handle_ended_state():
     if is_playing():
         log("Playback ended, starting next video")
         start_next_video()
+    elif is_scene_active() and get_cached_videos():
+        # Not playing but scene is active and we have videos - start playback
+        log("Scene active and videos available, starting playback")
+        start_next_video()
 
 def handle_stopped_state():
     """Handle video stopped state."""
@@ -288,8 +293,12 @@ def log_playback_progress(video_id, current_time, duration):
         # Get video info for better logging
         video_info = get_cached_video_info(video_id)
         if video_info:
+            # Convert milliseconds to seconds and format
+            current_time_formatted = format_duration(current_time / 1000)
+            duration_formatted = format_duration(duration / 1000)
+            
             log(f"Playing: {video_info['song']} - {video_info['artist']} "
-                f"[{percent}% - {int(current_time/1000)}s / {int(duration/1000)}s]")
+                f"[{percent}% - {current_time_formatted} / {duration_formatted}]")
 
 def select_next_video():
     """

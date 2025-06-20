@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.3.11"  # Fixed early video switching - videos now play until natural end
+SCRIPT_VERSION = "2.4.1"  # Fixed playback start issue and added duration formatting to metadata logs
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
