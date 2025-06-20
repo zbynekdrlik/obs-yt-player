@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.7.0"  # Added smooth opacity transitions for title display
+SCRIPT_VERSION = "2.7.1"  # Fixed opacity transitions using color filter approach
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -39,6 +39,7 @@ TOOLS_CHECK_INTERVAL = 60  # 60 seconds retry for tools
 TITLE_FADE_DURATION = 1000  # 1 second fade in/out duration
 TITLE_FADE_STEPS = 20  # Number of steps for smooth transition
 TITLE_FADE_INTERVAL = TITLE_FADE_DURATION // TITLE_FADE_STEPS  # Time between opacity updates
+OPACITY_FILTER_NAME = "YTFastOpacityControl"  # Name for our opacity filter
 
 # Processing limits
 MAX_RESOLUTION = "1440"
