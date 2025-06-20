@@ -203,10 +203,7 @@ def handle_playing_state():
         if video_id:
             log_playback_progress(video_id, current_time, duration)
         
-        # Check if video is near end (95% complete)
-        if is_video_near_end(duration, current_time, 95):
-            log("Video near end, preparing next...")
-            start_next_video()
+        # REMOVED: Early switching logic - let videos play until they naturally end
 
 def handle_ended_state():
     """Handle video ended state."""
