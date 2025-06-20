@@ -64,3 +64,22 @@ def ensure_cache_directory():
 def validate_youtube_id(video_id):
     """Validate YouTube video ID format."""
     return bool(YOUTUBE_ID_PATTERN.match(video_id))
+
+def format_duration(seconds):
+    """Format seconds into human-readable duration."""
+    if seconds is None or seconds < 0:
+        return "unknown"
+    
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    
+    minutes = seconds // 60
+    seconds = seconds % 60
+    
+    if minutes < 60:
+        return f"{minutes}m {seconds}s"
+    
+    hours = minutes // 60
+    minutes = minutes % 60
+    return f"{hours}h {minutes}m {seconds}s"
