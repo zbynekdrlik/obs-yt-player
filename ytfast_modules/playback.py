@@ -19,8 +19,7 @@ from state import (
     get_current_playback_video_id, set_current_playback_video_id,
     get_cached_videos, get_cached_video_info,
     get_played_videos, add_played_video, clear_played_videos,
-    is_scene_active, should_stop_threads,
-    is_stop_requested, clear_stop_request
+    is_scene_active, should_stop_threads
 )
 
 # Module-level variables
@@ -85,18 +84,11 @@ def playback_controller():
                 stop_current_playback()
             return
         
-        # Priority 2: Check if stop has been requested via button
-        if is_stop_requested():
-            log("Stop requested - stopping playback")
-            stop_current_playback()
-            clear_stop_request()  # Clear the flag after handling
-            return
-        
         # Verify sources exist
         if not verify_sources():
             return
         
-        # Priority 3: Check if scene is active
+        # Priority 2: Check if scene is active
         if not is_scene_active():
             if is_playing():
                 log("Scene inactive, stopping playback")
