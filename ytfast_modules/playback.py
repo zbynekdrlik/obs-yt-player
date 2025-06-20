@@ -89,26 +89,35 @@ def show_media_source():
 
 def clear_media_on_startup():
     """Clear any pre-loaded media and hide source on script startup."""
-    # First, hide the media source
-    hide_media_source()
-    
-    # Then clear any loaded content
+    # First clear any loaded content BEFORE hiding
     source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
     if source:
-        # Stop any playback
+        # Stop any playback first
         obs.obs_source_media_stop(source)
         
-        # Clear the file
+        # Clear the file immediately
         settings = obs.obs_data_create()
         obs.obs_data_set_string(settings, "local_file", "")
         obs.obs_data_set_bool(settings, "unload_when_not_showing", True)
-        obs.obs_data_set_bool(settings, "close_when_inactive", False)
+        obs.obs_data_set_bool(settings, "close_when_inactive", True)
         
         obs.obs_source_update(source, settings)
         obs.obs_data_release(settings)
         obs.obs_source_release(source)
         
         log("Cleared pre-loaded media on startup")
+    
+    # Then hide the media source
+    hide_media_source()
+    
+    # Clear text source as well
+    source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+    if source:
+        settings = obs.obs_data_create()
+        obs.obs_data_set_string(settings, "text", "")
+        obs.obs_source_update(source, settings)
+        obs.obs_data_release(settings)
+        obs.obs_source_release(source)
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
