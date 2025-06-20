@@ -1,6 +1,6 @@
 """
 Metadata extraction for OBS YouTube Player (Windows-only).
-Handles AcoustID fingerprinting, iTunes search, and title parsing.
+Handles AcoustID fingerprinting, iTunes search, title parsing, and Gemini AI fallback.
 """
 
 import os
@@ -13,11 +13,13 @@ import urllib.parse
 from config import ACOUSTID_API_KEY, ACOUSTID_ENABLED, SCRIPT_VERSION
 from logger import log
 from utils import get_fpcalc_path, format_duration
+from . import gemini_metadata
+from . import state
 
-def get_video_metadata(filepath, title):
+def get_video_metadata(filepath, title, video_id=None):
     """
     Main metadata extraction function.
-    Tries AcoustID first, then falls back to title-based extraction.
+    Tries AcoustID first, then iTunes, then title parsing, finally Gemini AI.
     Always returns (song, artist, source) - never None.
     """
     # Try AcoustID metadata extraction
@@ -31,6 +33,19 @@ def get_video_metadata(filepath, title):
     # If AcoustID fails, try title-based extraction (iTunes + parsing)
     if not song or not artist:
         song, artist, metadata_source = extract_metadata_from_title(title)
+    
+    # NEW: Gemini fallback for Unknown Artist or failed extraction
+    gemini_api_key = state.get_state('gemini_api_key')
+    if gemini_api_key and video_id and (not artist or artist == 'Unknown Artist'):
+        log(f"Attempting Gemini metadata extraction for '{title}'")
+        gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(
+            video_id, title, gemini_api_key
+        )
+        if gemini_artist and gemini_song:
+            artist = gemini_artist
+            song = clean_featuring_from_song(gemini_song)  # Apply universal cleaning
+            metadata_source = 'Gemini'
+            log(f"Metadata from Gemini: {artist} - {song}")
     
     return song, artist, metadata_source
 
