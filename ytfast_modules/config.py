@@ -47,17 +47,22 @@ ACOUSTID_API_KEY = "RXS1uld515"  # AcoustID API key for metadata
 ACOUSTID_ENABLED = True  # Toggle to enable/disable AcoustID lookups
 
 # URLs for tool downloads
-YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+YTDLP_URL_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
 YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 
-# FFmpeg URLs by platform
+# For Windows tools.py compatibility
+YTDLP_URL = YTDLP_URL_WIN
+FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+FPCALC_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
+
+# FFmpeg URLs by platform (for future cross-platform support)
 FFMPEG_URLS = {
     "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
     "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
     "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
 }
 
-# fpcalc (Chromaprint) URLs by platform
+# fpcalc (Chromaprint) URLs by platform (for future cross-platform support)
 FPCALC_URLS = {
     "win32": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip",
     "darwin": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-macos-x86_64.tar.gz",
