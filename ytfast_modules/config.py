@@ -1,12 +1,13 @@
 """
-Configuration constants and settings for OBS YouTube Player.
+Configuration constants for OBS YouTube Player.
+Central location for all script settings and constants.
 """
 
 import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.8.0"  # New approach: let pre-loaded video play, fixed title fadeout timing
+SCRIPT_VERSION = "2.8.1"  # Fixed pre-loaded video title handling and fade out timing
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -17,43 +18,63 @@ SCRIPT_NAME = os.path.splitext(os.path.basename(SCRIPT_PATH))[0]
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 DEFAULT_CACHE_DIR = os.path.join(SCRIPT_DIR, f"{SCRIPT_NAME}-cache")
 
-# Scene and source names based on script name
-SCENE_NAME = SCRIPT_NAME
+# OBS Scene and Source names
+SCENE_NAME = SCRIPT_NAME  # Scene name matches script filename without extension
 MEDIA_SOURCE_NAME = "video"
 TEXT_SOURCE_NAME = "title"
+OPACITY_FILTER_NAME = "Title Opacity"
 
-# Directory names
+# Tool settings
 TOOLS_SUBDIR = "tools"
-
-# Tool filenames (Windows-only)
-YTDLP_FILENAME = "yt-dlp.exe"
-FFMPEG_FILENAME = "ffmpeg.exe"
-FPCALC_FILENAME = "fpcalc.exe"
+YTDLP_FILENAME = "yt-dlp.exe" if os.name == 'nt' else "yt-dlp"
+FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
+FPCALC_FILENAME = "fpcalc.exe" if os.name == 'nt' else "fpcalc"
 
 # Timing intervals (milliseconds)
 PLAYBACK_CHECK_INTERVAL = 1000  # 1 second
 SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
-TOOLS_CHECK_INTERVAL = 60  # 60 seconds retry for tools
+TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
 
-# Title transition settings
-TITLE_FADE_DURATION = 1000  # 1 second fade in/out duration
-TITLE_FADE_STEPS = 20  # Number of steps for smooth transition
-TITLE_FADE_INTERVAL = TITLE_FADE_DURATION // TITLE_FADE_STEPS  # Time between opacity updates
-OPACITY_FILTER_NAME = "YTFastOpacityControl"  # Name for our opacity filter
-
-# Processing limits
+# Video settings
 MAX_RESOLUTION = "1440"
-DOWNLOAD_TIMEOUT = 600  # 10 minutes
-NORMALIZE_TIMEOUT = 300  # 5 minutes
+
+# Network timeouts (seconds)
+DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads
+NORMALIZE_TIMEOUT = 300  # 5 minutes timeout for normalization
 
 # AcoustID settings
-ACOUSTID_API_KEY = "RXS1uld515"
-ACOUSTID_ENABLED = True
+ACOUSTID_API_KEY = "RXS1uld515"  # AcoustID API key for metadata
+ACOUSTID_ENABLED = True  # Toggle to enable/disable AcoustID lookups
+
+# URLs for tool downloads
+YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+
+# FFmpeg URLs by platform
+FFMPEG_URLS = {
+    "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+    "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
+    "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+}
+
+# fpcalc (Chromaprint) URLs by platform
+FPCALC_URLS = {
+    "win32": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip",
+    "darwin": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-macos-x86_64.tar.gz",
+    "linux": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-linux-x86_64.tar.gz"
+}
+
+# Title opacity transition settings
+TITLE_FADE_DURATION = 1000  # Total duration for fade (milliseconds)
+TITLE_FADE_STEPS = 20  # Number of steps in the fade
+TITLE_FADE_INTERVAL = TITLE_FADE_DURATION // TITLE_FADE_STEPS  # Time between steps
 
 # Gemini API settings
-GEMINI_ENABLED_DEFAULT = False  # User must opt-in with API key
-
-# Tool download URLs (Windows-only)
-YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-FPCALC_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
+GEMINI_API_KEY_PROPERTY = "gemini_api_key"
+GEMINI_MODEL = "models/gemini-1.5-flash"
+GEMINI_MAX_TOKENS = 100
+GEMINI_TEMPERATURE = 0.7
+GEMINI_ANALYSIS_PROMPT = """Analyze this song title and extract the song name and artist.
+Return ONLY a JSON object with "song" and "artist" fields.
+Do not include any other text or explanation.
+Example: {"song": "Amazing Grace", "artist": "Chris Tomlin"}"""
