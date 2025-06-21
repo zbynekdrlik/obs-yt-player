@@ -41,6 +41,7 @@ _title_clear_scheduled = False  # Track if title clear is already scheduled
 _duration_check_timer = None  # Timer for delayed duration check
 _preloaded_video_handled = False  # Track if we've handled pre-loaded video
 _is_preloaded_video = False  # Track if current video is pre-loaded
+_last_playback_time = 0  # Track last playback position for seek detection
 
 # Opacity transition variables
 _opacity_timer = None
@@ -54,6 +55,7 @@ _opacity_filter_created = False
 # Title timing constants (in seconds)
 TITLE_CLEAR_BEFORE_END = 3.5  # Clear title 3.5 seconds before song ends
 TITLE_SHOW_AFTER_START = 1.5  # Show title 1.5 seconds after song starts
+SEEK_THRESHOLD = 5000  # 5 seconds - consider it a seek if position jumps by more than this
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -434,7 +436,7 @@ def playback_controller():
 
 def handle_playing_state():
     """Handle currently playing video state."""
-    global _is_preloaded_video
+    global _is_preloaded_video, _last_playback_time, _title_clear_scheduled, _title_clear_timer
     
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
@@ -450,20 +452,38 @@ def handle_playing_state():
     current_time = get_media_time(MEDIA_SOURCE_NAME)
     
     if duration > 0 and current_time > 0:
+        # Check for seek (large jump in playback position)
+        if _last_playback_time > 0:
+            time_diff = current_time - _last_playback_time
+            # If time jumped forward by more than threshold, it's likely a seek
+            if time_diff > SEEK_THRESHOLD:
+                log(f"Seek detected: jumped from {_last_playback_time/1000:.1f}s to {current_time/1000:.1f}s")
+                # Cancel existing timer and allow rescheduling
+                if _title_clear_timer:
+                    obs.timer_remove(_title_clear_timer)
+                    _title_clear_timer = None
+                _title_clear_scheduled = False
+        
+        _last_playback_time = current_time
+        
         # Log progress without spamming
         video_id = get_current_playback_video_id()
         if video_id:
             log_playback_progress(video_id, current_time, duration)
         
-        # Check if we need to schedule title clear
-        global _title_clear_timer, _title_clear_scheduled
-        if not _title_clear_scheduled and _title_clear_timer is None:
-            # Calculate remaining time
-            remaining_ms = duration - current_time
-            # Check if we're within the window to schedule fade out
-            if remaining_ms > 0 and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 5) * 1000):
-                # We're close enough to the end to schedule the fade out
+        # Check if we need to schedule or reschedule title clear
+        remaining_ms = duration - current_time
+        
+        # If we're close to the end and haven't scheduled fade out (or need to reschedule after seek)
+        if remaining_ms > 0 and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 5) * 1000):
+            if not _title_clear_scheduled or _title_clear_timer is None:
+                # Schedule the fade out based on current remaining time
                 schedule_title_clear_from_current(remaining_ms)
+        
+        # If opacity is showing but fade should have happened already, fade immediately
+        if remaining_ms > 0 and remaining_ms < (TITLE_CLEAR_BEFORE_END * 1000) and _current_opacity > 0:
+            log("Title should be faded out by now, fading immediately")
+            fade_out_text()
 
 def schedule_title_clear_from_current(remaining_ms):
     """Schedule title clear based on remaining time."""
@@ -481,10 +501,17 @@ def schedule_title_clear_from_current(remaining_ms):
         obs.timer_add(_title_clear_timer, int(clear_in_ms))
         _title_clear_scheduled = True
         log(f"Scheduled title fade out in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
+    else:
+        # Should fade out immediately
+        log("Time to fade out has passed, fading immediately")
+        fade_out_text()
 
 def handle_ended_state():
     """Handle video ended state."""
-    global _preloaded_video_handled, _is_preloaded_video
+    global _preloaded_video_handled, _is_preloaded_video, _last_playback_time
+    
+    # Reset playback tracking
+    _last_playback_time = 0
     
     if is_playing():
         if not _preloaded_video_handled and _is_preloaded_video:
@@ -749,7 +776,7 @@ def start_next_video():
     Start playing the next video.
     Must be called from main thread.
     """
-    global _playback_retry_count, _last_progress_log
+    global _playback_retry_count, _last_progress_log, _last_playback_time
     
     log("start_next_video called")
     
@@ -761,6 +788,7 @@ def start_next_video():
     
     # Clear progress log for new video
     _last_progress_log.clear()
+    _last_playback_time = 0
     
     # Select next video
     video_id = select_next_video()
@@ -818,7 +846,7 @@ def stop_current_playback():
     Enhanced stop with complete cleanup.
     Must be called from main thread.
     """
-    global _last_progress_log, _playback_retry_count, _current_opacity
+    global _last_progress_log, _playback_retry_count, _current_opacity, _last_playback_time
     
     # Cancel any pending title timers
     cancel_title_timers()
@@ -858,6 +886,7 @@ def stop_current_playback():
         # Clear tracking
         _last_progress_log.clear()
         _playback_retry_count = 0
+        _last_playback_time = 0
         
         log("Playback stopped and all sources cleared")
         
