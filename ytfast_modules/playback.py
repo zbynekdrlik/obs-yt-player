@@ -234,6 +234,10 @@ def fade_in_text():
 
 def fade_out_text():
     """Fade out the text source."""
+    global _current_opacity
+    # Don't start a new fade if we're already at 0 or fading out
+    if _current_opacity <= 0 or (_fade_direction == 'out' and _opacity_timer is not None):
+        return
     start_opacity_transition(0.0, 'out')
 
 def clear_title_before_end_callback():
@@ -479,11 +483,6 @@ def handle_playing_state():
             if not _title_clear_scheduled or _title_clear_timer is None:
                 # Schedule the fade out based on current remaining time
                 schedule_title_clear_from_current(remaining_ms)
-        
-        # If opacity is showing but fade should have happened already, fade immediately
-        if remaining_ms > 0 and remaining_ms < (TITLE_CLEAR_BEFORE_END * 1000) and _current_opacity > 0:
-            log("Title should be faded out by now, fading immediately")
-            fade_out_text()
 
 def schedule_title_clear_from_current(remaining_ms):
     """Schedule title clear based on remaining time."""
@@ -492,6 +491,7 @@ def schedule_title_clear_from_current(remaining_ms):
     # Cancel any existing timer
     if _title_clear_timer:
         obs.timer_remove(_title_clear_timer)
+        _title_clear_timer = None
     
     # Calculate when to clear
     clear_in_ms = remaining_ms - (TITLE_CLEAR_BEFORE_END * 1000)
@@ -501,9 +501,10 @@ def schedule_title_clear_from_current(remaining_ms):
         obs.timer_add(_title_clear_timer, int(clear_in_ms))
         _title_clear_scheduled = True
         log(f"Scheduled title fade out in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
-    else:
+    elif _current_opacity > 0:
         # Should fade out immediately
         log("Time to fade out has passed, fading immediately")
+        _title_clear_scheduled = False  # Don't schedule, just do it
         fade_out_text()
 
 def handle_ended_state():
