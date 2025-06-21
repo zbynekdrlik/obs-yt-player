@@ -40,6 +40,7 @@ _pending_title_info = None
 _title_clear_scheduled = False  # Track if title clear is already scheduled
 _duration_check_timer = None  # Timer for delayed duration check
 _preloaded_video_handled = False  # Track if we've handled pre-loaded video
+_is_preloaded_video = False  # Track if current video is pre-loaded
 
 # Opacity transition variables
 _opacity_timer = None
@@ -329,7 +330,8 @@ def playback_controller():
     Main playback controller - runs on main thread via timer.
     Manages video playback state and transitions.
     """
-    global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked, _preloaded_video_handled
+    global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
+    global _preloaded_video_handled, _is_preloaded_video
     
     try:
         # Priority 1: Check if we're shutting down
@@ -403,10 +405,12 @@ def playback_controller():
                 log("Media source is already playing - letting pre-loaded video play")
                 # Mark that we're handling a pre-loaded video
                 _preloaded_video_handled = False
+                _is_preloaded_video = True
                 # Update our state to match reality
                 set_playing(True)
-                # Clear any text that might be showing
+                # Clear any text that might be showing and set opacity to 0
                 update_text_source_content("", "")
+                _current_opacity = 0.0
                 update_text_opacity(0)
                 return  # Let it play out
         
@@ -430,10 +434,16 @@ def playback_controller():
 
 def handle_playing_state():
     """Handle currently playing video state."""
+    global _is_preloaded_video
+    
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
         log("Media playing but state out of sync - updating state")
         set_playing(True)
+        return
+    
+    # Don't process title timing for pre-loaded videos
+    if _is_preloaded_video:
         return
     
     duration = get_media_duration(MEDIA_SOURCE_NAME)
@@ -474,12 +484,13 @@ def schedule_title_clear_from_current(remaining_ms):
 
 def handle_ended_state():
     """Handle video ended state."""
-    global _preloaded_video_handled
+    global _preloaded_video_handled, _is_preloaded_video
     
     if is_playing():
-        if not _preloaded_video_handled:
+        if not _preloaded_video_handled and _is_preloaded_video:
             log("Pre-loaded video ended, starting playlist")
             _preloaded_video_handled = True
+            _is_preloaded_video = False
         else:
             log("Playback ended, starting next video")
         start_next_video()
