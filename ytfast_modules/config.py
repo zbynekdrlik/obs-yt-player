@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.8.1"  # Fixed pre-loaded video title handling and fade out timing
+SCRIPT_VERSION = "2.8.2"  # Fixed title fade out when seeking/scrubbing in video
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
