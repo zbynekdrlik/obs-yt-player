@@ -38,7 +38,6 @@ _title_clear_timer = None
 _title_show_timer = None
 _pending_title_info = None
 _title_clear_scheduled = False  # Track if title clear is already scheduled
-_media_source_hidden = False  # Track if we've hidden the source on startup
 _duration_check_timer = None  # Timer for delayed duration check
 _preloaded_video_handled = False  # Track if we've handled pre-loaded video
 
@@ -54,39 +53,6 @@ _opacity_filter_created = False
 # Title timing constants (in seconds)
 TITLE_CLEAR_BEFORE_END = 3.5  # Clear title 3.5 seconds before song ends
 TITLE_SHOW_AFTER_START = 1.5  # Show title 1.5 seconds after song starts
-
-def hide_media_source():
-    """Hide the media source to prevent unwanted playback on startup."""
-    global _media_source_hidden
-    
-    scene_source = obs.obs_get_source_by_name(SCENE_NAME)
-    if scene_source:
-        scene = obs.obs_scene_from_source(scene_source)
-        if scene:
-            scene_item = obs.obs_scene_find_source(scene, MEDIA_SOURCE_NAME)
-            if scene_item:
-                obs.obs_sceneitem_set_visible(scene_item, False)
-                _media_source_hidden = True
-                log("Media source hidden")
-        obs.obs_source_release(scene_source)
-
-def show_media_source():
-    """Show the media source when ready to play."""
-    global _media_source_hidden
-    
-    if not _media_source_hidden:
-        return  # Already visible
-        
-    scene_source = obs.obs_get_source_by_name(SCENE_NAME)
-    if scene_source:
-        scene = obs.obs_scene_from_source(scene_source)
-        if scene:
-            scene_item = obs.obs_scene_find_source(scene, MEDIA_SOURCE_NAME)
-            if scene_item:
-                obs.obs_sceneitem_set_visible(scene_item, True)
-                _media_source_hidden = False
-                log("Media source shown")
-        obs.obs_source_release(scene_source)
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -814,9 +780,6 @@ def start_next_video():
     
     # Update media source first
     if update_media_source(video_info['path']):
-        # Show the media source if it was hidden
-        show_media_source()
-        
         # Schedule title display (will clear immediately and show after delay)
         schedule_title_show(video_info)
         
