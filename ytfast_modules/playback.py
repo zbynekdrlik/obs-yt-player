@@ -40,7 +40,7 @@ _pending_title_info = None
 _title_clear_scheduled = False  # Track if title clear is already scheduled
 _media_source_hidden = False  # Track if we've hidden the source on startup
 _duration_check_timer = None  # Timer for delayed duration check
-_startup_cleared = False  # Track if we've done startup cleanup
+_preloaded_video_handled = False  # Track if we've handled pre-loaded video
 
 # Opacity transition variables
 _opacity_timer = None
@@ -87,50 +87,6 @@ def show_media_source():
                 _media_source_hidden = False
                 log("Media source shown")
         obs.obs_source_release(scene_source)
-
-def clear_media_on_startup():
-    """Clear any pre-loaded media and hide source on script startup."""
-    global _startup_cleared
-    
-    if _startup_cleared:
-        return  # Already done
-    
-    _startup_cleared = True
-    
-    # First clear any loaded content BEFORE hiding
-    source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-    if source:
-        # Stop any playback first
-        obs.obs_source_media_stop(source)
-        
-        # Clear the file immediately
-        settings = obs.obs_data_create()
-        obs.obs_data_set_string(settings, "local_file", "")
-        obs.obs_data_set_bool(settings, "unload_when_not_showing", True)
-        obs.obs_data_set_bool(settings, "close_when_inactive", True)
-        
-        obs.obs_source_update(source, settings)
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
-        
-        log("Cleared pre-loaded media on startup")
-    
-    # Then hide the media source
-    hide_media_source()
-    
-    # Clear text source as well
-    source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
-    if source:
-        settings = obs.obs_data_create()
-        obs.obs_data_set_string(settings, "text", "")
-        obs.obs_source_update(source, settings)
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
-    
-    # Reset state variables
-    set_playing(False)
-    set_current_video_path(None)
-    set_current_playback_video_id(None)
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
@@ -407,12 +363,9 @@ def playback_controller():
     Main playback controller - runs on main thread via timer.
     Manages video playback state and transitions.
     """
-    global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
+    global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked, _preloaded_video_handled
     
     try:
-        # Ensure startup cleanup happened
-        clear_media_on_startup()
-        
         # Priority 1: Check if we're shutting down
         if should_stop_threads():
             if is_playing():
@@ -481,14 +434,15 @@ def playback_controller():
         if not _initial_state_checked:
             _initial_state_checked = True
             if media_state == obs.OBS_MEDIA_STATE_PLAYING and not is_playing():
-                log("Media source is already playing - synchronizing state")
-                # Stop the current playback to start fresh
-                source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-                if source:
-                    obs.obs_source_media_stop(source)
-                    obs.obs_source_release(source)
-                media_state = obs.OBS_MEDIA_STATE_NONE
-                log("Stopped existing playback, starting fresh")
+                log("Media source is already playing - letting pre-loaded video play")
+                # Mark that we're handling a pre-loaded video
+                _preloaded_video_handled = False
+                # Update our state to match reality
+                set_playing(True)
+                # Clear any text that might be showing
+                update_text_source_content("", "")
+                update_text_opacity(0)
+                return  # Let it play out
         
         # Handle different states
         if media_state == obs.OBS_MEDIA_STATE_PLAYING:
@@ -513,22 +467,6 @@ def handle_playing_state():
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
         log("Media playing but state out of sync - updating state")
-        # Check if we actually have valid playback info
-        current_video_id = get_current_playback_video_id()
-        current_path = get_current_video_path()
-        
-        if not current_video_id or not current_path:
-            # We don't have valid playback info, so stop and restart
-            log("No valid playback info - stopping and restarting")
-            source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-            if source:
-                obs.obs_source_media_stop(source)
-                obs.obs_source_release(source)
-            # Now start fresh
-            start_next_video()
-            return
-        
-        # We have valid info, just update state
         set_playing(True)
         return
     
@@ -546,8 +484,9 @@ def handle_playing_state():
         if not _title_clear_scheduled and _title_clear_timer is None:
             # Calculate remaining time
             remaining_ms = duration - current_time
-            if remaining_ms > (TITLE_CLEAR_BEFORE_END * 1000) and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 1) * 1000):
-                # We're within the window where we should schedule the clear
+            # Check if we're within the window to schedule fade out
+            if remaining_ms > 0 and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 5) * 1000):
+                # We're close enough to the end to schedule the fade out
                 schedule_title_clear_from_current(remaining_ms)
 
 def schedule_title_clear_from_current(remaining_ms):
@@ -569,8 +508,14 @@ def schedule_title_clear_from_current(remaining_ms):
 
 def handle_ended_state():
     """Handle video ended state."""
+    global _preloaded_video_handled
+    
     if is_playing():
-        log("Playback ended, starting next video")
+        if not _preloaded_video_handled:
+            log("Pre-loaded video ended, starting playlist")
+            _preloaded_video_handled = True
+        else:
+            log("Playback ended, starting next video")
         start_next_video()
     elif is_scene_active() and get_cached_videos():
         # Not playing but scene is active and we have videos - start playback
@@ -945,18 +890,11 @@ def stop_current_playback():
     except Exception as e:
         log(f"ERROR stopping playback: {e}")
 
-# Call startup cleanup immediately when module is imported
-# This happens before any timers are started
-clear_media_on_startup()
-
 def start_playback_controller():
     """Start the playback controller timer."""
     global _playback_timer, _initial_state_checked
     
     try:
-        # Ensure cleanup happened (in case module wasn't imported properly)
-        clear_media_on_startup()
-        
         # Reset initial state check
         _initial_state_checked = False
         
