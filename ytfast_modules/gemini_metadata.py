@@ -34,8 +34,24 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
     if not api_key:
         return None, None
         
-    # Ultra-minimal prompt to avoid token limits
-    prompt = f'Title: "{video_title}"\nExtract: {{"artist":"X","song":"Y"}}'
+    # Clear prompt with specific instructions
+    prompt = f"""Extract the primary artist and song title from this YouTube video title:
+"{video_title}"
+
+Return ONLY a JSON object with this exact format:
+{{"artist": "Primary Artist Name", "song": "Song Title"}}
+
+Rules:
+1. Artist = ONLY the main/primary artist (not featured artists or collaborators)
+2. Remove "feat.", "ft.", "Ft.", "featuring", "with", etc. from artist name
+3. Song = title without version info like "(Extended)", "(Live)", "(Official Video)"
+4. For titles with "|", usually: Song Title | Artist Name
+5. Keep "/" in multi-part song titles like "Song A / Song B"
+
+Examples:
+- "Ask Me Why // Michael Bethany Ft. Dwan Hill + The Choir Room" → {{"artist": "Michael Bethany", "song": "Ask Me Why"}}
+- "Praise (feat. Brandon Lake) | Elevation Worship" → {{"artist": "Elevation Worship", "song": "Praise"}}
+- "No One & You Really Are (feat. Artists) | Main Artist" → {{"artist": "Main Artist", "song": "No One & You Really Are"}}"""
 
     request_body = {
         "contents": [{
@@ -45,9 +61,8 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
         }],
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
-            "candidateCount": 1,
-            "maxOutputTokens": 1024,  # Doubled from 512
-            "stopSequences": ["}"]  # Stop after closing the JSON
+            "candidateCount": 1
+            # Removed maxOutputTokens - let Gemini decide
         }
     }
     
@@ -68,12 +83,6 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
                 if 'candidates' in result and result['candidates']:
                     candidate = result['candidates'][0]
                     
-                    # Check for MAX_TOKENS finish reason first
-                    if 'finishReason' in candidate and candidate['finishReason'] == 'MAX_TOKENS':
-                        log(f"Gemini hit MAX_TOKENS limit for '{video_title}' - prompt or response too long")
-                        # Skip retry since we're already at 1024 tokens
-                        return None, None
-                    
                     if 'content' in candidate and 'parts' in candidate['content']:
                         parts = candidate['content']['parts']
                         if parts and 'text' in parts[0]:
@@ -87,23 +96,19 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
                         continue
                     
                     try:
-                        # Clean up the response - handle partial JSON due to stop sequence
+                        # Clean up the response - remove markdown code blocks if present
                         cleaned_text = text.strip()
                         
-                        # Remove markdown code block markers if present
+                        # Remove markdown code block markers
                         if cleaned_text.startswith('```json'):
-                            cleaned_text = cleaned_text[7:]
+                            cleaned_text = cleaned_text[7:]  # Remove ```json
                         elif cleaned_text.startswith('```'):
-                            cleaned_text = cleaned_text[3:]
+                            cleaned_text = cleaned_text[3:]  # Remove ```
                         
                         if cleaned_text.endswith('```'):
-                            cleaned_text = cleaned_text[:-3]
+                            cleaned_text = cleaned_text[:-3]  # Remove trailing ```
                         
                         cleaned_text = cleaned_text.strip()
-                        
-                        # Add closing brace if missing due to stop sequence
-                        if not cleaned_text.endswith('}'):
-                            cleaned_text += '}'
                         
                         # Parse the JSON response
                         metadata = json.loads(cleaned_text)
@@ -111,16 +116,6 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
                         song = metadata.get('song')
                         
                         if artist and song:
-                            # Clean the song title to match requirements
-                            # Remove album names and version info
-                            if '|' in song:
-                                song = song.split('|')[0].strip()
-                            
-                            # Remove common suffixes
-                            for suffix in ['(Extended Version)', '(Live)', '(Official Video)', '[Official]', '(feat.', 'Pt.', 'Part']:
-                                if suffix in song:
-                                    song = song.split(suffix)[0].strip()
-                            
                             log(f"Gemini extracted: {artist} - {song}")
                             return artist, song
                         else:
