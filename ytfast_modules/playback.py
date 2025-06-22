@@ -414,10 +414,7 @@ def playback_controller():
                 _is_preloaded_video = True
                 # Update our state to match reality
                 set_playing(True)
-                # Clear any text that might be showing and set opacity to 0
-                update_text_source_content("", "")
-                _current_opacity = 0.0
-                update_text_opacity(0)
+                # Don't touch the title or opacity - let it continue as-is
                 return  # Let it play out
         
         # Handle different states
