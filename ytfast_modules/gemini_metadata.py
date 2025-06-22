@@ -15,7 +15,7 @@ from logger import log
 from config import SCRIPT_NAME
 
 # Gemini API configuration
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/models/gemini-2.5-flash:generateContent"
 GEMINI_TIMEOUT = 10  # seconds
 MAX_RETRIES = 2
 
@@ -67,11 +67,7 @@ Examples:
             "parts": [{
                 "text": prompt
             }]
-        }],
-        "generationConfig": {
-            "temperature": 0.1,  # Low temperature for consistent results
-            "maxOutputTokens": 100
-        }
+        }]
     }
     
     for attempt in range(MAX_RETRIES):
