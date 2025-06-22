@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.2"  # Fixed Gemini 2.5 Flash API endpoint - removed duplicate /models/ in path
+SCRIPT_VERSION = "3.0.3"  # Fixed Gemini MAX_TOKENS issue - increased output tokens and optimized prompt
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
