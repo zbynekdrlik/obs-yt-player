@@ -33,25 +33,31 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
     """
     if not api_key:
         return None, None
-        
-    # Clear prompt with specific instructions
-    prompt = f"""Extract the primary artist and song title from this YouTube video title:
-"{video_title}"
+    
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    # Enhanced prompt with URL and clearer instructions
+    prompt = f"""Extract the primary artist and song title from this YouTube video:
+URL: {video_url}
+Title: "{video_title}"
 
 Return ONLY a JSON object with this exact format:
 {{"artist": "Primary Artist Name", "song": "Song Title"}}
 
-Rules:
+CRITICAL RULES:
 1. Artist = ONLY the main/primary artist (not featured artists or collaborators)
 2. Remove "feat.", "ft.", "Ft.", "featuring", "with", etc. from artist name
-3. Song = title without version info like "(Extended)", "(Live)", "(Official Video)"
-4. For titles with "|", usually: Song Title | Artist Name
-5. Keep "/" in multi-part song titles like "Song A / Song B"
+3. Song = ONLY the song title, NOTHING ELSE
+4. If title has "|" character, song is ONLY the part BEFORE the FIRST "|"
+5. EXCLUDE album names, "Pt. 2", "Glory Pt. 2", episode names, series names
+6. Remove version info like "(Extended)", "(Live)", "(Official Video)"
+7. Keep "/" in multi-part song titles like "Song A / Song B"
 
 Examples:
-- "Ask Me Why // Michael Bethany Ft. Dwan Hill + The Choir Room" → {{"artist": "Michael Bethany", "song": "Ask Me Why"}}
+- "So Good | Glory Pt. 2 | Planetshakers" → {{"artist": "Planetshakers", "song": "So Good"}}
 - "Praise (feat. Brandon Lake) | Elevation Worship" → {{"artist": "Elevation Worship", "song": "Praise"}}
-- "No One & You Really Are (feat. Artists) | Main Artist" → {{"artist": "Main Artist", "song": "No One & You Really Are"}}"""
+- "Ask Me Why // Michael Bethany Ft. Dwan Hill" → {{"artist": "Michael Bethany", "song": "Ask Me Why"}}
+- "Faithful Then / Faithful Now (Extended Version) | Elevation Worship" → {{"artist": "Elevation Worship", "song": "Faithful Then / Faithful Now"}}"""
 
     request_body = {
         "contents": [{
@@ -62,7 +68,7 @@ Examples:
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
             "candidateCount": 1
-            # Removed maxOutputTokens - let Gemini decide
+            # No maxOutputTokens - let Gemini decide
         }
     }
     
