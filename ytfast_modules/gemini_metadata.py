@@ -89,8 +89,13 @@ Examples:
                 
                 # Extract the generated text
                 if 'candidates' in result and result['candidates']:
-                    text = result['candidates'][0]['content']['parts'][0]['text']
-                    log(f"Gemini response for '{video_title}': {text}")
+                    candidate = result['candidates'][0]
+                    if 'content' in candidate and 'parts' in candidate['content']:
+                        text = candidate['content']['parts'][0]['text']
+                        log(f"Gemini response for '{video_title}': {text}")
+                    else:
+                        log(f"Unexpected Gemini response structure: {json.dumps(result, indent=2)[:500]}")
+                        continue
                     
                     try:
                         # Clean up the response - remove markdown code blocks if present
@@ -115,11 +120,24 @@ Examples:
                         if artist and song:
                             log(f"Gemini extracted: {artist} - {song}")
                             return artist, song
+                        else:
+                            log(f"Gemini response missing artist or song: {metadata}")
                     except json.JSONDecodeError as e:
                         log(f"Failed to parse Gemini JSON response: {text} (Error: {e})")
+                else:
+                    log(f"No candidates in Gemini response: {json.dumps(result, indent=2)[:500]}")
                         
         except urllib.error.HTTPError as e:
-            log(f"Gemini API HTTP error (attempt {attempt + 1}): {e.code} - {e.reason}")
+            error_body = None
+            try:
+                error_body = e.read().decode('utf-8')
+                error_json = json.loads(error_body)
+                log(f"Gemini API HTTP error (attempt {attempt + 1}): {e.code} - {e.reason}")
+                log(f"Error details: {json.dumps(error_json, indent=2)[:500]}")
+            except:
+                log(f"Gemini API HTTP error (attempt {attempt + 1}): {e.code} - {e.reason}")
+                if error_body:
+                    log(f"Error response: {error_body[:500]}")
             if e.code == 429:  # Rate limit
                 time.sleep(2 ** attempt)  # Exponential backoff
         except urllib.error.URLError as e:
