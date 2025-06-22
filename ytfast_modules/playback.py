@@ -450,6 +450,14 @@ def handle_playing_state():
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
         log("Media playing but state out of sync - updating state")
+        # Check if this is a valid video or just empty media source
+        duration = get_media_duration(MEDIA_SOURCE_NAME)
+        if duration <= 0:
+            # No valid media loaded, start fresh
+            log("No valid media loaded, starting playback")
+            start_next_video()
+            return
+        # Valid media is playing, sync the state
         set_playing(True)
         return
     
