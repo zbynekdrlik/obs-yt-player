@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.0"  # Major update: Simplified Gemini prompt and increased token limit for 2.5 Flash
+SCRIPT_VERSION = "3.0.1"  # Restored YouTube URL for potential web grounding capabilities
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))

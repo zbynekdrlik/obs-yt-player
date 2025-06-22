@@ -36,8 +36,9 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
         
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    prompt = f"""Extract artist and song from this YouTube video title:
-"{video_title}"
+    prompt = f"""Extract artist and song from this YouTube music video:
+URL: {video_url}
+Title: "{video_title}"
 
 Return ONLY JSON: {{"artist": "Artist Name", "song": "Song Title"}}
 
