@@ -40,9 +40,10 @@ It is authoritative; later Phase prompts reference this spec.
 - **Transition handling**: Start playback immediately when transitioning TO scene, continue playing until transition completes when leaving scene.
 - Support both regular mode and Studio Mode (preview/program).
 - **Title display timing**:
-  - Clear title 2 seconds before song ends (prevents text on black screen during fade)
-  - Show title 2 seconds after song starts (allows video to establish before text appears)
+  - Clear title 3.5 seconds before song ends (prevents text on black screen during fade)
+  - Show title 1.5 seconds after song starts (allows video to establish before text appears)
   - Use OBS timers for precise timing control
+  - Smooth opacity transitions (1 second fade duration) using OBS color correction filter
 
 ## Threading
 - All OBS API calls **must** run on main thread (`obs.timer_add`).  
