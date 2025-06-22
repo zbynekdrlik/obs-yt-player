@@ -34,10 +34,8 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
     if not api_key:
         return None, None
         
-    # Simplified prompt to reduce token usage
-    prompt = f"""Extract artist and song from: "{video_title}"
-Return JSON: {{"artist": "name", "song": "title"}}
-Rules: Song=first part before "|", exclude album names/Pt.2, remove (Official)/(Live)"""
+    # Ultra-minimal prompt to avoid token limits
+    prompt = f'Title: "{video_title}"\nExtract: {{"artist":"X","song":"Y"}}'
 
     request_body = {
         "contents": [{
@@ -48,7 +46,8 @@ Rules: Song=first part before "|", exclude album names/Pt.2, remove (Official)/(
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
             "candidateCount": 1,
-            "maxOutputTokens": 512  # Increased significantly from 256
+            "maxOutputTokens": 1024,  # Doubled from 512
+            "stopSequences": ["}"]  # Stop after closing the JSON
         }
     }
     
@@ -71,9 +70,9 @@ Rules: Song=first part before "|", exclude album names/Pt.2, remove (Official)/(
                     
                     # Check for MAX_TOKENS finish reason first
                     if 'finishReason' in candidate and candidate['finishReason'] == 'MAX_TOKENS':
-                        log(f"Gemini hit MAX_TOKENS limit for '{video_title}' - retrying with longer limit")
-                        # Could implement a fallback with even higher tokens if needed
-                        continue
+                        log(f"Gemini hit MAX_TOKENS limit for '{video_title}' - prompt or response too long")
+                        # Skip retry since we're already at 1024 tokens
+                        return None, None
                     
                     if 'content' in candidate and 'parts' in candidate['content']:
                         parts = candidate['content']['parts']
@@ -88,19 +87,23 @@ Rules: Song=first part before "|", exclude album names/Pt.2, remove (Official)/(
                         continue
                     
                     try:
-                        # Clean up the response - remove markdown code blocks if present
+                        # Clean up the response - handle partial JSON due to stop sequence
                         cleaned_text = text.strip()
                         
-                        # Remove markdown code block markers
+                        # Remove markdown code block markers if present
                         if cleaned_text.startswith('```json'):
-                            cleaned_text = cleaned_text[7:]  # Remove ```json
+                            cleaned_text = cleaned_text[7:]
                         elif cleaned_text.startswith('```'):
-                            cleaned_text = cleaned_text[3:]  # Remove ```
+                            cleaned_text = cleaned_text[3:]
                         
                         if cleaned_text.endswith('```'):
-                            cleaned_text = cleaned_text[:-3]  # Remove trailing ```
+                            cleaned_text = cleaned_text[:-3]
                         
                         cleaned_text = cleaned_text.strip()
+                        
+                        # Add closing brace if missing due to stop sequence
+                        if not cleaned_text.endswith('}'):
+                            cleaned_text += '}'
                         
                         # Parse the JSON response
                         metadata = json.loads(cleaned_text)
@@ -108,6 +111,16 @@ Rules: Song=first part before "|", exclude album names/Pt.2, remove (Official)/(
                         song = metadata.get('song')
                         
                         if artist and song:
+                            # Clean the song title to match requirements
+                            # Remove album names and version info
+                            if '|' in song:
+                                song = song.split('|')[0].strip()
+                            
+                            # Remove common suffixes
+                            for suffix in ['(Extended Version)', '(Live)', '(Official Video)', '[Official]', '(feat.', 'Pt.', 'Part']:
+                                if suffix in song:
+                                    song = song.split(suffix)[0].strip()
+                            
                             log(f"Gemini extracted: {artist} - {song}")
                             return artist, song
                         else:
