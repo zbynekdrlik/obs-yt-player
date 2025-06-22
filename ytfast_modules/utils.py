@@ -33,14 +33,25 @@ def get_fpcalc_path():
 
 def sanitize_filename(text):
     """Sanitize text for use in filename."""
-    # Remove/replace invalid filename characters
-    invalid_chars = '<>:"|?*\\/'  # Note: escaped backslash
+    # First, replace forward slashes with hyphens to avoid space issues
+    text = text.replace('/', '-')
+    
+    # Remove/replace other invalid filename characters
+    invalid_chars = '<>:"|?*\\'  # Note: forward slash already handled
     for char in invalid_chars:
         text = text.replace(char, '_')
+    
+    # Clean up multiple spaces or dashes
+    text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with single space
+    text = re.sub(r'-+', '-', text)   # Replace multiple dashes with single dash
+    text = re.sub(r'_+', '_', text)   # Replace multiple underscores with single underscore
     
     # Remove non-ASCII characters
     text = unicodedata.normalize('NFKD', text)
     text = text.encode('ascii', 'ignore').decode('ascii')
+    
+    # Remove any leading/trailing spaces, dashes, or underscores
+    text = text.strip(' -_')
     
     # Limit length and clean up
     text = text[:50].strip().rstrip('.')
