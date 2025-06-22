@@ -67,7 +67,12 @@ Examples:
             "parts": [{
                 "text": prompt
             }]
-        }]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,  # Low temperature for consistent results
+            "candidateCount": 1,
+            "maxOutputTokens": 100
+        }
     }
     
     for attempt in range(MAX_RETRIES):

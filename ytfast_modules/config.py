@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.9.8"  # Fixed Gemini 2.5 Flash API endpoint with correct path
+SCRIPT_VERSION = "2.9.9"  # Added candidateCount parameter for Gemini 2.5 Flash compatibility
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
