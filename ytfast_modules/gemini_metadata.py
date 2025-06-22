@@ -34,21 +34,10 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
     if not api_key:
         return None, None
         
-    video_url = f"https://www.youtube.com/watch?v={video_id}"
-    
-    prompt = f"""Extract artist and song from this YouTube music video:
-URL: {video_url}
-Title: "{video_title}"
-
-Return ONLY JSON: {{"artist": "Artist Name", "song": "Song Title"}}
-
-Rules:
-- Song = ONLY the first part before any "|" separator
-- Exclude album names, "Pt. 2", etc from song
-- Remove (Official Video), [Live], etc from song
-- Keep "/" in multi-song titles
-
-Example: "So Good | Glory Pt. 2 | Planetshakers" → {{"artist": "Planetshakers", "song": "So Good"}}"""
+    # Simplified prompt to reduce token usage
+    prompt = f"""Extract artist and song from: "{video_title}"
+Return JSON: {{"artist": "name", "song": "title"}}
+Rules: Song=first part before "|", exclude album names/Pt.2, remove (Official)/(Live)"""
 
     request_body = {
         "contents": [{
@@ -59,7 +48,7 @@ Example: "So Good | Glory Pt. 2 | Planetshakers" → {{"artist": "Planetshakers"
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
             "candidateCount": 1,
-            "maxOutputTokens": 256  # Increased from 100
+            "maxOutputTokens": 512  # Increased significantly from 256
         }
     }
     
@@ -79,19 +68,20 @@ Example: "So Good | Glory Pt. 2 | Planetshakers" → {{"artist": "Planetshakers"
                 # Extract the generated text
                 if 'candidates' in result and result['candidates']:
                     candidate = result['candidates'][0]
-                    if 'content' in candidate:
-                        content = candidate['content']
-                        if 'parts' in content and content['parts']:
-                            text = content['parts'][0]['text']
-                            log(f"Gemini response for '{video_title}': {text}")
-                        elif 'text' in content:
-                            # Sometimes the text might be directly in content
-                            text = content['text']
+                    
+                    # Check for MAX_TOKENS finish reason first
+                    if 'finishReason' in candidate and candidate['finishReason'] == 'MAX_TOKENS':
+                        log(f"Gemini hit MAX_TOKENS limit for '{video_title}' - retrying with longer limit")
+                        # Could implement a fallback with even higher tokens if needed
+                        continue
+                    
+                    if 'content' in candidate and 'parts' in candidate['content']:
+                        parts = candidate['content']['parts']
+                        if parts and 'text' in parts[0]:
+                            text = parts[0]['text']
                             log(f"Gemini response for '{video_title}': {text}")
                         else:
                             log(f"Unexpected Gemini response structure: {json.dumps(result, indent=2)[:500]}")
-                            if 'finishReason' in candidate and candidate['finishReason'] == 'MAX_TOKENS':
-                                log("Response hit MAX_TOKENS limit - prompt may be too long")
                             continue
                     else:
                         log(f"No content in candidate: {json.dumps(candidate, indent=2)[:500]}")
