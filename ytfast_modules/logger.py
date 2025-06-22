@@ -15,10 +15,12 @@ _log_file_handle = None
 _log_file_path = None
 _log_initialized = False
 _log_lock = threading.Lock()
+_first_log_time = None
+_log_buffer = []  # Buffer for messages before file is ready
 
 def _initialize_file_logging():
     """Initialize file logging for this run."""
-    global _log_file_handle, _log_file_path, _log_initialized
+    global _log_file_handle, _log_file_path, _log_initialized, _log_buffer
     
     if _log_initialized:
         return
@@ -45,6 +47,12 @@ def _initialize_file_logging():
         _log_file_handle.write(f"=== {SCRIPT_NAME} Log Session ===\n")
         _log_file_handle.write(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         _log_file_handle.write("=" * 40 + "\n\n")
+        
+        # Write buffered messages
+        for msg in _log_buffer:
+            _log_file_handle.write(msg + "\n")
+        _log_buffer.clear()
+        
         _log_file_handle.flush()
         
         # Log successful initialization to console
@@ -65,14 +73,24 @@ def _write_to_file(formatted_message):
             except Exception:
                 # Silently fail if file write fails
                 pass
+        elif not _log_initialized:
+            # Buffer messages until file is ready
+            _log_buffer.append(formatted_message)
 
 def log(message):
     """
     Log messages with timestamp and script identifier.
     Outputs to both OBS console and log file.
     """
-    # Initialize file logging on first use
-    if not _log_initialized:
+    global _first_log_time
+    
+    # Track when first log was called
+    if _first_log_time is None:
+        _first_log_time = time.time()
+    
+    # Initialize file logging after a short delay (to avoid multiple files from quick reload)
+    # But only if we've been running for more than 1 second
+    if not _log_initialized and (time.time() - _first_log_time) > 1.0:
         _initialize_file_logging()
     
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -91,14 +109,15 @@ def log(message):
     # Output to console (OBS)
     print(console_msg)
     
-    # Output to file
+    # Output to file (or buffer if not ready)
     _write_to_file(file_msg)
 
 def cleanup_logging():
     """Clean up logging resources. Call when script unloads."""
-    global _log_file_handle, _log_initialized
+    global _log_file_handle, _log_initialized, _first_log_time, _log_buffer
     
     with _log_lock:
+        # Only write to file if we actually initialized it
         if _log_file_handle:
             try:
                 # Write footer
@@ -110,7 +129,11 @@ def cleanup_logging():
                 pass
             finally:
                 _log_file_handle = None
-                _log_initialized = False
+        
+        # Reset all state
+        _log_initialized = False
+        _first_log_time = None
+        _log_buffer.clear()
 
 def get_current_log_path():
     """Get the path of the current log file."""

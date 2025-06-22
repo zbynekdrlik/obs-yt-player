@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.9.1"  # Fixed file logging to use state cache dir
+SCRIPT_VERSION = "2.9.2"  # Prevent duplicate log files from quick OBS reloads
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
