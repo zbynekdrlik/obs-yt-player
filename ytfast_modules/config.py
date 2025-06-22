@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.3"  # Fixed Gemini MAX_TOKENS issue - increased output tokens and optimized prompt
+SCRIPT_VERSION = "3.0.4"  # Fixed Gemini MAX_TOKENS issue - increased to 1024, minimized prompt, added stop sequence
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
