@@ -46,9 +46,18 @@ Please respond with ONLY a JSON object in this exact format:
 
 Guidelines:
 - If featuring multiple artists, list the primary artist
+- For the song title, include ONLY the actual song name
+- Do NOT include album names, part numbers (like "Pt. 2" or "Part II"), or album references in the song title
 - Remove any extra information like (Official Video), [Live], (feat.), etc from the song title
+- Remove subtitles that indicate the album or collection (e.g., "| Glory Pt. 2" should just be the song name)
+- If the title contains a separator like "|" or "-", carefully determine which part is the song name versus album/collection info
 - If you cannot determine either field, use null
-- Base your response on the video title and any context available"""
+- Base your response on the video title and any context available
+
+Examples:
+- "So Good | Glory Pt. 2 | Planetshakers Official Music Video" -> {{"artist": "Planetshakers", "song": "So Good"}}
+- "Amazing Grace (My Chains Are Gone) | Album: Freedom | Chris Tomlin" -> {{"artist": "Chris Tomlin", "song": "Amazing Grace (My Chains Are Gone)"}}
+- "Holy Spirit | Jesus Culture feat. Kim Walker-Smith | Live From Chicago" -> {{"artist": "Jesus Culture", "song": "Holy Spirit"}}"""
 
     request_body = {
         "contents": [{
