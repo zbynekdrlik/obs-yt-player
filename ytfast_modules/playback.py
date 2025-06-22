@@ -414,7 +414,15 @@ def playback_controller():
                 _is_preloaded_video = True
                 # Update our state to match reality
                 set_playing(True)
-                # Don't touch the title or opacity - let it continue as-is
+                
+                # Check if we need to fade out the title for pre-loaded video
+                duration = get_media_duration(MEDIA_SOURCE_NAME)
+                current_time = get_media_time(MEDIA_SOURCE_NAME)
+                if duration > 0 and current_time > 0:
+                    remaining_ms = duration - current_time
+                    # If we're already close to the end, schedule fade out
+                    if remaining_ms > 0 and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 10) * 1000):
+                        schedule_title_clear_from_current(remaining_ms)
                 return  # Let it play out
         
         # Handle different states
@@ -445,10 +453,6 @@ def handle_playing_state():
         set_playing(True)
         return
     
-    # Don't process title timing for pre-loaded videos
-    if _is_preloaded_video:
-        return
-    
     duration = get_media_duration(MEDIA_SOURCE_NAME)
     current_time = get_media_time(MEDIA_SOURCE_NAME)
     
@@ -475,7 +479,7 @@ def handle_playing_state():
         # Check if we need to schedule or reschedule title clear
         remaining_ms = duration - current_time
         
-        # If we're close to the end and haven't scheduled fade out (or need to reschedule after seek)
+        # Schedule fade out for both pre-loaded and regular videos when close to end
         if remaining_ms > 0 and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 5) * 1000):
             if not _title_clear_scheduled or _title_clear_timer is None:
                 # Schedule the fade out based on current remaining time
