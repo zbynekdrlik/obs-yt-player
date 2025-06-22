@@ -24,8 +24,12 @@ def _initialize_file_logging():
         return
     
     try:
+        # Use cache dir from state if available, otherwise use default
+        from state import get_cache_dir
+        cache_dir = get_cache_dir() or DEFAULT_CACHE_DIR
+        
         # Create logs directory
-        logs_dir = Path(DEFAULT_CACHE_DIR) / "logs"
+        logs_dir = Path(cache_dir) / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
         
         # Create unique log filename with timestamp
@@ -42,6 +46,9 @@ def _initialize_file_logging():
         _log_file_handle.write(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         _log_file_handle.write("=" * 40 + "\n\n")
         _log_file_handle.flush()
+        
+        # Log successful initialization to console
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] File logging initialized: {_log_file_path}")
         
     except Exception as e:
         # If file logging fails, we'll just use console
