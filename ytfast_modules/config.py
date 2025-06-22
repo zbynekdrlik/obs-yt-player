@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.5"  # Improved Gemini prompt - removed token limit, added clear rules for primary artist only
+SCRIPT_VERSION = "3.0.6"  # Fixed Gemini prompt - emphasize song is ONLY before first pipe, added YouTube URL
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
