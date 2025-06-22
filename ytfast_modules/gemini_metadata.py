@@ -36,31 +36,18 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
         
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    prompt = f"""Analyze this YouTube music video and extract the artist name and song title.
+    prompt = f"""Extract artist and song from this YouTube video title:
+"{video_title}"
 
-Video URL: {video_url}
-Video Title: {video_title}
+Return ONLY JSON: {{"artist": "Artist Name", "song": "Song Title"}}
 
-Please respond with ONLY a JSON object in this exact format:
-{{"artist": "Artist Name", "song": "Song Title"}}
+Rules:
+- Song = ONLY the first part before any "|" separator
+- Exclude album names, "Pt. 2", etc from song
+- Remove (Official Video), [Live], etc from song
+- Keep "/" in multi-song titles
 
-Guidelines:
-- If featuring multiple artists, list the primary artist
-- For the song title, include ONLY the actual song name - the FIRST part before any separator
-- When you see "|" in the title, everything AFTER the first "|" should be excluded from the song title
-- Do NOT include album names, part numbers (like "Pt. 2" or "Part II"), or album references in the song title
-- Remove any extra information like (Official Video), [Live], (feat.), etc from the song title
-- Remove subtitles that indicate the album or collection (e.g., "| Glory Pt. 2" should just be the song name)
-- If the title contains multiple songs separated by "/" or "&", keep them as part of the song title
-- If you cannot determine either field, use null
-- Base your response on the video title and any context available
-
-Examples:
-- "So Good | Glory Pt. 2 | Planetshakers Official Music Video" -> {{"artist": "Planetshakers", "song": "So Good"}}
-- "Living In Me | Show Me Your Glory - Live At Chapel | Planetshakers" -> {{"artist": "Planetshakers", "song": "Living In Me"}}
-- "Way Truth Life | REVIVAL | Planetshakers Official Music Video" -> {{"artist": "Planetshakers", "song": "Way Truth Life"}}
-- "Faithful Then / Faithful Now (Extended Version) | Elevation Worship" -> {{"artist": "Elevation Worship", "song": "Faithful Then / Faithful Now"}}
-- "Amazing Grace (My Chains Are Gone) | Album: Freedom | Chris Tomlin" -> {{"artist": "Chris Tomlin", "song": "Amazing Grace (My Chains Are Gone)"}}"""
+Example: "So Good | Glory Pt. 2 | Planetshakers" → {{"artist": "Planetshakers", "song": "So Good"}}"""
 
     request_body = {
         "contents": [{
@@ -71,7 +58,7 @@ Examples:
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
             "candidateCount": 1,
-            "maxOutputTokens": 100
+            "maxOutputTokens": 256  # Increased from 100
         }
     }
     
@@ -91,11 +78,22 @@ Examples:
                 # Extract the generated text
                 if 'candidates' in result and result['candidates']:
                     candidate = result['candidates'][0]
-                    if 'content' in candidate and 'parts' in candidate['content']:
-                        text = candidate['content']['parts'][0]['text']
-                        log(f"Gemini response for '{video_title}': {text}")
+                    if 'content' in candidate:
+                        content = candidate['content']
+                        if 'parts' in content and content['parts']:
+                            text = content['parts'][0]['text']
+                            log(f"Gemini response for '{video_title}': {text}")
+                        elif 'text' in content:
+                            # Sometimes the text might be directly in content
+                            text = content['text']
+                            log(f"Gemini response for '{video_title}': {text}")
+                        else:
+                            log(f"Unexpected Gemini response structure: {json.dumps(result, indent=2)[:500]}")
+                            if 'finishReason' in candidate and candidate['finishReason'] == 'MAX_TOKENS':
+                                log("Response hit MAX_TOKENS limit - prompt may be too long")
+                            continue
                     else:
-                        log(f"Unexpected Gemini response structure: {json.dumps(result, indent=2)[:500]}")
+                        log(f"No content in candidate: {json.dumps(candidate, indent=2)[:500]}")
                         continue
                     
                     try:
