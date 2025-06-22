@@ -16,6 +16,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **Scene Management**: Automatic start/stop based on scene activation
 - **Transition Support**: Proper handling of scene transitions with configurable delays
 - **Google Gemini AI Integration**: Optional AI-powered metadata extraction for accurate artist/song identification
+- **File-Based Logging**: Comprehensive logging to both OBS console and individual log files per session
 
 ## Requirements
 
@@ -49,6 +50,29 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 5. Click "Sync Playlist Now" to manually update the playlist
 6. Switch to your scene to begin random playback
 7. Switch away from scene to automatically stop playback
+
+## Logging System
+
+The script includes a comprehensive logging system that outputs to both OBS console and individual log files:
+
+### Log Files
+- Located in `{cache_dir}/logs/` directory
+- One log file per OBS session with timestamp-based naming
+- Example: `ytfast_20250622_183209.log`
+- Includes thread information for debugging concurrent operations
+- Automatically cleaned up when script unloads
+
+### Log Format
+- Console logs: Standard OBS format with timestamps
+- File logs: Enhanced format with thread identification
+- Session headers and footers for easy navigation
+- All messages are preserved, even during quick script reloads
+
+### Benefits
+- **Debugging**: Track issues across multiple threads
+- **History**: Persistent logs survive OBS restarts
+- **Analysis**: Separate files per session for easy comparison
+- **Thread Safety**: Proper handling of concurrent logging
 
 ## Metadata Extraction
 
@@ -119,7 +143,7 @@ ytfast.py                    # Main entry point (minimal OBS interface)
 ytfast_modules/
     __init__.py             # Package marker
     config.py               # Configuration constants
-    logger.py               # Thread-aware logging
+    logger.py               # Thread-aware logging with file output
     state.py                # Thread-safe global state
     utils.py                # Utility functions
     tools.py                # Tool download/management (Windows binaries)
@@ -161,19 +185,28 @@ The project is organized into logical implementation phases:
 
 ### Enhanced Features
 13. **Phase 13**: Google Gemini AI Integration - AI-powered metadata extraction
+14. **Phase 14**: File-Based Logging - Comprehensive logging to files for debugging
 
 Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
 ## Current Status
 
-Version 2.5.5 - Google Gemini AI Integration:
+Version 2.9.2 - File-Based Logging:
 - ✅ Phases 1-11: Complete foundation, processing, playback, and scene management
 - ✅ Phase 13: Google Gemini AI integration for enhanced metadata extraction
+- ✅ Phase 14: File-based logging system for comprehensive debugging
 - ✅ Modular code structure with separated concerns
 - ✅ Windows-optimized with platform-specific code removed
 - ⏳ Phase 12: Final polish and optimization to be implemented
 
 ## Recent Updates
+
+### v2.9.2 - File-Based Logging System
+- Added comprehensive file-based logging alongside OBS console output
+- Logs saved to `{cache_dir}/logs/` with timestamp-based filenames
+- One log file per OBS session with proper session management
+- Thread information included for debugging concurrent operations
+- Intelligent buffering prevents duplicate files from quick script reloads
 
 ### v2.5.5 - Gemini API Endpoint Update
 - Updated to use the latest `gemini-2.0-flash` model endpoint
