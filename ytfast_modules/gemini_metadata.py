@@ -15,7 +15,7 @@ from logger import log
 from config import SCRIPT_NAME
 
 # Gemini API configuration
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 GEMINI_TIMEOUT = 10  # seconds
 MAX_RETRIES = 2
 
