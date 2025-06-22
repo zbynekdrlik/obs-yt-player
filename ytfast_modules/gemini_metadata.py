@@ -45,19 +45,21 @@ Return ONLY a JSON object with this exact format:
 {{"artist": "Primary Artist Name", "song": "Song Title"}}
 
 CRITICAL RULES:
-1. Artist = ONLY the main/primary artist (not featured artists or collaborators)
-2. Remove "feat.", "ft.", "Ft.", "featuring", "with", etc. from artist name
-3. Song = ONLY the song title, NOTHING ELSE
-4. If title has "|" character, song is ONLY the part BEFORE the FIRST "|"
-5. EXCLUDE album names, "Pt. 2", "Glory Pt. 2", episode names, series names
-6. Remove version info like "(Extended)", "(Live)", "(Official Video)"
-7. Keep "/" in multi-part song titles like "Song A / Song B"
+1. For titles with "|" - common patterns:
+   - "Song Title | Artist Name" → artist after pipe
+   - "Song Title | Album/Series | Artist" → artist is last part
+   - "SONG | Artist (additional info)" → artist after pipe, ignore parentheses content
+2. Remove "feat.", "ft.", "featuring", "with" from artist name
+3. Remove "(worship cover)", "(Official Video)", "(Live)" etc from artist name
+4. Song = clean title without version info
+5. Keep "/" in multi-part song titles
 
 Examples:
+- "HOLYGHOST | Sons Of Sunday" → {{"artist": "Sons Of Sunday", "song": "HOLYGHOST"}}
+- "Presence | NEW LEVEL (worship cover)" → {{"artist": "NEW LEVEL", "song": "Presence"}}  
 - "So Good | Glory Pt. 2 | Planetshakers" → {{"artist": "Planetshakers", "song": "So Good"}}
 - "Praise (feat. Brandon Lake) | Elevation Worship" → {{"artist": "Elevation Worship", "song": "Praise"}}
-- "Ask Me Why // Michael Bethany Ft. Dwan Hill" → {{"artist": "Michael Bethany", "song": "Ask Me Why"}}
-- "Faithful Then / Faithful Now (Extended Version) | Elevation Worship" → {{"artist": "Elevation Worship", "song": "Faithful Then / Faithful Now"}}"""
+- "Marco Barrientos - Yo Sé (Video Oficial)" → {{"artist": "Marco Barrientos", "song": "Yo Sé"}}"""
 
     request_body = {
         "contents": [{
