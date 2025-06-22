@@ -408,6 +408,14 @@ def playback_controller():
         if not _initial_state_checked:
             _initial_state_checked = True
             if media_state == obs.OBS_MEDIA_STATE_PLAYING and not is_playing():
+                # Check if this is valid media or just empty/invalid source
+                duration = get_media_duration(MEDIA_SOURCE_NAME)
+                if duration <= 0:
+                    # No valid media, start fresh
+                    log("No valid media in source, starting fresh playback")
+                    start_next_video()
+                    return
+                    
                 log("Media source is already playing - letting pre-loaded video play")
                 # Mark that we're handling a pre-loaded video
                 _preloaded_video_handled = False
@@ -416,7 +424,6 @@ def playback_controller():
                 set_playing(True)
                 
                 # Check if we need to fade out the title for pre-loaded video
-                duration = get_media_duration(MEDIA_SOURCE_NAME)
                 current_time = get_media_time(MEDIA_SOURCE_NAME)
                 if duration > 0 and current_time > 0:
                     remaining_ms = duration - current_time
