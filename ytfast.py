@@ -23,7 +23,7 @@ if MODULES_DIR not in sys.path:
 
 # Import modules after path is set
 from config import SCRIPT_VERSION, DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, SCENE_CHECK_DELAY
-from logger import log
+from logger import log, cleanup_logging
 from state import (
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
@@ -166,6 +166,9 @@ def script_unload():
     # Clean up temp files
     from cache import cleanup_temp_files
     cleanup_temp_files()
+    
+    # Clean up logging
+    cleanup_logging()
     
     log("Script unloaded")
 
