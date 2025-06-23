@@ -1,10 +1,10 @@
-# Phase 12 – Simple Polish
+# Phase 10 – Simple Polish
 
 ## Goal
 Add minimal polish to ensure cached videos are valid and improve time display formatting.
 
 ## Version Increment
-**Minor improvements** → Increment to 2.4.0
+**Minor improvements** → Increment to appropriate version
 
 ## Simplified Requirements
 This phase adds only essential improvements without over-engineering:
@@ -86,19 +86,18 @@ Update progress logging to use formatted time:
 1. Add `validate_video_file()` to cache module
 2. Add `format_duration()` to utils module  
 3. Update logging to use formatted durations
-4. Version bump to 2.4.0
+4. Version bump appropriately
 
 ## What We're NOT Doing
 - No complex error recovery systems
 - No resource monitoring
-- No version reset to 2.0.0
 - No unnecessary refactoring
 - No breaking changes
 
 ## Commit
 After testing, commit with message:
-*"Simple polish - video validation and time formatting (Phase 12)"*
+*"Simple polish - video validation and time formatting (Phase 10)"*
 
 **Keep it simple, keep it working!**
 
-*Prev → Phase-11-Scene-Management.md | Next → Phase-13-Cross-Platform.md*
+*Prev → Phase-09-Playback-Control.md | Next → Phase-11-File-Based-Logging.md*

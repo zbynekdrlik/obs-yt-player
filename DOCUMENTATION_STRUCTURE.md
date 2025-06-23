@@ -3,7 +3,7 @@
 ## Overview
 This document explains the relationship between all documentation files and the new modular code structure.
 
-## Code Architecture (v2.0.0+)
+## Code Architecture (v3.0+)
 
 ### Main Script
 - **ytfast.py** - Minimal main script containing only OBS interface functions
@@ -11,17 +11,19 @@ This document explains the relationship between all documentation files and the 
 ### Module Structure (`ytfast_modules/`)
 - **__init__.py** - Package marker
 - **config.py** - All configuration constants and settings
-- **logger.py** - Thread-aware logging system
+- **logger.py** - Thread-aware logging system with file output
 - **state.py** - Thread-safe global state management
 - **utils.py** - Shared utility functions
-- **tools.py** - Tool download and management (yt-dlp, FFmpeg, fpcalc)
+- **tools.py** - Tool download and management (yt-dlp, FFmpeg)
 - **cache.py** - Cache directory scanning and cleanup
 - **playlist.py** - Playlist synchronization logic
 - **download.py** - Video downloading and processing pipeline
-- **metadata.py** - Metadata extraction (AcoustID, iTunes, title parsing)
+- **metadata.py** - Metadata extraction orchestration (Gemini + title parser)
+- **gemini_metadata.py** - Google Gemini AI integration with Google Search grounding
 - **normalize.py** - Audio normalization with FFmpeg
-- **playback.py** - Playback control (placeholder for Phase 10)
+- **playback.py** - Playback control and random selection
 - **scene.py** - Scene management and OBS event handling
+- **reprocess.py** - Automatic retry system for failed Gemini extractions
 
 ### Multi-Instance Support
 When the script is renamed (e.g., `music.py`), the module folder automatically becomes `music_modules/`. This allows multiple independent instances with separate:
@@ -34,7 +36,7 @@ When the script is renamed (e.g., `music.py`), the module folder automatically b
 
 ### Core Documentation (`/docs/`)
 1. **01-overview.md** - Project purpose and high-level goals
-2. **02-requirements.md** - Authoritative functional specification (includes logging spec)
+2. **02-requirements.md** - Authoritative functional specification
 3. **03-obs_api.md** - OBS-specific constraints and rules
 4. **04-guidelines.md** - Coding style, logging guidelines, and development workflow
 
@@ -42,21 +44,21 @@ When the script is renamed (e.g., `music.py`), the module folder automatically b
 
 #### Foundation Phases
 1. **Phase-01-Scaffolding.md** - Basic script structure
-2. **Phase-02-Dependency-Setup.md** - Tool download system (yt-dlp, FFmpeg, fpcalc)
+2. **Phase-02-Dependency-Setup.md** - Tool download system (yt-dlp, FFmpeg)
 3. **Phase-03-Playlist-Sync.md** - Cache-aware playlist synchronization with cleanup
-
-#### Processing Pipeline Phases
 4. **Phase-04-Video-Download.md** - Download videos with yt-dlp
-5. **Phase-05-AcoustID-Metadata.md** - AcoustID fingerprinting
-6. **Phase-06-iTunes-Metadata.md** - iTunes metadata as secondary source
-7. **Phase-07-Title-Parser-Fallback.md** - Smart YouTube title parsing
-8. **Phase-08-Universal-Metadata-Cleaning.md** - Universal song title cleaning for all metadata sources
-9. **Phase-09-Audio-Normalization.md** - FFmpeg loudness normalization to -14 LUFS
+
+#### Metadata & Processing Phases
+5. **Phase-05-Gemini-Metadata.md** - Google Gemini AI as primary metadata source
+6. **Phase-06-Title-Parser-Fallback.md** - Smart YouTube title parsing (fallback)
+7. **Phase-07-Universal-Metadata-Cleaning.md** - Universal song title cleaning
+8. **Phase-08-Audio-Normalization.md** - FFmpeg loudness normalization to -14 LUFS
 
 #### Playback & Control Phases
-10. **Phase-10-Playback-Control.md** - Random playback and media control
-11. **Phase-11-Scene-Management.md** - Scene transition handling and stop button
-12. **Phase-12-Final-Polish.md** - Integration testing and optimization
+9. **Phase-09-Playback-Control.md** - Random playback and media control
+10. **Phase-10-Scene-Management.md** - Scene transition handling
+11. **Phase-11-Simple-Polish.md** - Integration testing and optimization
+12. **Phase-12-File-Based-Logging.md** - Comprehensive logging to files
 
 ## Development Workflow
 
@@ -67,7 +69,7 @@ When the script is renamed (e.g., `music.py`), the module folder automatically b
 4. **Update Version**: Increment `SCRIPT_VERSION` in `config.py`
 5. **Implement**: Update relevant modules
 6. **Test**: Follow testing steps in each phase
-7. **Commit**: Only after successful testing and user approval
+7. **Commit**: Only after successful testing
 
 ### Module Development Guidelines
 - Each module has a single responsibility
@@ -77,19 +79,26 @@ When the script is renamed (e.g., `music.py`), the module folder automatically b
 - Heavy processing happens in background threads
 - OBS API calls only on main thread
 
-### Logging System
-The script uses a simplified, thread-aware logging system:
-- Format: `[timestamp] message` or `[timestamp] [script_name] message`
-- Single `log(message)` function with thread detection
-- No debug levels or configuration
-- Implementation in `logger.py` module
+### Metadata System (v3.0+)
+The script uses a simplified metadata extraction system:
+1. **Google Gemini AI** (Primary - Required)
+   - Uses Gemini 2.5 Flash with Google Search grounding
+   - Handles complex title patterns intelligently
+   - Failed extractions marked with `_gf` suffix
+2. **Smart Title Parser** (Fallback)
+   - Activates when Gemini fails or is unavailable
+   - Handles common YouTube title formats
+3. **Automatic Retry**
+   - Videos with `_gf` marker are retried on startup
+   - Successful extraction results in file rename
 
 ### Version Management
 - Version constant in `config.py`
-- Each code output must increment the script version
-- **MINOR**: New phase implementations, completing new features
-- **PATCH**: Bug fixes, minor changes, iterations within a phase
-- **MAJOR**: Breaking changes, major refactors (e.g., v2.0.0 for modular refactoring)
+- Current version: 3.0.12
+- Each code change increments the version
+- **MAJOR**: Significant changes (e.g., v3.0 for Gemini-only)
+- **MINOR**: New features, phase implementations
+- **PATCH**: Bug fixes, minor changes
 
 ### Cross-References
 - Every phase references the requirements it implements
@@ -103,32 +112,18 @@ The script uses a simplified, thread-aware logging system:
 3. All heavy work in background threads
 4. OBS API calls only on main thread
 5. Increment version with every code output
-6. Test before commit with user approval
+6. Test before commit
 7. Follow PEP-8 style
-8. Use simplified, thread-aware logging
+8. Use thread-aware logging
 
-## Phase Dependencies
-- Phase 1-3: Foundation (can run but no videos)
-  - Phase 3 includes cache scanning for efficient restarts
-- Phase 4: Adds downloading capability
-- Phase 5: Adds AcoustID metadata extraction
-- Phase 6: Adds iTunes metadata search
-- Phase 7: Adds smart title parsing fallback
-- Phase 8: Adds universal metadata cleaning
-- Phase 9: Adds audio normalization
-- Phase 10: Adds playback functionality
-- Phase 11: Adds scene management and stop control
-- Phase 12: Final polish and optimization
-
-Each phase builds on previous phases, creating a complete system.
-
-## Current Implementation Status
+## Current Implementation Status (v3.0.12)
 The implementation includes:
-- ✅ Phase 1-9: Complete foundation, processing pipeline, and audio normalization
-- ✅ Modular architecture (v2.0.0) with separated concerns
-- ✅ Cache-aware sync prevents re-downloading existing videos
-- ✅ Universal song title cleaning for all metadata sources
-- ✅ Audio normalization to -14 LUFS with clean, annotation-free song titles
-- ⏳ Phase 10-12: Playback, scene management, and final polish to be implemented
+- ✅ Phase 1-4: Foundation and video downloading
+- ✅ Phase 5: Gemini metadata (primary source)
+- ✅ Phase 6: Title parser (fallback)
+- ✅ Phase 7-10: Universal cleaning, normalization, playback, scene management
+- ✅ Phase 11-12: Polish and file-based logging
+- ✅ Automatic retry system for failed Gemini extractions
+- ✅ Simplified metadata pipeline with single primary source
 
-All videos are processed through: download → metadata extraction → universal cleaning → audio normalization.
+All videos are processed through: download → Gemini/parser → universal cleaning → normalization → playback.

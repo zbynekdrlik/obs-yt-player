@@ -1,6 +1,6 @@
 """
 Tool management for OBS YouTube Player (Windows-only).
-Downloads and verifies yt-dlp, FFmpeg, and fpcalc.
+Downloads and verifies yt-dlp and FFmpeg.
 """
 
 import os
@@ -11,8 +11,8 @@ import threading
 from pathlib import Path
 
 from config import (
-    YTDLP_FILENAME, FFMPEG_FILENAME, FPCALC_FILENAME,
-    YTDLP_URL, FFMPEG_URL, FPCALC_URL,
+    YTDLP_FILENAME, FFMPEG_FILENAME,
+    YTDLP_URL, FFMPEG_URL,
     TOOLS_CHECK_INTERVAL
 )
 from logger import log
@@ -20,7 +20,7 @@ from state import (
     tools_thread, set_tools_ready, is_tools_logged_waiting, 
     set_tools_logged_waiting, should_stop_threads
 )
-from utils import get_ytdlp_path, get_ffmpeg_path, get_fpcalc_path, get_tools_path, ensure_cache_directory
+from utils import get_ytdlp_path, get_ffmpeg_path, get_tools_path, ensure_cache_directory
 
 def download_file(url, destination, description="file"):
     """Download a file from URL to destination with progress logging."""
@@ -84,28 +84,6 @@ def extract_ffmpeg(archive_path, tools_dir):
         
     except Exception as e:
         log(f"Failed to extract FFmpeg: {e}")
-        return False
-
-def extract_fpcalc(archive_path, tools_dir):
-    """Extract fpcalc from downloaded zip archive (Windows)."""
-    try:
-        import zipfile
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-            # Find fpcalc.exe in the archive
-            for file_info in zip_ref.filelist:
-                if file_info.filename.endswith('fpcalc.exe'):
-                    # Extract to tools directory
-                    target_path = os.path.join(tools_dir, FPCALC_FILENAME)
-                    with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
-                        target.write(source.read())
-                    log("Extracted fpcalc.exe from archive")
-                    return True
-        
-        log("fpcalc.exe not found in archive")
-        return False
-        
-    except Exception as e:
-        log(f"Failed to extract fpcalc: {e}")
         return False
 
 def verify_tool(tool_path, test_args):
@@ -175,30 +153,6 @@ def download_ffmpeg(tools_dir):
     
     return False
 
-def download_fpcalc(tools_dir):
-    """Download fpcalc executable for Windows (AcoustID fingerprinting)."""
-    fpcalc_path = os.path.join(tools_dir, FPCALC_FILENAME)
-    
-    # Skip if already exists and works
-    if os.path.exists(fpcalc_path) and verify_tool(fpcalc_path, ["-version"]):
-        log("fpcalc already exists and works")
-        return True
-    
-    # Download Windows zip archive
-    archive_path = os.path.join(tools_dir, "fpcalc_temp.zip")
-    
-    if download_file(FPCALC_URL, archive_path, "fpcalc"):
-        # Extract fpcalc
-        if extract_fpcalc(archive_path, tools_dir):
-            # Clean up archive
-            try:
-                os.remove(archive_path)
-            except:
-                pass
-            return True
-    
-    return False
-
 def setup_tools():
     """Download and verify required tools."""
     # Log waiting message only once
@@ -219,11 +173,6 @@ def setup_tools():
     ffmpeg_success = download_ffmpeg(tools_dir)
     if not ffmpeg_success:
         log("Failed to setup FFmpeg, will retry in 60 seconds")
-        return False
-    
-    fpcalc_success = download_fpcalc(tools_dir)
-    if not fpcalc_success:
-        log("Failed to setup fpcalc, will retry in 60 seconds")
         return False
     
     # All tools downloaded and verified successfully

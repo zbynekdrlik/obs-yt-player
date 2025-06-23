@@ -1,7 +1,7 @@
-# Phase 08 – Universal Metadata Cleaning
+# Phase 07 – Universal Metadata Cleaning
 
 ## Goal
-Apply consistent metadata cleaning to ALL sources (AcoustID, iTunes, title parsing) to ensure clean, consistent song titles without annotations or extra information.
+Apply consistent metadata cleaning to ALL sources (Gemini, title parsing) to ensure clean, consistent song titles without annotations or extra information.
 
 ## Version Increment
 **This phase adds new features** → Increment MINOR version (e.g., from 1.7.0 to 1.8.0)
@@ -180,31 +180,20 @@ def apply_universal_song_cleaning(song, artist, source):
 ### 3. Integration Points
 Apply cleaning at these key points in the code:
 
-#### AcoustID Results (in process_videos_worker):
+#### Gemini Results:
 ```python
-# Try AcoustID metadata extraction
-song, artist = get_acoustid_metadata(temp_path)
-metadata_source = "AcoustID" if (song and artist) else None
-
-# Apply universal cleaning to AcoustID results if found
-if song and artist:
-    song, artist = apply_universal_song_cleaning(song, artist, "AcoustID")
+# In extract_gemini_metadata, before returning results:
+if song_gemini and artist_gemini:
+    # Apply universal cleaning to Gemini results
+    song_gemini, artist_gemini = apply_universal_song_cleaning(song_gemini, artist_gemini, "Gemini")
+    return song_gemini, artist_gemini
 ```
 
-#### iTunes Results (in search_itunes_metadata):
-```python
-# In search_itunes_metadata, before returning results:
-if song_itunes and artist_itunes:
-    # Apply universal cleaning to iTunes results
-    song_itunes, artist_itunes = apply_universal_song_cleaning(song_itunes, artist_itunes, "iTunes")
-    return song_itunes, artist_itunes, "iTunes"
-```
-
-#### Title Parsing Results (in extract_metadata_from_title):
+#### Title Parsing Results:
 ```python
 # Apply universal cleaning to parsed results
 song_parsed, artist_parsed = apply_universal_song_cleaning(song_parsed, artist_parsed, "title_parsing")
-return song_parsed, artist_parsed, "title_parsing"
+return song_parsed, artist_parsed
 ```
 
 ### 4. Update Process Worker
@@ -251,16 +240,15 @@ log(f"=====================================")
 - [ ] Update `SCRIPT_VERSION` (increment MINOR version)
 - [ ] Implement clean_featuring_from_song function
 - [ ] Implement apply_universal_song_cleaning wrapper
-- [ ] Apply to AcoustID results
-- [ ] Apply to iTunes results  
+- [ ] Apply to Gemini results
 - [ ] Apply to title parsing results
 - [ ] Add comprehensive annotation patterns
 - [ ] Add detailed transformation logging
 - [ ] Handle edge cases (empty results, no changes)
 
 ## Testing Before Commit
-1. Test AcoustID result with annotations: Verify cleaning applied
-2. Test iTunes result with (feat.): Verify featuring removed
+1. Test Gemini result with annotations: Verify cleaning applied
+2. Test Gemini result with (feat.): Verify featuring removed
 3. Test title parsing with [Official Video]: Verify suffix removed
 4. Test multiple brackets: "(Live) [HD] (2023)"
 5. Test trailing phrases: "Song Title feat. Artist B"
@@ -272,6 +260,6 @@ log(f"=====================================")
 
 ## Commit
 After successful testing, commit with message:  
-> *"Add universal metadata cleaning for all sources (Phase 8)"*
+> *"Add universal metadata cleaning for all sources (Phase 7)"*
 
-*After verification, proceed to Phase 09.*
+*After verification, proceed to Phase 08.*

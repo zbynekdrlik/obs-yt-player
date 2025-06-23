@@ -45,9 +45,10 @@ def scan_existing_cache():
     found_count = 0
     debug_count = 0
     skipped_count = 0
+    gemini_failed_count = 0
     
-    # Look for normalized videos
-    for file_path in cache_path.glob("*_normalized.mp4"):
+    # Look for normalized videos (both with and without _gf marker)
+    for file_path in cache_path.glob("*_normalized*.mp4"):
         debug_count += 1
         
         # Validate the video file
@@ -58,9 +59,16 @@ def scan_existing_cache():
             
         try:
             # Extract video ID from filename
-            # Format: song_artist_videoId_normalized.mp4
-            # Video IDs can contain underscores, so we need careful parsing
+            # Format: song_artist_videoId_normalized.mp4 or song_artist_videoId_normalized_gf.mp4
             filename = file_path.stem  # Remove .mp4
+            
+            # Check if this is a Gemini failed file
+            gemini_failed = False
+            if filename.endswith('_gf'):
+                gemini_failed = True
+                gemini_failed_count += 1
+                # Remove _gf suffix for parsing
+                filename = filename[:-3]
             
             # Must end with _normalized
             if not filename.endswith('_normalized'):
@@ -88,7 +96,7 @@ def scan_existing_cache():
                     break
             
             if not video_id:
-                log(f"Could not extract video ID from: {filename}")
+                log(f"Could not extract video ID from: {file_path.name}")
                 continue
             
             # Try to extract metadata from remaining part
@@ -111,21 +119,28 @@ def scan_existing_cache():
                 'path': str(file_path),
                 'song': song.replace('_', ' '),
                 'artist': artist.replace('_', ' '),
-                'normalized': True
+                'normalized': True,
+                'gemini_failed': gemini_failed
             })
             found_count += 1
             
             # Debug log for first few files
             if debug_count <= 3:
-                log(f"Scanned: {filename} -> ID: {video_id}, Song: {song}, Artist: {artist}")
+                status = " (Gemini failed)" if gemini_failed else ""
+                log(f"Scanned: {file_path.name} -> ID: {video_id}, Song: {song}, Artist: {artist}{status}")
                         
         except Exception as e:
             log(f"Error scanning file {file_path}: {e}")
     
     if found_count > 0:
         log(f"Found {found_count} existing videos in cache")
+        if gemini_failed_count > 0:
+            log(f"  - {gemini_failed_count} videos marked for Gemini retry")
     if skipped_count > 0:
         log(f"Skipped {skipped_count} invalid video files")
+    
+    # Return whether we found any videos that need reprocessing
+    return gemini_failed_count > 0
 
 def cleanup_removed_videos():
     """Remove videos that are no longer in playlist."""

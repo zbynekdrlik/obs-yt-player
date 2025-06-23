@@ -1,14 +1,14 @@
-# Phase 07 – Title Parser Fallback
+# Phase 06 – Title Parser Fallback
 
 ## Goal
-Implement smart title parsing as a fallback when online metadata sources (AcoustID, iTunes) fail. This ensures every video gets reasonable metadata even without online matches.
+Implement smart title parsing as a fallback when Gemini metadata extraction fails. This ensures every video gets reasonable metadata.
 
 ## Version Increment
-**This phase adds new features** → Increment MINOR version (e.g., from 1.6.0 to 1.7.0)
+**This phase adds new features** → Increment version appropriately
 
 ## Requirements Reference
 This phase implements the fallback metadata extraction from `02-requirements.md`:
-- Parse YouTube titles when online sources fail
+- Parse YouTube titles when Gemini fails
 - Log the transformation for debugging
 - Handle various title formats intelligently
 
@@ -61,7 +61,7 @@ def parse_title_smart(title):
             artist = part1
             song = part2
         
-        # Remove basic video suffixes from song (comprehensive cleaning in Phase 8)
+        # Remove basic video suffixes from song (comprehensive cleaning in Phase 7)
         for suffix in ['Official Music Video', 'Official Video', 'Music Video', 'Official', 'Video', 'Live', 'Audio']:
             song = re.sub(f'\\s*[\\(\\[]?{suffix}[\\)\\]]?', '', song, flags=re.IGNORECASE).strip()
         
@@ -150,61 +150,52 @@ def parse_title_smart(title):
     return None, None
 ```
 
-### 2. Update Metadata Extraction Wrapper
+### 2. Update Metadata Extraction
 ```python
 def extract_metadata_from_title(title):
     """
-    Enhanced title parser that tries iTunes then falls back to parsing.
-    Always returns metadata - never None. This is the final fallback step.
+    Title parser that always returns metadata - never None. This is the final fallback step.
     Returns (song, artist, source)
     """
-    # First, try smart title parsing to extract expected artist
+    # Try smart title parsing
     song_parsed, artist_parsed = parse_title_smart(title)
     
-    # Try iTunes search with multiple strategies:
-    # 1. If we have parsed artist, try strict matching
-    # 2. Always try relaxed matching regardless of parsing success
-    song_itunes, artist_itunes = search_itunes_metadata(title, expected_artist=artist_parsed)
-    if song_itunes and artist_itunes:
-        # Note: Universal cleaning will be applied in Phase 8
-        return song_itunes, artist_itunes, "iTunes"
-    
-    # If iTunes fails but we have good parsed results, use them
     if song_parsed and artist_parsed:
         log(f"Using parsed metadata: {artist_parsed} - {song_parsed}")
-        # Note: Universal cleaning will be applied in Phase 8
+        # Note: Universal cleaning will be applied in Phase 7
         return song_parsed, artist_parsed, "title_parsing"
     
-    # Conservative fallback - still counts as title parsing attempt
+    # Conservative fallback
     log("No reliable artist/song could be parsed - using conservative fallback")
     return title, "Unknown Artist", "title_parsing"
 ```
 
-### 3. Integration with Process Worker
-Update process_videos_worker:
+### 3. Integration with Metadata Flow
+In the metadata extraction flow (now Gemini-only):
 ```python
-# In process_videos_worker, after download:
-# Try AcoustID metadata extraction
-song, artist = get_acoustid_metadata(temp_path)
-metadata_source = "AcoustID" if (song and artist) else None
+# In get_video_metadata:
+# Always try Gemini if API key is configured
+gemini_api_key = state.get_gemini_api_key()
+if gemini_api_key and video_id:
+    log(f"Attempting Gemini metadata extraction for '{title}'")
+    gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(
+        video_id, title, gemini_api_key
+    )
+    if gemini_artist and gemini_song:
+        # Apply universal cleaning to Gemini results
+        song = clean_featuring_from_song(gemini_song)
+        artist = gemini_artist
+        log(f"Metadata from Gemini: {artist} - {song}")
+        return song, artist, 'Gemini', False
+    else:
+        # Gemini failed
+        gemini_failed = True
+        log(f"Gemini failed for video {video_id}, falling back to title parsing")
 
-# If AcoustID fails, try title-based extraction (iTunes + parsing)
-# This function always returns metadata - never None
-if not song or not artist:
-    song, artist, metadata_source = extract_metadata_from_title(title)
+# Fall back to title parsing
+song, artist, metadata_source = extract_metadata_from_title(title)
 
-# Log metadata source with detailed results
-log(f"Metadata from {metadata_source}: {artist} - {song}")
-
-# Store metadata for next phase
-metadata = {
-    'song': song,
-    'artist': artist,
-    'yt_title': title
-}
-
-# TODO: Apply universal cleaning in Phase 8
-# TODO: Continue to Phase 9 (Audio Normalization)
+return song, artist, metadata_source, gemini_failed
 ```
 
 ## Title Format Examples
@@ -220,7 +211,7 @@ metadata = {
 8. **Complex**: "SONG NAME | Artist Name | Worship Together Session"
 
 ### Note on Cleaning:
-This phase does basic suffix removal during parsing. Comprehensive metadata cleaning (removing all brackets, features, etc.) is handled by the universal cleaning function in Phase 8.
+This phase does basic suffix removal during parsing. Comprehensive metadata cleaning (removing all brackets, features, etc.) is handled by the universal cleaning function in Phase 7.
 
 ## Key Considerations
 - Always returns some metadata (never None, None, None)
@@ -233,15 +224,15 @@ This phase does basic suffix removal during parsing. Comprehensive metadata clea
 - Falls back to "Unknown Artist" if needed
 
 ## Implementation Checklist
-- [ ] Update `SCRIPT_VERSION` (increment MINOR version)
+- [ ] Update `SCRIPT_VERSION` appropriately
 - [ ] Implement parse_title_smart function
 - [ ] Update extract_metadata_from_title
 - [ ] Add pattern matching for various formats
 - [ ] Add quote detection pattern
 - [ ] Ensure fallback always returns something
 - [ ] Add detailed logging of parsing attempts
-- [ ] Update process_videos_worker integration
-- [ ] Remove references to Phase 8 cleaning (will be added in next phase)
+- [ ] Update metadata flow integration
+- [ ] Remove references to Phase 8 cleaning (will be Phase 7)
 
 ## Testing Before Commit
 1. Test basic format: "Artist - Song"
@@ -258,6 +249,8 @@ This phase does basic suffix removal during parsing. Comprehensive metadata clea
 
 ## Commit
 After successful testing, commit with message:  
-> *"Add smart title parser fallback for metadata (Phase 7)"*
+> *"Add smart title parser fallback for metadata (Phase 6)"*
 
-*After verification, proceed to Phase 08.*
+*After verification, proceed to Phase 07.*
+
+*Prev → Phase-05-Gemini-Metadata.md | Next → Phase-07-Universal-Metadata-Cleaning.md*

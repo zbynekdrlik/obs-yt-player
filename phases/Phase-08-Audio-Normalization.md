@@ -1,4 +1,4 @@
-# Phase 09 – Audio Normalization
+# Phase 08 – Audio Normalization
 
 ## Goal
 Implement audio normalization to -14 LUFS using FFmpeg's loudnorm filter, ensuring consistent volume across all videos.
@@ -220,7 +220,7 @@ with state_lock:
 
 log(f"Video ready for playback: {metadata['artist']} - {metadata['song']}")
 
-# TODO: Continue to Phase 10 (Playback Control)
+# TODO: Continue to Phase 09 (Playback Control)
 ```
 
 ## Audio Normalization Details
@@ -278,6 +278,6 @@ The loudnorm filter implements EBU R128 loudness normalization:
 
 ## Commit
 After successful testing, commit with message:  
-> *"Add audio normalization to -14 LUFS (Phase 9)"*
+> *"Add audio normalization to -14 LUFS (Phase 8)"*
 
-*After verification, proceed to Phase 10.*
+*After verification, proceed to Phase 09.*

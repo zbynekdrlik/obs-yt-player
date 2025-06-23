@@ -10,7 +10,7 @@ It is authoritative; later Phase prompts reference this spec.
 ## Playlist Synchronisation
 1. Trigger **only** at startup and via *Sync Playlist Now* button.  
 2. **NO PERIODIC SYNC** - Script runs on slow LTE internet, sync only on demand.
-3. Process videos **one‑by‑one**: download → fingerprint → normalise → rename.  
+3. Process videos **one‑by‑one**: download → metadata → normalise → rename.  
 4. Remove local files whose IDs left the playlist (skip currently playing).
 
 ## Caching & File Management
@@ -20,18 +20,26 @@ It is authoritative; later Phase prompts reference this spec.
   - Allows multiple script instances with separate caches
   - Users can easily modify path in text field
 - Sanitise filenames: `<song>_<artist>_<id>_normalized.mp4`.  
+- Add `_gf` suffix for videos where Gemini extraction failed.
 - Retain only newest duplicate; clean temp `.part` files.
 
 ## Metadata Retrieval
-- Primary: **Google Gemini API** (optional, when configured with API key).
-  - Uses LLM to intelligently extract artist/song from video context
+- Primary: **Google Gemini API** (required, must be configured with API key).
+  - Uses AI with Google Search grounding to extract artist/song
   - Most accurate for complex titles
-- Secondary: **AcoustID** (`RXS1uld515`).
-- Tertiary: **iTunes API**.
-- Quaternary: Parse YouTube title.
-- Apply universal song title cleaning to ALL metadata sources
-- Remove annotations like (Live), [Official], (feat. Artist) from every result
+  - Failed extractions marked with `_gf` for automatic retry
+- Fallback: Smart title parser when Gemini unavailable or fails
+  - Handles "Artist - Song" and "Song | Artist" patterns
+  - Conservative fallback ensures videos always play
+- Apply universal song title cleaning to ALL results
+- Remove annotations like (Live), [Official], (feat. Artist)
 - Log all cleaning transformations for debugging
+
+## Automatic Retry System
+- Videos with `_gf` marker are automatically retried on startup
+- If Gemini succeeds on retry, file is renamed without marker
+- Metadata is updated in cache registry
+- Ensures maximum accuracy over time without manual intervention
 
 ## Playback Logic
 - Scene name == script filename without extension (e.g. `ytfast.py` → scene `ytfast`).  
@@ -48,6 +56,7 @@ It is authoritative; later Phase prompts reference this spec.
 ## Threading
 - All OBS API calls **must** run on main thread (`obs.timer_add`).  
 - Separate worker threads/queues for download, normalisation, metadata.
+- Gemini reprocess thread runs on startup to retry failed extractions.
 
 ## Logging
 - Thread-aware logging system with timestamp and script identification.
@@ -60,6 +69,7 @@ It is authoritative; later Phase prompts reference this spec.
 - This allows distinguishing between multiple script instances in background threads.
 - No debug levels or toggles - all messages are logged equally.
 - Log script version on startup.
+- File-based logging to `{cache_dir}/logs/` with session management.
 
 ## Versioning
 - Maintain version constant in script (`SCRIPT_VERSION = "X.Y.Z"`)  

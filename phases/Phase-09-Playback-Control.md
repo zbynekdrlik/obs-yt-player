@@ -1,4 +1,4 @@
-# Phase 10 – Playback Control
+# Phase 09 – Playback Control
 
 ## Goal
 Implement random video playback through OBS Media Source with metadata display, handling playback end detection and scene transitions.
@@ -601,6 +601,6 @@ def stop_current_playback():
 
 ## Commit
 After successful testing and user approval with logs, commit with message:  
-> *"Implement enhanced playback control with Song-Artist format, state sync, and title timing (Phase 10)"*
+> *"Implement enhanced playback control with Song-Artist format, state sync, and title timing (Phase 9)"*
 
-*After verification, proceed to Phase 11.*
+*After verification, proceed to Phase 10.*

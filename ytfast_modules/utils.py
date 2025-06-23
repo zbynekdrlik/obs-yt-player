@@ -26,11 +26,6 @@ def get_ffmpeg_path():
     from config import FFMPEG_FILENAME
     return os.path.join(get_tools_path(), FFMPEG_FILENAME)
 
-def get_fpcalc_path():
-    """Get path to fpcalc executable."""
-    from config import FPCALC_FILENAME
-    return os.path.join(get_tools_path(), FPCALC_FILENAME)
-
 def sanitize_filename(text):
     """Sanitize text for use in filename."""
     # First, replace forward slashes with hyphens to avoid space issues
