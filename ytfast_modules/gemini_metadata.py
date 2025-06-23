@@ -79,8 +79,8 @@ REMEMBER: Return ONLY valid JSON, nothing else."""
         },
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
-            "candidateCount": 1,
-            "responseMimeType": "application/json"  # Explicitly request JSON
+            "candidateCount": 1
+            # Removed responseMimeType as it's not supported with tool use
         }
     }
     
