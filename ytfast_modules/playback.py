@@ -11,7 +11,7 @@ from pathlib import Path
 from config import (
     PLAYBACK_CHECK_INTERVAL, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME,
     SCENE_NAME, TITLE_FADE_DURATION, TITLE_FADE_STEPS, TITLE_FADE_INTERVAL,
-    OPACITY_FILTER_NAME
+    OPACITY_FILTER_NAME, PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP
 )
 from logger import log
 from state import (
@@ -20,7 +20,9 @@ from state import (
     get_current_playback_video_id, set_current_playback_video_id,
     get_cached_videos, get_cached_video_info,
     get_played_videos, add_played_video, clear_played_videos,
-    is_scene_active, should_stop_threads
+    is_scene_active, should_stop_threads,
+    get_playback_mode, is_first_video_played, set_first_video_played,
+    get_loop_video_id, set_loop_video_id
 )
 from utils import format_duration
 
@@ -531,13 +533,33 @@ def handle_ended_state():
     # Reset playback tracking
     _last_playback_time = 0
     
+    playback_mode = get_playback_mode()
+    
     if is_playing():
         if not _preloaded_video_handled and _is_preloaded_video:
             log("Pre-loaded video ended, starting playlist")
             _preloaded_video_handled = True
             _is_preloaded_video = False
         else:
-            log("Playback ended, starting next video")
+            # Check playback mode to determine what to do next
+            if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
+                log("Single mode: First video ended, stopping playback")
+                stop_current_playback()
+                return
+            elif playback_mode == PLAYBACK_MODE_LOOP:
+                # In loop mode, replay the same video
+                loop_video_id = get_loop_video_id()
+                if loop_video_id:
+                    log("Loop mode: Replaying the same video")
+                    start_specific_video(loop_video_id)
+                    return
+                else:
+                    log("Loop mode: No video ID set, selecting first video")
+                    # Will be set when we start the next video
+            else:
+                # Continuous mode or first video not played yet
+                log("Playback ended, starting next video")
+        
         start_next_video()
     elif is_scene_active() and get_cached_videos():
         # Not playing but scene is active and we have videos - start playback
@@ -634,10 +656,19 @@ def select_next_video():
     Returns video_id or None if no videos available.
     """
     cached_videos = get_cached_videos()
+    playback_mode = get_playback_mode()
     
     if not cached_videos:
         log("No videos available for playback")
         return None
+    
+    # In loop mode, return the loop video if set
+    if playback_mode == PLAYBACK_MODE_LOOP:
+        loop_video_id = get_loop_video_id()
+        if loop_video_id and loop_video_id in cached_videos:
+            video_info = cached_videos[loop_video_id]
+            log(f"Loop mode - Selected: {video_info['song']} - {video_info['artist']}")
+            return loop_video_id
     
     available_videos = list(cached_videos.keys())
     played_videos = get_played_videos()
@@ -648,6 +679,11 @@ def select_next_video():
         # Don't add to played list if it's the only video
         video_info = cached_videos[selected]
         log(f"Selected (only video): {video_info['song']} - {video_info['artist']}")
+        
+        # Set as loop video if in loop mode
+        if playback_mode == PLAYBACK_MODE_LOOP and not get_loop_video_id():
+            set_loop_video_id(selected)
+        
         return selected
     
     # If all videos have been played, reset the played list
@@ -670,6 +706,10 @@ def select_next_video():
     
     video_info = cached_videos[selected]
     log(f"Selected: {video_info['song']} - {video_info['artist']}")
+    
+    # Set as loop video if in loop mode and not set
+    if playback_mode == PLAYBACK_MODE_LOOP and not get_loop_video_id():
+        set_loop_video_id(selected)
     
     return selected
 
@@ -794,6 +834,59 @@ def schedule_title_clear_with_delay():
     _duration_check_timer = delayed_duration_check_callback
     obs.timer_add(_duration_check_timer, 200)
 
+def start_specific_video(video_id):
+    """
+    Start playing a specific video by ID.
+    Used for loop mode to replay the same video.
+    """
+    global _playback_retry_count, _last_progress_log, _last_playback_time
+    
+    log(f"start_specific_video called for ID: {video_id}")
+    
+    # Cancel any pending title timers
+    cancel_title_timers()
+    
+    # Reset retry count on successful transition
+    _playback_retry_count = 0
+    
+    # Clear progress log for new video
+    _last_progress_log.clear()
+    _last_playback_time = 0
+    
+    # Get video info
+    video_info = get_cached_video_info(video_id)
+    if not video_info:
+        log(f"ERROR: No info for video {video_id}")
+        return
+    
+    # Validate video file exists
+    if not os.path.exists(video_info['path']):
+        log(f"ERROR: Video file missing: {video_info['path']}")
+        return
+    
+    # Extract metadata with fallbacks
+    song = video_info.get('song', 'Unknown Song')
+    artist = video_info.get('artist', 'Unknown Artist')
+    
+    # Update media source
+    if update_media_source(video_info['path']):
+        # Schedule title display
+        schedule_title_show(video_info)
+        
+        # Update playback state
+        set_playing(True)
+        set_current_video_path(video_info['path'])
+        set_current_playback_video_id(video_id)
+        
+        log(f"Started playback (loop): {song} - {artist}")
+        
+        # Schedule title clear with a delay to ensure accurate duration
+        schedule_title_clear_with_delay()
+    else:
+        # Failed to update media source
+        log("Failed to start video")
+        set_playing(False)
+
 def start_next_video():
     """
     Start playing the next video.
@@ -812,6 +905,15 @@ def start_next_video():
     # Clear progress log for new video
     _last_progress_log.clear()
     _last_playback_time = 0
+    
+    # Check playback mode
+    playback_mode = get_playback_mode()
+    
+    # If in single or loop mode and first video has been played
+    if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
+        log("Single mode: Already played first video, stopping")
+        stop_current_playback()
+        return
     
     # Select next video
     video_id = select_next_video()
@@ -850,7 +952,17 @@ def start_next_video():
         set_current_video_path(video_info['path'])
         set_current_playback_video_id(video_id)
         
-        log(f"Started playback: {song} - {artist}")
+        # Mark first video as played for single/loop modes
+        if not is_first_video_played():
+            set_first_video_played(True)
+            if playback_mode == PLAYBACK_MODE_SINGLE:
+                log(f"Single mode - Started first and only playback: {song} - {artist}")
+            elif playback_mode == PLAYBACK_MODE_LOOP:
+                log(f"Loop mode - Started first playback: {song} - {artist}")
+            else:
+                log(f"Started playback: {song} - {artist}")
+        else:
+            log(f"Started playback: {song} - {artist}")
         
         # Schedule title clear with a delay to ensure accurate duration
         schedule_title_clear_with_delay()
