@@ -44,6 +44,7 @@ _duration_check_timer = None  # Timer for delayed duration check
 _preloaded_video_handled = False  # Track if we've handled pre-loaded video
 _is_preloaded_video = False  # Track if current video is pre-loaded
 _last_playback_time = 0  # Track last playback position for seek detection
+_loop_restart_timer = None  # Timer reference for loop restart
 _loop_restart_pending = False  # Track if we're waiting to restart loop
 
 # Opacity transition variables
@@ -298,7 +299,8 @@ def show_title_after_start_callback():
 
 def cancel_title_timers():
     """Cancel any pending title timers."""
-    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled, _opacity_timer, _duration_check_timer
+    global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled
+    global _opacity_timer, _duration_check_timer, _loop_restart_timer
     
     if _title_clear_timer:
         obs.timer_remove(_title_clear_timer)
@@ -315,6 +317,10 @@ def cancel_title_timers():
     if _duration_check_timer:
         obs.timer_remove(_duration_check_timer)
         _duration_check_timer = None
+    
+    if _loop_restart_timer:
+        obs.timer_remove(_loop_restart_timer)
+        _loop_restart_timer = None
         
     _pending_title_info = None
     _title_clear_scheduled = False
@@ -589,8 +595,8 @@ def handle_ended_state():
                 if loop_video_id:
                     log("Loop mode: Replaying the same video")
                     _loop_restart_pending = True
-                    # Add a small delay before restarting to ensure clean transition
-                    obs.timer_add(lambda: restart_loop_video(loop_video_id), 100)
+                    # Schedule restart with a single timer
+                    schedule_loop_restart(loop_video_id)
                     return
                 else:
                     log("Loop mode: No video ID set, selecting first video")
@@ -605,13 +611,28 @@ def handle_ended_state():
         log("Scene active and videos available, starting playback")
         start_next_video()
 
-def restart_loop_video(video_id):
-    """Restart the loop video after a small delay."""
-    global _loop_restart_pending
-    _loop_restart_pending = False
-    start_specific_video(video_id)
-    # Remove this timer after execution
-    obs.timer_remove(lambda: restart_loop_video(video_id))
+def schedule_loop_restart(video_id):
+    """Schedule a single restart of the loop video."""
+    global _loop_restart_timer
+    
+    # Cancel any existing timer
+    if _loop_restart_timer:
+        obs.timer_remove(_loop_restart_timer)
+        _loop_restart_timer = None
+    
+    # Create a closure that captures the video_id
+    def restart_callback():
+        global _loop_restart_timer, _loop_restart_pending
+        # Remove the timer reference
+        if _loop_restart_timer:
+            obs.timer_remove(_loop_restart_timer)
+            _loop_restart_timer = None
+        _loop_restart_pending = False
+        start_specific_video(video_id)
+    
+    # Schedule the restart
+    _loop_restart_timer = restart_callback
+    obs.timer_add(_loop_restart_timer, 100)
 
 def handle_stopped_state():
     """Handle video stopped state."""
