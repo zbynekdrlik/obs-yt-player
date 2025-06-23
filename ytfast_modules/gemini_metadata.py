@@ -1,6 +1,6 @@
 """
 Google Gemini API metadata extraction for YouTube videos.
-Uses Gemini 2.5 Flash with Google Search grounding to intelligently extract artist and song information.
+Uses Gemini 2.0 Flash with Google Search grounding to intelligently extract artist and song information.
 """
 import json
 import time
@@ -15,7 +15,7 @@ from logger import log
 from config import SCRIPT_NAME
 
 # Gemini API configuration
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 GEMINI_TIMEOUT = 30  # Increased timeout for Google Search grounding
 MAX_RETRIES = 2
 
@@ -36,34 +36,33 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
     
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    # Enhanced prompt that asks Gemini to use Google Search
+    # Enhanced prompt with STRICT JSON requirements
     prompt = f"""Look up information about this YouTube video and extract the artist and song title:
 URL: {video_url}
 Title: "{video_title}"
 
 Use Google Search to find information about this specific YouTube video URL.
-The video page, description, and search results should help identify the correct artist.
 
-Return ONLY a JSON object with this exact format:
+CRITICAL: Respond with ONLY a valid JSON object. No explanatory text allowed.
+
+Return EXACTLY this format:
 {{"artist": "Primary Artist Name", "song": "Song Title"}}
 
 RULES:
-1. Use the YouTube URL to search for video information
-2. The artist may not be in the title - check video description and channel info
-3. For worship/church music, identify the actual performing artist/band
-4. Remove feat./ft./featuring from the primary artist name
-5. Remove (Official Video), (Live), etc from song titles
-6. Keep "/" in multi-part song titles like "Faithful Then / Faithful Now"
-7. If no artist found in title but found via search, use that artist
-8. If title has "-", check if it's "Artist - Song" or "Song - Description"
+1. Search for the YouTube URL to find the actual artist
+2. For worship/church music, identify the performing artist/band
+3. Remove feat./ft./featuring from artist name
+4. Remove (Official Video), (Live), etc from song titles
+5. Keep "/" in multi-part titles like "Faithful Then / Faithful Now"
+6. If no artist found, return empty string for artist
 
 Examples:
-- "Donde Vaya (En Vivo) - Official Music Video" → search finds Saddleback Worship
 - "HOLYGHOST | Sons Of Sunday" → {{"artist": "Sons Of Sunday", "song": "HOLYGHOST"}}
-- "Song Title - Official Video" → search for actual artist
+- "'COME RIGHT NOW' | Official Video" → {{"artist": "Planetshakers", "song": "COME RIGHT NOW"}}
 
-If you cannot determine the artist even with search, return empty string for artist."""
+REMEMBER: Return ONLY valid JSON, nothing else."""
 
+    # Add system instruction to enforce JSON-only responses
     request_body = {
         "contents": [{
             "parts": [{
@@ -73,9 +72,15 @@ If you cannot determine the artist even with search, return empty string for art
         "tools": [{
             "google_search": {}
         }],
+        "systemInstruction": {
+            "parts": [{
+                "text": "You are a JSON API that returns only valid JSON objects. Never include explanatory text, reasoning, or any content outside the JSON structure."
+            }]
+        },
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
-            "candidateCount": 1
+            "candidateCount": 1,
+            "responseMimeType": "application/json"  # Explicitly request JSON
         }
     }
     
@@ -122,6 +127,13 @@ If you cannot determine the artist even with search, return empty string for art
                             cleaned_text = cleaned_text[:-3]  # Remove trailing ```
                         
                         cleaned_text = cleaned_text.strip()
+                        
+                        # Try to extract JSON even if there's extra text (fallback)
+                        # Look for JSON object pattern
+                        json_match = re.search(r'\{[^{}]*"artist"[^{}]*"song"[^{}]*\}', cleaned_text)
+                        if json_match and not cleaned_text.startswith('{'):
+                            log(f"Extracting JSON from mixed response")
+                            cleaned_text = json_match.group(0)
                         
                         # Parse the JSON response
                         metadata = json.loads(cleaned_text)
