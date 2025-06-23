@@ -1,6 +1,6 @@
 # OBS YouTube Player (Windows)
 
-A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them randomly via Media Source with metadata display. All processing runs in background threads to keep OBS responsive.
+A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them randomly via Media Source with metadata display. Features AI-powered metadata extraction using Google Gemini.
 
 ## Features
 
@@ -8,15 +8,16 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **Local Caching**: Downloads and stores videos locally for reliable playback
 - **Audio Normalization**: Normalizes audio to -14 LUFS using FFmpeg
 - **Random Playback**: Plays videos randomly without repeats
-- **Metadata Display**: Shows song and artist information via Text Source
+- **AI-Powered Metadata**: Google Gemini AI extracts accurate artist/song information
+- **Smart Fallback**: Title parser handles cases when Gemini is unavailable
 - **Background Processing**: All heavy tasks run in separate threads
 - **OBS Integration**: Seamless integration with OBS Studio scenes and sources
 - **Multi-Instance Support**: Rename script to run multiple instances with separate caches
 - **Modular Architecture**: Clean, maintainable code structure with separated concerns
 - **Scene Management**: Automatic start/stop based on scene activation
 - **Transition Support**: Proper handling of scene transitions with configurable delays
-- **Google Gemini AI Integration**: Optional AI-powered metadata extraction for accurate artist/song identification
-- **File-Based Logging**: Comprehensive logging to both OBS console and individual log files per session
+- **File-Based Logging**: Comprehensive logging to both OBS console and individual log files
+- **Automatic Retry**: Failed Gemini extractions are retried on next startup
 
 ## Requirements
 
@@ -24,7 +25,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - OBS Studio with Python scripting support
 - Internet connection for initial video downloads
 - Sufficient disk space for video cache
-- (Optional) Google Gemini API key for enhanced metadata extraction
+- Google Gemini API key (required for metadata extraction)
 
 ## Installation
 
@@ -37,7 +38,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 6. Configure the script properties:
    - Set your YouTube playlist URL
    - Cache directory (defaults to `<script_location>/<scriptname>-cache/`)
-   - (Optional) Google Gemini API key for better metadata extraction
+   - **Google Gemini API key** (get free key at https://makersuite.google.com/app/apikey)
 
 ## Usage
 
@@ -51,96 +52,88 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 6. Switch to your scene to begin random playback
 7. Switch away from scene to automatically stop playback
 
+## Metadata Extraction System
+
+The script uses a streamlined metadata extraction system:
+
+### Google Gemini AI (Primary)
+- Uses Gemini 2.5 Flash with Google Search grounding
+- Intelligently extracts artist and song from video context
+- Handles complex title patterns:
+  - "Song | Artist" format
+  - Multiple pipe separators
+  - Various YouTube title conventions
+- Most accurate for worship/church music and international content
+- **Free tier available** with generous limits
+
+### Smart Title Parser (Fallback)
+- Activates when Gemini is unavailable or fails
+- Handles common patterns:
+  - "Artist - Song"
+  - "Song | Artist"
+- Conservative fallback ensures videos always play
+
+### Automatic Retry System
+- Videos that fail Gemini extraction are marked with `_gf` in filename
+- Automatically retried on next OBS startup
+- Successfully extracted metadata results in file rename
+- Ensures maximum metadata accuracy over time
+
+### Universal Song Cleaning
+All metadata sources apply cleaning to remove:
+- (Official Video), [Live], (feat. Artist)
+- (Official Audio), (Lyric Video)
+- And many more annotations...
+
 ## Logging System
 
-The script includes a comprehensive logging system that outputs to both OBS console and individual log files:
+The script includes a comprehensive logging system:
 
 ### Log Files
 - Located in `{cache_dir}/logs/` directory
 - One log file per OBS session with timestamp-based naming
-- Example: `ytfast_20250622_183209.log`
-- Includes thread information for debugging concurrent operations
+- Example: `ytfast_20250623_183209.log`
+- Includes thread information for debugging
 - Automatically cleaned up when script unloads
 
 ### Log Format
 - Console logs: Standard OBS format with timestamps
 - File logs: Enhanced format with thread identification
 - Session headers and footers for easy navigation
-- All messages are preserved, even during quick script reloads
-
-### Benefits
-- **Debugging**: Track issues across multiple threads
-- **History**: Persistent logs survive OBS restarts
-- **Analysis**: Separate files per session for easy comparison
-- **Thread Safety**: Proper handling of concurrent logging
-
-## Metadata Extraction
-
-The script uses a sophisticated metadata extraction system with multiple fallback sources:
-
-1. **Google Gemini AI** (Primary - Optional)
-   - Uses advanced AI to intelligently extract artist and song from video titles
-   - **NEW in v3.0+**: Enhanced handling of complex title patterns:
-     - Correctly identifies artist/song in "Song | Artist" format
-     - Excludes album names and part numbers (e.g., "Glory Pt. 2")
-     - Handles multiple pipe separators intelligently
-   - Powered by Gemini 2.5 Flash model with free tier support
-   - Requires API key (get free key at https://makersuite.google.com/app/apikey)
-   - Most accurate for worship/church music and international content
-
-2. **AcoustID** (Secondary)
-   - Audio fingerprinting technology
-   - Matches against MusicBrainz database
-   - Good for commercially released music
-
-3. **iTunes API** (Tertiary)
-   - Searches Apple's music catalog
-   - Fast and reliable for mainstream music
-
-4. **Smart Title Parser** (Fallback)
-   - Intelligent parsing of YouTube video titles
-   - Handles common patterns like "Artist - Song" and "Song | Artist"
-
-All sources apply universal song title cleaning to remove annotations like:
-- (Official Video), [Live], (feat. Artist)
-- (Official Audio), (Lyric Video)
-- And many more...
 
 ## Scene Transitions
 
 The script properly handles OBS scene transitions:
-- **Transitioning TO the scene**: Video starts playing immediately as the transition begins
-- **Transitioning FROM the scene**: Video continues playing until the transition completes
-- Works with any transition duration (tested up to 5+ seconds)
-- Supports both regular mode and Studio Mode (preview/program)
+- **Transitioning TO the scene**: Video starts playing immediately
+- **Transitioning FROM the scene**: Video continues until transition completes
+- Works with any transition duration
+- Supports both regular mode and Studio Mode
 
 ## Multi-Instance Setup
 
-You can run multiple instances by copying and renaming the script:
+Run multiple instances by copying and renaming the script:
 
 ```
 obs-scripts/
-├── ytfast.py              → Scene: ytfast, Cache: ./ytfast-cache/
+├── ytfast.py              → Scene: ytfast
 ├── ytfast_modules/        → Modules for ytfast.py
-├── music-chill.py         → Scene: music-chill, Cache: ./music-chill-cache/
+├── music-chill.py         → Scene: music-chill
 ├── music-chill_modules/   → Modules for music-chill.py
-└── stream-bgm.py          → Scene: stream-bgm, Cache: ./stream-bgm-cache/
+└── stream-bgm.py          → Scene: stream-bgm
 └── stream-bgm_modules/    → Modules for stream-bgm.py
 ```
 
-Each instance maintains its own playlist, cache, settings, and module folder.
+Each instance maintains its own playlist, cache, settings, and modules.
 
 ## Windows-Specific Features
 
 The script is optimized for Windows with:
 - Hidden console windows for background processes
-- Automatic download of Windows binaries (yt-dlp.exe, ffmpeg.exe, fpcalc.exe)
+- Automatic download of Windows binaries (yt-dlp.exe, ffmpeg.exe)
 - Windows-compatible file path handling
 - Native Windows subprocess management
 
 ## Project Structure
-
-### Script Architecture
 
 ```
 ytfast.py                    # Main entry point (minimal OBS interface)
@@ -150,101 +143,62 @@ ytfast_modules/
     logger.py               # Thread-aware logging with file output
     state.py                # Thread-safe global state
     utils.py                # Utility functions
-    tools.py                # Tool download/management (Windows binaries)
+    tools.py                # Tool download/management
     cache.py                # Cache scanning/cleanup
     playlist.py             # Playlist synchronization
     download.py             # Video downloading
-    metadata.py             # Metadata extraction (Gemini, AcoustID, iTunes, parsing)
+    metadata.py             # Metadata extraction orchestration
     gemini_metadata.py      # Google Gemini AI integration
     normalize.py            # Audio normalization
     playback.py             # Playback control
-    scene.py                # Scene management and transition handling
+    scene.py                # Scene management
+    reprocess.py            # Gemini retry system
 ```
-
-### Documentation
-
-This project follows a phased development approach. See the `docs/` directory for detailed implementation specifications and the `phases/` directory for step-by-step development guides.
-
-## Development Phases
-
-The project is organized into logical implementation phases:
-
-### Foundation
-1. **Phase 01**: Scaffolding - Basic script structure and OBS integration
-2. **Phase 02**: Tool Management - Download and verify Windows binaries
-3. **Phase 03**: Playlist Sync - Fetch playlist, queue videos, manage cache
-
-### Processing Pipeline
-4. **Phase 04**: Video Download - Download videos with yt-dlp
-5. **Phase 05**: AcoustID Metadata - Audio fingerprinting for accurate metadata
-6. **Phase 06**: iTunes Metadata - Secondary metadata source via iTunes API
-7. **Phase 07**: Title Parser Fallback - Smart YouTube title parsing when online sources fail
-8. **Phase 08**: Universal Metadata Cleaning - Clean song titles from all sources
-9. **Phase 09**: Audio Normalization - FFmpeg loudnorm to -14 LUFS
-
-### Playback & Control
-10. **Phase 10**: Playback Control - Random playback, media source control
-11. **Phase 11**: Scene Management - Handle scene transitions, cleanup on exit
-12. **Phase 12**: Final Polish - Testing, optimization, documentation
-
-### Enhanced Features
-13. **Phase 13**: Google Gemini AI Integration - AI-powered metadata extraction
-14. **Phase 14**: File-Based Logging - Comprehensive logging to files for debugging
-
-Each phase builds upon the previous one, ensuring a systematic and maintainable development process.
 
 ## Current Status
 
-Version 3.0.7 - Enhanced Gemini Metadata Extraction:
-- ✅ Phases 1-11: Complete foundation, processing, playback, and scene management
-- ✅ Phase 13: Google Gemini AI integration with enhanced title parsing
-- ✅ Phase 14: File-based logging system for comprehensive debugging
-- ✅ Improved handling of complex title patterns with pipe separators
-- ✅ Excludes album names and part numbers from song titles
-- ✅ Upgraded to Gemini 2.5 Flash for better performance and free tier support
-- ✅ Fixed filename sanitization for songs with forward slashes
-- ✅ Modular code structure with separated concerns
-- ✅ Windows-optimized with platform-specific code removed
-- ⏳ Phase 12: Final polish and optimization to be implemented
+Version 3.0.12 - Gemini-Only Metadata:
+- ✅ Complete foundation, processing, and playback system
+- ✅ Google Gemini AI as primary metadata source
+- ✅ Smart title parser as fallback
+- ✅ Automatic retry for failed Gemini extractions
+- ✅ File-based logging system
+- ✅ Scene transition support
+- ✅ Multi-instance capability
+- ✅ Windows-optimized implementation
 
 ## Recent Updates
 
-### v3.0.7 - Enhanced Gemini Metadata Extraction
-- Improved Gemini prompt to correctly handle "Song | Artist" patterns
-- Excludes album names and part numbers (e.g., "Glory Pt. 2") from song titles
-- Handles complex titles with multiple pipe separators intelligently
-- Fixed filename sanitization: forward slashes now converted to hyphens
-- Upgraded to Gemini 2.5 Flash model for better performance
-- Removed unused configuration constants for cleaner codebase
-- Enhanced error handling and logging for Gemini API responses
+### v3.0.12 - Gemini-Only Metadata Branch
+- Removed AcoustID and iTunes metadata sources
+- Gemini AI is now the sole metadata extraction method
+- Smart title parser provides fallback when Gemini fails
+- Automatic retry system for failed extractions
+- Simplified metadata pipeline for better reliability
+- Files marked with `_gf` for Gemini failures
+- Enhanced Google Search grounding in Gemini prompts
 
-### v2.9.2 - File-Based Logging System
-- Added comprehensive file-based logging alongside OBS console output
-- Logs saved to `{cache_dir}/logs/` with timestamp-based filenames
-- One log file per OBS session with proper session management
-- Thread information included for debugging concurrent operations
-- Intelligent buffering prevents duplicate files from quick script reloads
+## Getting a Gemini API Key
 
-### v2.5.5 - Gemini API Endpoint Update
-- Updated to use the latest `gemini-2.0-flash` model endpoint
-- Fixed 404 errors with deprecated API endpoints
+1. Visit https://makersuite.google.com/app/apikey
+2. Sign in with your Google account
+3. Click "Create API Key"
+4. Copy the key and paste it in OBS script settings
+5. Free tier includes generous limits for personal use
 
-### v2.5.0 - Google Gemini AI Integration
-- Added optional Google Gemini AI for intelligent metadata extraction
-- Gemini is now the primary metadata source when API key is configured
-- Handles complex video titles with high accuracy
-- Particularly effective for worship/church music and international content
-- Falls back to AcoustID, iTunes, and parsing when Gemini is not available
+## Troubleshooting
 
-### v2.3.8 - Stop Button Removed
-- Removed manual stop button functionality for cleaner interface
-- Playback control is now fully automatic based on scene activation
+### Gemini Metadata Failures
+- Check your internet connection
+- Verify API key is correct
+- Failed extractions will retry automatically on restart
+- Check logs in `{cache_dir}/logs/` for details
 
-### v2.3.7 - Transition Support
-- Added proper scene transition handling using correct OBS events
-- Transition detection with duration-aware delays
-- Support for both regular mode and Studio Mode
-- Fixed API compatibility issues with non-existent events
+### No Videos Playing
+- Ensure scene and source names match exactly
+- Check that playlist URL is valid
+- Verify cache directory has write permissions
+- Review logs for download errors
 
 ## License
 
