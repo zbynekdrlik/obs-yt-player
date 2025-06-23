@@ -44,6 +44,7 @@ _duration_check_timer = None  # Timer for delayed duration check
 _preloaded_video_handled = False  # Track if we've handled pre-loaded video
 _is_preloaded_video = False  # Track if current video is pre-loaded
 _last_playback_time = 0  # Track last playback position for seek detection
+_loop_restart_pending = False  # Track if we're waiting to restart loop
 
 # Opacity transition variables
 _opacity_timer = None
@@ -365,7 +366,7 @@ def playback_controller():
     Manages video playback state and transitions.
     """
     global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
-    global _preloaded_video_handled, _is_preloaded_video
+    global _preloaded_video_handled, _is_preloaded_video, _loop_restart_pending
     
     try:
         # Priority 1: Check if we're shutting down
@@ -484,7 +485,10 @@ def playback_controller():
 
 def handle_playing_state():
     """Handle currently playing video state."""
-    global _is_preloaded_video, _last_playback_time, _title_clear_scheduled, _title_clear_timer
+    global _is_preloaded_video, _last_playback_time, _title_clear_scheduled, _title_clear_timer, _loop_restart_pending
+    
+    # Clear loop restart flag if we're playing
+    _loop_restart_pending = False
     
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
@@ -557,7 +561,7 @@ def schedule_title_clear_from_current(remaining_ms):
 
 def handle_ended_state():
     """Handle video ended state."""
-    global _preloaded_video_handled, _is_preloaded_video, _last_playback_time
+    global _preloaded_video_handled, _is_preloaded_video, _last_playback_time, _loop_restart_pending
     
     # Reset playback tracking
     _last_playback_time = 0
@@ -565,6 +569,10 @@ def handle_ended_state():
     playback_mode = get_playback_mode()
     
     if is_playing():
+        # Prevent loop mode from firing multiple times
+        if playback_mode == PLAYBACK_MODE_LOOP and _loop_restart_pending:
+            return  # Already scheduled a restart
+            
         if not _preloaded_video_handled and _is_preloaded_video:
             log("Pre-loaded video ended, starting playlist")
             _preloaded_video_handled = True
@@ -580,7 +588,9 @@ def handle_ended_state():
                 loop_video_id = get_loop_video_id()
                 if loop_video_id:
                     log("Loop mode: Replaying the same video")
-                    start_specific_video(loop_video_id)
+                    _loop_restart_pending = True
+                    # Add a small delay before restarting to ensure clean transition
+                    obs.timer_add(lambda: restart_loop_video(loop_video_id), 100)
                     return
                 else:
                     log("Loop mode: No video ID set, selecting first video")
@@ -594,6 +604,14 @@ def handle_ended_state():
         # Not playing but scene is active and we have videos - start playback
         log("Scene active and videos available, starting playback")
         start_next_video()
+
+def restart_loop_video(video_id):
+    """Restart the loop video after a small delay."""
+    global _loop_restart_pending
+    _loop_restart_pending = False
+    start_specific_video(video_id)
+    # Remove this timer after execution
+    obs.timer_remove(lambda: restart_loop_video(video_id))
 
 def handle_stopped_state():
     """Handle video stopped state."""
