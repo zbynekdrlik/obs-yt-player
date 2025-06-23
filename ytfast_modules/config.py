@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.9"  # Enhanced Gemini prompt to enforce JSON-only responses and added fallback JSON extraction
+SCRIPT_VERSION = "3.0.10"  # Fixed Gemini API compatibility - removed responseMimeType parameter
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
