@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.11"  # Clean up config.py to match main branch structure
+SCRIPT_VERSION = "3.0.12"  # Removed AcoustID support, Gemini-only metadata
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -28,7 +28,6 @@ OPACITY_FILTER_NAME = "Title Opacity"
 TOOLS_SUBDIR = "tools"
 YTDLP_FILENAME = "yt-dlp.exe" if os.name == 'nt' else "yt-dlp"
 FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
-FPCALC_FILENAME = "fpcalc.exe" if os.name == 'nt' else "fpcalc"
 
 # Timing intervals (milliseconds)
 PLAYBACK_CHECK_INTERVAL = 1000  # 1 second
@@ -42,10 +41,6 @@ MAX_RESOLUTION = "1440"
 DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads
 NORMALIZE_TIMEOUT = 300  # 5 minutes timeout for normalization
 
-# AcoustID settings
-ACOUSTID_API_KEY = "RXS1uld515"  # AcoustID API key for metadata
-ACOUSTID_ENABLED = True  # Toggle to enable/disable AcoustID lookups
-
 # URLs for tool downloads
 YTDLP_URL_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
 YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
@@ -53,20 +48,12 @@ YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dl
 # For Windows tools.py compatibility
 YTDLP_URL = YTDLP_URL_WIN
 FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-FPCALC_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
 
 # FFmpeg URLs by platform (for future cross-platform support)
 FFMPEG_URLS = {
     "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
     "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
     "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-}
-
-# fpcalc (Chromaprint) URLs by platform (for future cross-platform support)
-FPCALC_URLS = {
-    "win32": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip",
-    "darwin": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-macos-x86_64.tar.gz",
-    "linux": "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-linux-x86_64.tar.gz"
 }
 
 # Title opacity transition settings
