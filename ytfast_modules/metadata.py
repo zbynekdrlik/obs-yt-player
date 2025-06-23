@@ -23,15 +23,8 @@ def get_video_metadata(filepath, title, video_id=None):
     """
     gemini_failed = False
     
-    # Check if this video already has a Gemini failed marker in the cache
-    # Look for existing file with _gf marker
-    if video_id and should_skip_gemini(video_id):
-        log(f"Skipping Gemini for video {video_id} - previous failure detected")
-        # Fall back to title parsing directly
-        song, artist, metadata_source = extract_metadata_from_title(title)
-        return song, artist, metadata_source, True
-    
-    # Try Gemini if API key is configured
+    # Always try Gemini if API key is configured
+    # We want to retry on every restart
     gemini_api_key = state.get_gemini_api_key()
     if gemini_api_key and video_id:
         log(f"Attempting Gemini metadata extraction for '{title}'")
@@ -53,21 +46,6 @@ def get_video_metadata(filepath, title, video_id=None):
     song, artist, metadata_source = extract_metadata_from_title(title)
     
     return song, artist, metadata_source, gemini_failed
-
-def should_skip_gemini(video_id):
-    """
-    Check if a video should skip Gemini extraction based on existing files.
-    Returns True if a file with _gf marker exists for this video ID.
-    """
-    cache_dir = Path(state.get_cache_dir())
-    if not cache_dir.exists():
-        return False
-    
-    # Look for any file with this video ID and _gf marker
-    pattern = f"*_{video_id}_normalized_gf.mp4"
-    matching_files = list(cache_dir.glob(pattern))
-    
-    return len(matching_files) > 0
 
 def extract_metadata_from_title(title):
     """
@@ -188,7 +166,7 @@ def apply_universal_song_cleaning(song, artist, source):
     
     return cleaned_song, artist
 
-# No longer needed - using filename-based tracking
 def clear_gemini_failures():
-    """Legacy function kept for compatibility - no longer tracks failures in memory."""
-    log("Gemini failures are now tracked via filename markers (_gf)")
+    """Legacy function kept for compatibility."""
+    log("Gemini failures are tracked via filename markers (_gf) and retried on restart")
+    # This function is now a no-op since we always retry on restart
