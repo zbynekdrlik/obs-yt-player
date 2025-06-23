@@ -197,7 +197,7 @@ def opacity_transition_callback():
         
         # If fading out and reached 0, update the text
         if _fade_direction == 'out' and _current_opacity == 0 and _pending_text is not None:
-            update_text_source_content(_pending_text['song'], _pending_text['artist'])
+            update_text_source_content(_pending_text['song'], _pending_text['artist'], _pending_text.get('gemini_failed', False))
             _pending_text = None
             # Now fade in
             fade_in_text()
@@ -262,8 +262,9 @@ def show_title_after_start_callback():
     if _pending_title_info:
         song = _pending_title_info.get('song', 'Unknown Song')
         artist = _pending_title_info.get('artist', 'Unknown Artist')
+        gemini_failed = _pending_title_info.get('gemini_failed', False)
         log(f"Showing title after delay: {song} - {artist}")
-        update_text_source_content(song, artist)
+        update_text_source_content(song, artist, gemini_failed)
         fade_in_text()
         _pending_title_info = None
 
@@ -324,7 +325,7 @@ def schedule_title_show(video_info):
     update_text_opacity(0.0)
     
     # Clear text immediately
-    update_text_source_content("", "")
+    update_text_source_content("", "", False)
     
     # Schedule the show
     _title_show_timer = show_title_after_start_callback
@@ -705,11 +706,12 @@ def update_media_source(video_path):
         log(f"ERROR updating media source: {e}")
         return False
 
-def update_text_source_content(song, artist):
+def update_text_source_content(song, artist, gemini_failed=False):
     """
     Update OBS Text Source content only (not opacity).
     Must be called from main thread.
     Format: Song - Artist
+    If gemini_failed is True, adds a marker to indicate Gemini extraction failed.
     """
     try:
         source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
@@ -723,6 +725,10 @@ def update_text_source_content(song, artist):
                 text = artist
             else:
                 text = ""  # Allow empty when clearing
+            
+            # Add indicator if Gemini failed
+            if text and gemini_failed:
+                text += " ⚠"  # Warning symbol to indicate Gemini failure
                 
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "text", text)
@@ -742,7 +748,7 @@ def update_text_source_content(song, artist):
         log(f"ERROR updating text source: {e}")
         return False
 
-def update_text_source(song, artist):
+def update_text_source(song, artist, gemini_failed=False):
     """
     Update text and trigger fade effect.
     This is called when we want to change the text with a transition.
@@ -751,11 +757,11 @@ def update_text_source(song, artist):
     
     # If opacity is not 0, fade out first then update
     if _current_opacity > 0:
-        _pending_text = {'song': song, 'artist': artist}
+        _pending_text = {'song': song, 'artist': artist, 'gemini_failed': gemini_failed}
         fade_out_text()
     else:
         # Already at 0, just update and fade in
-        update_text_source_content(song, artist)
+        update_text_source_content(song, artist, gemini_failed)
         if song or artist:  # Only fade in if there's content
             fade_in_text()
 
@@ -893,7 +899,7 @@ def stop_current_playback():
             fade_out_text()
         
         # Clear text source content
-        update_text_source_content("", "")
+        update_text_source_content("", "", False)
         
         # Update state
         set_playing(False)
