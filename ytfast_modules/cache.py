@@ -135,9 +135,12 @@ def scan_existing_cache():
     if found_count > 0:
         log(f"Found {found_count} existing videos in cache")
         if gemini_failed_count > 0:
-            log(f"  - {gemini_failed_count} videos with Gemini extraction failures")
+            log(f"  - {gemini_failed_count} videos marked for Gemini retry")
     if skipped_count > 0:
         log(f"Skipped {skipped_count} invalid video files")
+    
+    # Return whether we found any videos that need reprocessing
+    return gemini_failed_count > 0
 
 def cleanup_removed_videos():
     """Remove videos that are no longer in playlist."""
