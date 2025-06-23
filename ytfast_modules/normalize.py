@@ -43,10 +43,11 @@ def extract_loudnorm_stats(ffmpeg_output):
         log(f"Error extracting loudnorm stats: {e}")
         return None
 
-def normalize_audio(input_path, video_id, metadata):
+def normalize_audio(input_path, video_id, metadata, gemini_failed=False):
     """
     Normalize audio to -14 LUFS using FFmpeg's loudnorm filter.
     Returns path to normalized file or None on failure.
+    If gemini_failed is True, adds '_gf' marker to filename.
     """
     try:
         cache_dir = get_cache_dir()
@@ -54,13 +55,33 @@ def normalize_audio(input_path, video_id, metadata):
         # Generate output filename based on metadata
         safe_song = sanitize_filename(metadata.get('song', 'Unknown'))
         safe_artist = sanitize_filename(metadata.get('artist', 'Unknown'))
-        output_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized.mp4"
+        
+        # Add gemini failed marker if needed
+        if gemini_failed:
+            output_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized_gf.mp4"
+        else:
+            output_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized.mp4"
+        
         output_path = os.path.join(cache_dir, output_filename)
         
         # Skip if already normalized
         if os.path.exists(output_path):
             log(f"Already normalized: {output_filename}")
             return output_path
+        
+        # Check if we need to rename an existing file (if gemini status changed)
+        # This handles the case where a file was processed before but now we know Gemini failed
+        if gemini_failed:
+            # Check if non-gf version exists
+            non_gf_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized.mp4"
+            non_gf_path = os.path.join(cache_dir, non_gf_filename)
+            if os.path.exists(non_gf_path):
+                try:
+                    os.rename(non_gf_path, output_path)
+                    log(f"Renamed existing file to mark Gemini failure: {output_filename}")
+                    return output_path
+                except Exception as e:
+                    log(f"Error renaming file: {e}")
         
         log(f"Starting normalization: {metadata['artist']} - {metadata['song']}")
         
