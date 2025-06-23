@@ -6,15 +6,13 @@ Handles Gemini AI and title parsing only.
 import os
 import re
 import json
+from pathlib import Path
 
 from config import SCRIPT_VERSION
 from logger import log
-from utils import format_duration
+from utils import format_duration, validate_youtube_id
 import gemini_metadata
 import state
-
-# Temporary storage for Gemini failures (not persisted between script restarts)
-_gemini_failed_videos = set()
 
 def get_video_metadata(filepath, title, video_id=None):
     """
@@ -25,9 +23,17 @@ def get_video_metadata(filepath, title, video_id=None):
     """
     gemini_failed = False
     
-    # Try Gemini if API key is configured and video hasn't failed before
+    # Check if this video already has a Gemini failed marker in the cache
+    # Look for existing file with _gf marker
+    if video_id and should_skip_gemini(video_id):
+        log(f"Skipping Gemini for video {video_id} - previous failure detected")
+        # Fall back to title parsing directly
+        song, artist, metadata_source = extract_metadata_from_title(title)
+        return song, artist, metadata_source, True
+    
+    # Try Gemini if API key is configured
     gemini_api_key = state.get_gemini_api_key()
-    if gemini_api_key and video_id and video_id not in _gemini_failed_videos:
+    if gemini_api_key and video_id:
         log(f"Attempting Gemini metadata extraction for '{title}'")
         gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(
             video_id, title, gemini_api_key
@@ -39,8 +45,7 @@ def get_video_metadata(filepath, title, video_id=None):
             log(f"Metadata from Gemini: {artist} - {song}")
             return song, artist, 'Gemini', False
         else:
-            # Gemini failed - mark this video to avoid retrying in this session
-            _gemini_failed_videos.add(video_id)
+            # Gemini failed
             gemini_failed = True
             log(f"Gemini failed for video {video_id}, falling back to title parsing")
     
@@ -49,11 +54,20 @@ def get_video_metadata(filepath, title, video_id=None):
     
     return song, artist, metadata_source, gemini_failed
 
-def clear_gemini_failures():
-    """Clear the list of failed Gemini extractions (called on script restart)."""
-    global _gemini_failed_videos
-    _gemini_failed_videos.clear()
-    log("Cleared Gemini failure cache")
+def should_skip_gemini(video_id):
+    """
+    Check if a video should skip Gemini extraction based on existing files.
+    Returns True if a file with _gf marker exists for this video ID.
+    """
+    cache_dir = Path(state.get_cache_dir())
+    if not cache_dir.exists():
+        return False
+    
+    # Look for any file with this video ID and _gf marker
+    pattern = f"*_{video_id}_normalized_gf.mp4"
+    matching_files = list(cache_dir.glob(pattern))
+    
+    return len(matching_files) > 0
 
 def extract_metadata_from_title(title):
     """
@@ -173,3 +187,8 @@ def apply_universal_song_cleaning(song, artist, source):
         log(f"Universal cleaning applied to {source} result: '{original_song}' → '{cleaned_song}'")
     
     return cleaned_song, artist
+
+# No longer needed - using filename-based tracking
+def clear_gemini_failures():
+    """Legacy function kept for compatibility - no longer tracks failures in memory."""
+    log("Gemini failures are now tracked via filename markers (_gf)")
