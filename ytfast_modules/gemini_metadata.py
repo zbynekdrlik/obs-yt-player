@@ -1,6 +1,6 @@
 """
 Google Gemini API metadata extraction for YouTube videos.
-Uses Gemini to intelligently parse artist and song from video context.
+Uses Gemini 2.5 Flash with Google Search grounding to intelligently extract artist and song information.
 """
 import json
 import time
@@ -16,12 +16,12 @@ from config import SCRIPT_NAME
 
 # Gemini API configuration
 GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-GEMINI_TIMEOUT = 10  # seconds
+GEMINI_TIMEOUT = 30  # Increased timeout for Google Search grounding
 MAX_RETRIES = 2
 
 def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """
-    Extract artist and song metadata using Google Gemini API.
+    Extract artist and song metadata using Google Gemini API with Google Search grounding.
     
     Args:
         video_id: YouTube video ID
@@ -36,30 +36,33 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
     
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    # Enhanced prompt with URL and clearer instructions
-    prompt = f"""Extract the primary artist and song title from this YouTube video:
+    # Enhanced prompt that asks Gemini to use Google Search
+    prompt = f"""Look up information about this YouTube video and extract the artist and song title:
 URL: {video_url}
 Title: "{video_title}"
+
+Use Google Search to find information about this specific YouTube video URL.
+The video page, description, and search results should help identify the correct artist.
 
 Return ONLY a JSON object with this exact format:
 {{"artist": "Primary Artist Name", "song": "Song Title"}}
 
-CRITICAL RULES:
-1. For titles with "|" - common patterns:
-   - "Song Title | Artist Name" → artist after pipe
-   - "Song Title | Album/Series | Artist" → artist is last part
-   - "SONG | Artist (additional info)" → artist after pipe, ignore parentheses content
-2. Remove "feat.", "ft.", "featuring", "with" from artist name
-3. Remove "(worship cover)", "(Official Video)", "(Live)" etc from artist name
-4. Song = clean title without version info
-5. Keep "/" in multi-part song titles
+RULES:
+1. Use the YouTube URL to search for video information
+2. The artist may not be in the title - check video description and channel info
+3. For worship/church music, identify the actual performing artist/band
+4. Remove feat./ft./featuring from the primary artist name
+5. Remove (Official Video), (Live), etc from song titles
+6. Keep "/" in multi-part song titles like "Faithful Then / Faithful Now"
+7. If no artist found in title but found via search, use that artist
+8. If title has "-", check if it's "Artist - Song" or "Song - Description"
 
 Examples:
+- "Donde Vaya (En Vivo) - Official Music Video" → search finds Saddleback Worship
 - "HOLYGHOST | Sons Of Sunday" → {{"artist": "Sons Of Sunday", "song": "HOLYGHOST"}}
-- "Presence | NEW LEVEL (worship cover)" → {{"artist": "NEW LEVEL", "song": "Presence"}}  
-- "So Good | Glory Pt. 2 | Planetshakers" → {{"artist": "Planetshakers", "song": "So Good"}}
-- "Praise (feat. Brandon Lake) | Elevation Worship" → {{"artist": "Elevation Worship", "song": "Praise"}}
-- "Marco Barrientos - Yo Sé (Video Oficial)" → {{"artist": "Marco Barrientos", "song": "Yo Sé"}}"""
+- "Song Title - Official Video" → search for actual artist
+
+If you cannot determine the artist even with search, return empty string for artist."""
 
     request_body = {
         "contents": [{
@@ -67,10 +70,12 @@ Examples:
                 "text": prompt
             }]
         }],
+        "tools": [{
+            "google_search": {}
+        }],
         "generationConfig": {
             "temperature": 0.1,  # Low temperature for consistent results
             "candidateCount": 1
-            # No maxOutputTokens - let Gemini decide
         }
     }
     
@@ -120,14 +125,18 @@ Examples:
                         
                         # Parse the JSON response
                         metadata = json.loads(cleaned_text)
-                        artist = metadata.get('artist')
-                        song = metadata.get('song')
+                        artist = metadata.get('artist', '').strip()
+                        song = metadata.get('song', '').strip()
                         
-                        if artist and song:
-                            log(f"Gemini extracted: {artist} - {song}")
-                            return artist, song
+                        # Accept response if we have at least a song title
+                        if song:
+                            if artist:
+                                log(f"Gemini extracted: {artist} - {song}")
+                            else:
+                                log(f"Gemini extracted song only: {song} (no artist found)")
+                            return artist if artist else None, song
                         else:
-                            log(f"Gemini response missing artist or song: {metadata}")
+                            log(f"Gemini response missing song title: {metadata}")
                     except json.JSONDecodeError as e:
                         log(f"Failed to parse Gemini JSON response: {text} (Error: {e})")
                 else:
