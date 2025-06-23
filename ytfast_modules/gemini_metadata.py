@@ -1,6 +1,6 @@
 """
 Google Gemini API metadata extraction for YouTube videos.
-Uses Gemini 2.0 Flash with Google Search grounding to intelligently extract artist and song information.
+Uses Gemini 2.5 Flash with Google Search grounding to intelligently extract artist and song information.
 """
 import json
 import time
@@ -15,7 +15,7 @@ from logger import log
 from config import SCRIPT_NAME
 
 # Gemini API configuration
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 GEMINI_TIMEOUT = 30  # Increased timeout for Google Search grounding
 MAX_RETRIES = 2
 
