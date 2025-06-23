@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.12"  # Removed AcoustID support, Gemini-only metadata
+SCRIPT_VERSION = "3.1.1"  # Fixed OBS media source loop setting conflict
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -17,6 +17,12 @@ SCRIPT_NAME = os.path.splitext(os.path.basename(SCRIPT_PATH))[0]
 # Default settings
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
 DEFAULT_CACHE_DIR = os.path.join(SCRIPT_DIR, f"{SCRIPT_NAME}-cache")
+
+# Playback behavior modes
+PLAYBACK_MODE_CONTINUOUS = "continuous"  # Play videos forever (default)
+PLAYBACK_MODE_SINGLE = "single"  # Play only first video and stop
+PLAYBACK_MODE_LOOP = "loop"  # Loop the first video
+DEFAULT_PLAYBACK_MODE = PLAYBACK_MODE_CONTINUOUS
 
 # OBS Scene and Source names
 SCENE_NAME = SCRIPT_NAME  # Scene name matches script filename without extension
