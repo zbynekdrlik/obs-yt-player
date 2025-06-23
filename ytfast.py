@@ -35,6 +35,7 @@ from playlist import start_playlist_sync_thread, trigger_manual_sync
 from download import start_video_processing_thread
 from scene import verify_scene_setup, on_frontend_event
 from playback import start_playback_controller, stop_playback_controller
+from metadata import clear_gemini_failures
 
 # Store timer references
 _verify_scene_timer = None
@@ -129,6 +130,9 @@ def script_load(settings):
     set_stop_threads(False)
     
     log(f"Script version {SCRIPT_VERSION} loaded")
+    
+    # Clear Gemini failure cache on script restart
+    clear_gemini_failures()
     
     # Apply initial settings
     script_update(settings)
