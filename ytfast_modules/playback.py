@@ -59,6 +59,24 @@ TITLE_CLEAR_BEFORE_END = 3.5  # Clear title 3.5 seconds before song ends
 TITLE_SHOW_AFTER_START = 1.5  # Show title 1.5 seconds after song starts
 SEEK_THRESHOLD = 5000  # 5 seconds - consider it a seek if position jumps by more than this
 
+def force_disable_media_loop():
+    """Force disable loop setting on media source."""
+    try:
+        source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+        if source:
+            settings = obs.obs_source_get_settings(source)
+            current_loop = obs.obs_data_get_bool(settings, "looping")
+            
+            if current_loop:
+                log("Disabling OBS loop checkbox on media source")
+                obs.obs_data_set_bool(settings, "looping", False)
+                obs.obs_source_update(source, settings)
+            
+            obs.obs_data_release(settings)
+            obs.obs_source_release(source)
+    except Exception as e:
+        log(f"ERROR forcing disable media loop: {e}")
+
 def verify_sources():
     """Verify that required sources exist and log their status."""
     global _sources_verified
@@ -95,6 +113,8 @@ def verify_sources():
         # Important note about media source configuration
         if media_exists:
             log("NOTE: Script will disable OBS 'Loop' checkbox to manage playback behavior")
+            # Force disable loop on first run
+            force_disable_media_loop()
         
         log("==========================")
         _sources_verified = True
@@ -415,6 +435,10 @@ def playback_controller():
         # Handle initial state mismatch (media playing but script thinks it's not)
         if not _initial_state_checked:
             _initial_state_checked = True
+            
+            # Always force disable loop on startup
+            force_disable_media_loop()
+            
             if media_state == obs.OBS_MEDIA_STATE_PLAYING and not is_playing():
                 # Check if this is valid media or just empty/invalid source
                 duration = get_media_duration(MEDIA_SOURCE_NAME)
