@@ -20,6 +20,9 @@ DEFAULT_CACHE_DIR = ""
 # Scene verification delay (milliseconds)
 SCENE_CHECK_DELAY = 1000  # 1 second after script load
 
+# Directory structure
+TOOLS_SUBDIR = "tools"  # Subdirectory for tools within cache directory
+
 # Tool filenames for Windows
 YTDLP_FILENAME = "yt-dlp.exe"
 FFMPEG_FILENAME = "ffmpeg.exe"
