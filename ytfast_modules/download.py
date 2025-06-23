@@ -181,11 +181,13 @@ def process_videos_worker():
                 log(f"Failed to download: {title}")
                 continue
             
-            # Get metadata (from metadata module) - UPDATED to pass video_id
-            song, artist, metadata_source = get_video_metadata(temp_path, title, video_id)
+            # Get metadata (from metadata module) - UPDATED to handle 4 return values
+            song, artist, metadata_source, gemini_failed = get_video_metadata(temp_path, title, video_id)
             
             # Log metadata source with detailed results
             log(f"Metadata from {metadata_source}: {artist} - {song}")
+            if gemini_failed:
+                log(f"Note: Gemini extraction failed for this video")
             
             # Store metadata for normalization
             metadata = {
@@ -199,6 +201,7 @@ def process_videos_worker():
             log(f"    Artist: {artist}")
             log(f"    Song: {song}")
             log(f"    Source: {metadata_source}")
+            log(f"    Gemini Failed: {gemini_failed}")
             log(f"=====================================")
             
             # Normalize audio
@@ -207,12 +210,13 @@ def process_videos_worker():
                 log(f"Failed to normalize: {title}")
                 continue
             
-            # Update cached videos registry
+            # Update cached videos registry - include gemini_failed flag
             add_cached_video(video_id, {
                 'path': normalized_path,
                 'song': metadata['song'],
                 'artist': metadata['artist'],
-                'normalized': True
+                'normalized': True,
+                'gemini_failed': gemini_failed
             })
             
             log(f"Video ready for playback: {metadata['artist']} - {metadata['song']}")
