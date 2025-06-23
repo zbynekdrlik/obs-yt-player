@@ -204,8 +204,8 @@ def process_videos_worker():
             log(f"    Gemini Failed: {gemini_failed}")
             log(f"=====================================")
             
-            # Normalize audio
-            normalized_path = normalize_audio(temp_path, video_id, metadata)
+            # Normalize audio - PASS GEMINI_FAILED FLAG
+            normalized_path = normalize_audio(temp_path, video_id, metadata, gemini_failed)
             if not normalized_path:
                 log(f"Failed to normalize: {title}")
                 continue
