@@ -46,23 +46,19 @@ When the script is renamed (e.g., `music.py`), the module folder automatically b
 1. **Phase-01-Scaffolding.md** - Basic script structure
 2. **Phase-02-Dependency-Setup.md** - Tool download system (yt-dlp, FFmpeg)
 3. **Phase-03-Playlist-Sync.md** - Cache-aware playlist synchronization with cleanup
-
-#### Processing Pipeline Phases
 4. **Phase-04-Video-Download.md** - Download videos with yt-dlp
-5. **Phase-05-AcoustID-Metadata.md** - *(NOT IMPLEMENTED - Removed in v3.0)*
-6. **Phase-06-iTunes-Metadata.md** - *(NOT IMPLEMENTED - Removed in v3.0)*
-7. **Phase-07-Title-Parser-Fallback.md** - Smart YouTube title parsing (now primary fallback)
-8. **Phase-08-Universal-Metadata-Cleaning.md** - Universal song title cleaning for all sources
-9. **Phase-09-Audio-Normalization.md** - FFmpeg loudness normalization to -14 LUFS
+
+#### Metadata & Processing Phases
+5. **Phase-05-Gemini-Metadata.md** - Google Gemini AI as primary metadata source
+6. **Phase-06-Title-Parser-Fallback.md** - Smart YouTube title parsing (fallback)
+7. **Phase-07-Universal-Metadata-Cleaning.md** - Universal song title cleaning
+8. **Phase-08-Audio-Normalization.md** - FFmpeg loudness normalization to -14 LUFS
 
 #### Playback & Control Phases
-10. **Phase-10-Playback-Control.md** - Random playback and media control
-11. **Phase-11-Scene-Management.md** - Scene transition handling
-12. **Phase-12-Simple-Polish.md** - Integration testing and optimization
-
-#### Enhanced Features
-13. **Phase-13-Gemini-Metadata.md** - Google Gemini AI as primary metadata source
-14. **Phase-14-File-Based-Logging.md** - Comprehensive logging to files
+9. **Phase-09-Playback-Control.md** - Random playback and media control
+10. **Phase-10-Scene-Management.md** - Scene transition handling
+11. **Phase-11-Simple-Polish.md** - Integration testing and optimization
+12. **Phase-12-File-Based-Logging.md** - Comprehensive logging to files
 
 ## Development Workflow
 
@@ -123,11 +119,10 @@ The script uses a simplified metadata extraction system:
 ## Current Implementation Status (v3.0.12)
 The implementation includes:
 - ✅ Phase 1-4: Foundation and video downloading
-- ❌ Phase 5-6: AcoustID and iTunes (removed in v3.0)
-- ✅ Phase 7: Title parser (now primary fallback)
-- ✅ Phase 8-11: Universal cleaning, normalization, playback, scene management
-- ✅ Phase 13: Gemini metadata (now primary source)
-- ✅ Phase 14: File-based logging
+- ✅ Phase 5: Gemini metadata (primary source)
+- ✅ Phase 6: Title parser (fallback)
+- ✅ Phase 7-10: Universal cleaning, normalization, playback, scene management
+- ✅ Phase 11-12: Polish and file-based logging
 - ✅ Automatic retry system for failed Gemini extractions
 - ✅ Simplified metadata pipeline with single primary source
 
