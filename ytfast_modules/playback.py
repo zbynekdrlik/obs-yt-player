@@ -46,6 +46,7 @@ _is_preloaded_video = False  # Track if current video is pre-loaded
 _last_playback_time = 0  # Track last playback position for seek detection
 _loop_restart_timer = None  # Timer reference for loop restart
 _loop_restart_pending = False  # Track if we're waiting to restart loop
+_loop_restart_video_id = None  # Track which video we're restarting
 
 # Opacity transition variables
 _opacity_timer = None
@@ -372,7 +373,7 @@ def playback_controller():
     Manages video playback state and transitions.
     """
     global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
-    global _preloaded_video_handled, _is_preloaded_video, _loop_restart_pending
+    global _preloaded_video_handled, _is_preloaded_video, _loop_restart_pending, _loop_restart_video_id
     
     try:
         # Priority 1: Check if we're shutting down
@@ -491,10 +492,17 @@ def playback_controller():
 
 def handle_playing_state():
     """Handle currently playing video state."""
-    global _is_preloaded_video, _last_playback_time, _title_clear_scheduled, _title_clear_timer, _loop_restart_pending
+    global _is_preloaded_video, _last_playback_time, _title_clear_scheduled, _title_clear_timer
+    global _loop_restart_pending, _loop_restart_video_id
     
-    # Clear loop restart flag if we're playing
-    _loop_restart_pending = False
+    # Check if we were waiting for a loop restart
+    if _loop_restart_pending and _loop_restart_video_id:
+        current_video_id = get_current_playback_video_id()
+        if current_video_id == _loop_restart_video_id:
+            # The loop video is now playing, clear the pending flag
+            log("Loop restart completed successfully")
+            _loop_restart_pending = False
+            _loop_restart_video_id = None
     
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
@@ -613,7 +621,10 @@ def handle_ended_state():
 
 def schedule_loop_restart(video_id):
     """Schedule a single restart of the loop video."""
-    global _loop_restart_timer
+    global _loop_restart_timer, _loop_restart_video_id
+    
+    # Store the video ID we're restarting
+    _loop_restart_video_id = video_id
     
     # Cancel any existing timer
     if _loop_restart_timer:
@@ -622,12 +633,12 @@ def schedule_loop_restart(video_id):
     
     # Create a closure that captures the video_id
     def restart_callback():
-        global _loop_restart_timer, _loop_restart_pending
+        global _loop_restart_timer
         # Remove the timer reference
         if _loop_restart_timer:
             obs.timer_remove(_loop_restart_timer)
             _loop_restart_timer = None
-        _loop_restart_pending = False
+        # Don't clear _loop_restart_pending here - wait until video is actually playing
         start_specific_video(video_id)
     
     # Schedule the restart
@@ -1054,9 +1065,14 @@ def stop_current_playback():
     Must be called from main thread.
     """
     global _last_progress_log, _playback_retry_count, _current_opacity, _last_playback_time
+    global _loop_restart_pending, _loop_restart_video_id
     
     # Cancel any pending title timers
     cancel_title_timers()
+    
+    # Clear loop restart state
+    _loop_restart_pending = False
+    _loop_restart_video_id = None
     
     if not is_playing():
         log("No active playback to stop")
