@@ -15,7 +15,10 @@ SCRIPT_NAME = os.path.splitext(os.path.basename(SCRIPT_PATH))[0]
 
 # Core settings - these are defaults, actual values are managed via script properties
 DEFAULT_PLAYLIST_URL = ""
-DEFAULT_CACHE_DIRECTORY = ""
+DEFAULT_CACHE_DIR = ""
+
+# Scene verification delay (milliseconds)
+SCENE_CHECK_DELAY = 1000  # 1 second after script load
 
 # Feature flags - can be controlled via environment variables for testing
 ACOUSTID_ENABLED = os.environ.get('YTFAST_ACOUSTID_ENABLED', 'true').lower() == 'true'
