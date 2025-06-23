@@ -22,13 +22,18 @@ if MODULES_DIR not in sys.path:
     sys.path.insert(0, MODULES_DIR)
 
 # Import modules after path is set
-from config import SCRIPT_VERSION, DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, SCENE_CHECK_DELAY
+from config import (
+    SCRIPT_VERSION, DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, SCENE_CHECK_DELAY,
+    PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, DEFAULT_PLAYBACK_MODE
+)
 from logger import log, cleanup_logging
 from state import (
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
     is_tools_ready, set_stop_threads,
-    set_gemini_api_key  # Use the correct function name
+    set_gemini_api_key,
+    get_playback_mode, set_playback_mode,
+    set_first_video_played, set_loop_video_id
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
@@ -74,6 +79,35 @@ def script_properties():
         sync_now_callback
     )
     
+    # Add separator for playback behavior
+    obs.obs_properties_add_text(
+        props,
+        "separator_playback",
+        "───── Playback Behavior ─────",
+        obs.OBS_TEXT_INFO
+    )
+    
+    # Playback mode dropdown
+    playback_mode = obs.obs_properties_add_list(
+        props,
+        "playback_mode",
+        "Playback Mode",
+        obs.OBS_COMBO_TYPE_LIST,
+        obs.OBS_COMBO_FORMAT_STRING
+    )
+    
+    obs.obs_property_list_add_string(playback_mode, "Continuous (Play all videos)", PLAYBACK_MODE_CONTINUOUS)
+    obs.obs_property_list_add_string(playback_mode, "Single (Play one video and stop)", PLAYBACK_MODE_SINGLE)
+    obs.obs_property_list_add_string(playback_mode, "Loop (Repeat first video)", PLAYBACK_MODE_LOOP)
+    
+    # Help text for playback modes
+    obs.obs_properties_add_text(
+        props,
+        "playback_help",
+        "• Continuous: Plays random videos forever\n• Single: Plays one video then stops\n• Loop: Repeats the first video",
+        obs.OBS_TEXT_INFO
+    )
+    
     # Add separator for optional features
     obs.obs_properties_add_text(
         props,
@@ -104,16 +138,28 @@ def script_defaults(settings):
     """Set default values for script properties."""
     obs.obs_data_set_default_string(settings, "playlist_url", DEFAULT_PLAYLIST_URL)
     obs.obs_data_set_default_string(settings, "cache_dir", DEFAULT_CACHE_DIR)
+    obs.obs_data_set_default_string(settings, "playback_mode", DEFAULT_PLAYBACK_MODE)
     obs.obs_data_set_default_string(settings, "gemini_api_key", "")
 
 def script_update(settings):
     """Called when script properties are updated."""
     playlist_url = obs.obs_data_get_string(settings, "playlist_url")
     cache_dir = obs.obs_data_get_string(settings, "cache_dir")
+    playback_mode = obs.obs_data_get_string(settings, "playback_mode")
     gemini_key = obs.obs_data_get_string(settings, "gemini_api_key")
+    
+    # Check if playback mode changed
+    old_mode = get_playback_mode()
     
     set_playlist_url(playlist_url)
     set_cache_dir(cache_dir)
+    set_playback_mode(playback_mode)
+    
+    # Reset playback state if mode changed
+    if old_mode != playback_mode:
+        set_first_video_played(False)
+        set_loop_video_id(None)
+        log(f"Playback mode changed to: {playback_mode}")
     
     # Store Gemini API key in state if provided
     if gemini_key:
@@ -122,7 +168,7 @@ def script_update(settings):
     else:
         set_gemini_api_key(None)
     
-    log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}")
+    log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}")
 
 def script_load(settings):
     """Called when script is loaded."""
