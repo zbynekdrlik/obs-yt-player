@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "2.9.2"  # Prevent duplicate log files from quick OBS reloads
+SCRIPT_VERSION = "3.0.11"  # Clean up config.py to match main branch structure
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -76,10 +76,3 @@ TITLE_FADE_INTERVAL = TITLE_FADE_DURATION // TITLE_FADE_STEPS  # Time between st
 
 # Gemini API settings
 GEMINI_API_KEY_PROPERTY = "gemini_api_key"
-GEMINI_MODEL = "models/gemini-1.5-flash"
-GEMINI_MAX_TOKENS = 100
-GEMINI_TEMPERATURE = 0.7
-GEMINI_ANALYSIS_PROMPT = """Analyze this song title and extract the song name and artist.
-Return ONLY a JSON object with "song" and "artist" fields.
-Do not include any other text or explanation.
-Example: {"song": "Amazing Grace", "artist": "Chris Tomlin"}"""

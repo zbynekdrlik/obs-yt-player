@@ -80,7 +80,11 @@ The script uses a sophisticated metadata extraction system with multiple fallbac
 
 1. **Google Gemini AI** (Primary - Optional)
    - Uses advanced AI to intelligently extract artist and song from video titles
-   - Handles complex titles with featuring artists, remixes, and special editions
+   - **NEW in v3.0+**: Enhanced handling of complex title patterns:
+     - Correctly identifies artist/song in "Song | Artist" format
+     - Excludes album names and part numbers (e.g., "Glory Pt. 2")
+     - Handles multiple pipe separators intelligently
+   - Powered by Gemini 2.5 Flash model with free tier support
    - Requires API key (get free key at https://makersuite.google.com/app/apikey)
    - Most accurate for worship/church music and international content
 
@@ -191,15 +195,28 @@ Each phase builds upon the previous one, ensuring a systematic and maintainable 
 
 ## Current Status
 
-Version 2.9.2 - File-Based Logging:
+Version 3.0.7 - Enhanced Gemini Metadata Extraction:
 - ✅ Phases 1-11: Complete foundation, processing, playback, and scene management
-- ✅ Phase 13: Google Gemini AI integration for enhanced metadata extraction
+- ✅ Phase 13: Google Gemini AI integration with enhanced title parsing
 - ✅ Phase 14: File-based logging system for comprehensive debugging
+- ✅ Improved handling of complex title patterns with pipe separators
+- ✅ Excludes album names and part numbers from song titles
+- ✅ Upgraded to Gemini 2.5 Flash for better performance and free tier support
+- ✅ Fixed filename sanitization for songs with forward slashes
 - ✅ Modular code structure with separated concerns
 - ✅ Windows-optimized with platform-specific code removed
 - ⏳ Phase 12: Final polish and optimization to be implemented
 
 ## Recent Updates
+
+### v3.0.7 - Enhanced Gemini Metadata Extraction
+- Improved Gemini prompt to correctly handle "Song | Artist" patterns
+- Excludes album names and part numbers (e.g., "Glory Pt. 2") from song titles
+- Handles complex titles with multiple pipe separators intelligently
+- Fixed filename sanitization: forward slashes now converted to hyphens
+- Upgraded to Gemini 2.5 Flash model for better performance
+- Removed unused configuration constants for cleaner codebase
+- Enhanced error handling and logging for Gemini API responses
 
 ### v2.9.2 - File-Based Logging System
 - Added comprehensive file-based logging alongside OBS console output
