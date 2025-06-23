@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.0.7"  # Improved Gemini prompt to handle "Song | Artist" pattern correctly
+SCRIPT_VERSION = "3.0.8"  # Added Google Search grounding to Gemini for better artist detection
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
