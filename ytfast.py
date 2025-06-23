@@ -33,7 +33,8 @@ from state import (
     is_tools_ready, set_stop_threads,
     set_gemini_api_key,
     get_playback_mode, set_playback_mode,
-    set_first_video_played, set_loop_video_id
+    set_first_video_played, set_loop_video_id,
+    get_current_playback_video_id
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
@@ -160,6 +161,13 @@ def script_update(settings):
         set_first_video_played(False)
         set_loop_video_id(None)
         log(f"Playback mode changed to: {playback_mode}")
+        
+        # If changing to loop mode and a video is currently playing, set it as the loop video
+        if playback_mode == PLAYBACK_MODE_LOOP:
+            current_video_id = get_current_playback_video_id()
+            if current_video_id:
+                set_loop_video_id(current_video_id)
+                log(f"Loop mode enabled - will loop current video")
     
     # Store Gemini API key in state if provided
     if gemini_key:
