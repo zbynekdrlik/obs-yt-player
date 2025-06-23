@@ -20,6 +20,19 @@ DEFAULT_CACHE_DIR = ""
 # Scene verification delay (milliseconds)
 SCENE_CHECK_DELAY = 1000  # 1 second after script load
 
+# Tool filenames for Windows
+YTDLP_FILENAME = "yt-dlp.exe"
+FFMPEG_FILENAME = "ffmpeg.exe"
+FPCALC_FILENAME = "fpcalc.exe"
+
+# Tool download URLs
+YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+FPCALC_URL = "https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-fpcalc-1.5.1-windows-x86_64.zip"
+
+# Tool check interval (seconds)
+TOOLS_CHECK_INTERVAL = 60  # Check every minute if tools setup fails
+
 # Feature flags - can be controlled via environment variables for testing
 ACOUSTID_ENABLED = os.environ.get('YTFAST_ACOUSTID_ENABLED', 'true').lower() == 'true'
 ACOUSTID_API_KEY = '3xvMBuMEGH'  # Free public key
