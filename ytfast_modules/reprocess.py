@@ -11,13 +11,55 @@ from pathlib import Path
 from logger import log
 from state import (
     get_cache_dir, get_cached_videos, get_cached_video_info,
-    should_stop_threads, get_playlist_videos, is_tools_ready,
-    add_cached_video, get_gemini_api_key
+    should_stop_threads, is_tools_ready,
+    add_cached_video, get_gemini_api_key, get_playlist_url
 )
 from metadata import get_video_metadata
 from utils import sanitize_filename
+import subprocess
+import json
 
 _reprocess_thread = None
+
+def get_video_title_from_youtube(video_id):
+    """Fetch video title from YouTube for a specific video ID."""
+    try:
+        from utils import get_ytdlp_path
+        
+        ytdlp_path = get_ytdlp_path()
+        
+        # Prepare command to get video info
+        cmd = [
+            ytdlp_path,
+            '--get-title',
+            '--no-warnings',
+            f'https://www.youtube.com/watch?v={video_id}'
+        ]
+        
+        # Run command with hidden window on Windows
+        startupinfo = None
+        if os.name == 'nt':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            startupinfo=startupinfo,
+            timeout=10
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        else:
+            log(f"Failed to get title for video {video_id}")
+            return None
+            
+    except Exception as e:
+        log(f"Error fetching video title: {e}")
+        return None
 
 def find_videos_to_reprocess():
     """Find all videos with _gf marker that need Gemini retry."""
@@ -26,13 +68,21 @@ def find_videos_to_reprocess():
     
     for video_id, video_info in cached_videos.items():
         if video_info.get('gemini_failed', False):
-            # Check if we have playlist info for this video
-            playlist_videos = get_playlist_videos()
-            playlist_info = playlist_videos.get(video_id)
-            if playlist_info:
+            # We need to get the title - either from cache or fetch it
+            title = None
+            
+            # First try to use the song title we have (it might be from title parsing)
+            if video_info.get('song') and video_info.get('song') != 'Unknown Song':
+                # Reconstruct a reasonable title from what we have
+                title = f"{video_info['song']} - {video_info['artist']}"
+            else:
+                # Fetch the actual title from YouTube
+                title = get_video_title_from_youtube(video_id)
+            
+            if title:
                 videos_to_reprocess.append({
                     'id': video_id,
-                    'title': playlist_info['title'],
+                    'title': title,
                     'current_path': video_info['path'],
                     'song': video_info['song'],
                     'artist': video_info['artist']
@@ -104,6 +154,9 @@ def reprocess_worker():
     
     if should_stop_threads():
         return
+    
+    # Wait a bit to ensure cache scan is complete
+    time.sleep(5)
     
     # Check if Gemini API key is configured
     if not get_gemini_api_key():
