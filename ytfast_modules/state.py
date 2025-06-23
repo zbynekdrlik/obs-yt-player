@@ -4,7 +4,7 @@ Thread-safe state variables and accessors.
 """
 
 import threading
-from config import DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR
+from config import DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, DEFAULT_PLAYBACK_MODE
 
 # Threading synchronization
 _state_lock = threading.Lock()
@@ -13,6 +13,7 @@ _state_lock = threading.Lock()
 _playlist_url = DEFAULT_PLAYLIST_URL
 _cache_dir = DEFAULT_CACHE_DIR
 _gemini_api_key = None  # Add Gemini API key state
+_playback_mode = DEFAULT_PLAYBACK_MODE  # Playback behavior mode
 
 # System state flags
 _tools_ready = False
@@ -22,10 +23,12 @@ _is_playing = False
 _stop_threads = False
 _sync_on_startup_done = False
 _stop_requested = False  # New flag for stop button
+_first_video_played = False  # Track if first video has been played (for single/loop modes)
 
 # Playback state
 _current_video_path = None
 _current_playback_video_id = None
+_loop_video_id = None  # Video ID to loop in loop mode
 
 # Data structures
 _cached_videos = {}  # {video_id: {"path": str, "song": str, "artist": str, "normalized": bool}}
@@ -77,6 +80,17 @@ def set_gemini_api_key(key):
     global _gemini_api_key
     with _state_lock:
         _gemini_api_key = key
+
+def get_playback_mode():
+    """Get the current playback mode."""
+    with _state_lock:
+        return _playback_mode
+
+def set_playback_mode(mode):
+    """Set the playback mode."""
+    global _playback_mode
+    with _state_lock:
+        _playback_mode = mode
 
 # ===== STATE FLAG ACCESSORS =====
 def is_tools_ready():
@@ -150,6 +164,17 @@ def clear_stop_request():
     with _state_lock:
         _stop_requested = False
 
+def is_first_video_played():
+    """Check if the first video has been played (for single/loop modes)."""
+    with _state_lock:
+        return _first_video_played
+
+def set_first_video_played(played):
+    """Set whether the first video has been played."""
+    global _first_video_played
+    with _state_lock:
+        _first_video_played = played
+
 # ===== PLAYBACK STATE ACCESSORS =====
 def get_current_video_path():
     with _state_lock:
@@ -168,6 +193,17 @@ def set_current_playback_video_id(video_id):
     global _current_playback_video_id
     with _state_lock:
         _current_playback_video_id = video_id
+
+def get_loop_video_id():
+    """Get the video ID to loop in loop mode."""
+    with _state_lock:
+        return _loop_video_id
+
+def set_loop_video_id(video_id):
+    """Set the video ID to loop in loop mode."""
+    global _loop_video_id
+    with _state_lock:
+        _loop_video_id = video_id
 
 # ===== DATA STRUCTURE ACCESSORS =====
 def get_cached_videos():
