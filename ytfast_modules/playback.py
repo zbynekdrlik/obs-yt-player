@@ -91,6 +91,11 @@ def verify_sources():
         log(f"Scene '{SCENE_NAME}': {'✓ EXISTS' if scene_exists else '✗ MISSING'}")
         log(f"Media Source '{MEDIA_SOURCE_NAME}': {'✓ EXISTS' if media_exists else '✗ MISSING'} (type: {source_id})")
         log(f"Text Source '{TEXT_SOURCE_NAME}': {'✓ EXISTS' if text_exists else '✗ MISSING'}")
+        
+        # Important note about media source configuration
+        if media_exists:
+            log("NOTE: Script will disable OBS 'Loop' checkbox to manage playback behavior")
+        
         log("==========================")
         _sources_verified = True
     
@@ -731,6 +736,10 @@ def update_media_source(video_path):
             obs.obs_data_set_bool(settings, "restart_on_activate", True)
             obs.obs_data_set_bool(settings, "close_when_inactive", True)
             obs.obs_data_set_bool(settings, "hw_decode", True)
+            
+            # IMPORTANT: Disable OBS's built-in loop to prevent conflicts
+            # with our script's playback behavior modes
+            obs.obs_data_set_bool(settings, "looping", False)
             
             obs.obs_source_update(source, settings)
             obs.obs_data_release(settings)
