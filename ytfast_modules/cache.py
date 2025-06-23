@@ -111,7 +111,8 @@ def scan_existing_cache():
                 'path': str(file_path),
                 'song': song.replace('_', ' '),
                 'artist': artist.replace('_', ' '),
-                'normalized': True
+                'normalized': True,
+                'gemini_failed': False  # Default for existing cache
             })
             found_count += 1
             
