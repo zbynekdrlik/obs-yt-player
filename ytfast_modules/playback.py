@@ -62,6 +62,41 @@ TITLE_CLEAR_BEFORE_END = 3.5  # Clear title 3.5 seconds before song ends
 TITLE_SHOW_AFTER_START = 1.5  # Show title 1.5 seconds after song starts
 SEEK_THRESHOLD = 5000  # 5 seconds - consider it a seek if position jumps by more than this
 
+def get_current_video_from_media_source():
+    """
+    Try to determine the current video ID from the media source file path.
+    Returns video_id if found, None otherwise.
+    """
+    try:
+        source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+        if not source:
+            return None
+        
+        settings = obs.obs_source_get_settings(source)
+        file_path = obs.obs_data_get_string(settings, "local_file")
+        obs.obs_data_release(settings)
+        obs.obs_source_release(source)
+        
+        if not file_path:
+            return None
+        
+        # Extract video ID from filename
+        # Expected format: <song>_<artist>_<id>_normalized.mp4
+        filename = os.path.basename(file_path)
+        if filename.endswith("_normalized.mp4"):
+            parts = filename[:-15].rsplit('_', 1)  # Remove _normalized.mp4 and split from right
+            if len(parts) >= 2:
+                video_id = parts[-1]
+                # Verify this video is in our cache
+                if get_cached_video_info(video_id):
+                    return video_id
+        
+        return None
+        
+    except Exception as e:
+        log(f"ERROR getting current video from media source: {e}")
+        return None
+
 def force_disable_media_loop():
     """Force disable loop setting on media source."""
     try:
@@ -463,6 +498,12 @@ def playback_controller():
                 # Update our state to match reality
                 set_playing(True)
                 
+                # Try to identify the current video
+                current_video_id = get_current_video_from_media_source()
+                if current_video_id:
+                    set_current_playback_video_id(current_video_id)
+                    log(f"Identified pre-loaded video: {current_video_id}")
+                
                 # Check if we need to fade out the title for pre-loaded video
                 current_time = get_media_time(MEDIA_SOURCE_NAME)
                 if duration > 0 and current_time > 0:
@@ -516,6 +557,14 @@ def handle_playing_state():
             return
         # Valid media is playing, sync the state
         set_playing(True)
+        
+        # Try to identify the current video if not already set
+        if not get_current_playback_video_id():
+            current_video_id = get_current_video_from_media_source()
+            if current_video_id:
+                set_current_playback_video_id(current_video_id)
+                log(f"Identified current video: {current_video_id}")
+        
         return
     
     duration = get_media_duration(MEDIA_SOURCE_NAME)
@@ -607,7 +656,7 @@ def handle_ended_state():
                     schedule_loop_restart(loop_video_id)
                     return
                 else:
-                    log("Loop mode: No video ID set, selecting first video")
+                    log("Loop mode: No video ID set, selecting next video")
                     # Will be set when we start the next video
             else:
                 # Continuous mode or first video not played yet
@@ -748,6 +797,7 @@ def select_next_video():
             video_info = cached_videos[loop_video_id]
             log(f"Loop mode - Selected: {video_info['song']} - {video_info['artist']}")
             return loop_video_id
+        # If no loop video set, continue to select one and set it
     
     available_videos = list(cached_videos.keys())
     played_videos = get_played_videos()
@@ -762,6 +812,7 @@ def select_next_video():
         # Set as loop video if in loop mode
         if playback_mode == PLAYBACK_MODE_LOOP and not get_loop_video_id():
             set_loop_video_id(selected)
+            log(f"Loop mode - Set loop video: {selected}")
         
         return selected
     
@@ -789,6 +840,7 @@ def select_next_video():
     # Set as loop video if in loop mode and not set
     if playback_mode == PLAYBACK_MODE_LOOP and not get_loop_video_id():
         set_loop_video_id(selected)
+        log(f"Loop mode - Set loop video: {selected}")
     
     return selected
 
