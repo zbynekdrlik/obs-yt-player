@@ -21,11 +21,6 @@ This document summarizes all documentation updates made for the nested scene pla
 - Technical implementation details
 - Troubleshooting guide
 
-### 4. tests/test_nested_scene_playback.py ✅ (NEW)
-- Unit tests for the new functions
-- Manual testing instructions
-- Expected log messages for verification
-
 ## Code Changes
 
 ### 1. ytfast_modules/scene.py ✅
@@ -57,8 +52,7 @@ All documentation has been reviewed and updated to ensure:
 
 ## Testing Documentation
 
-The feature includes comprehensive testing guidance:
-- Unit tests for importability and function signatures
+The feature includes comprehensive testing guidance in the nested-scene-playback.md file:
 - Manual testing instructions for OBS
 - Expected log messages for verification
 - Multiple test scenarios covering edge cases
