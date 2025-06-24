@@ -115,33 +115,23 @@ def playback_controller():
         
         # Priority 2: Check if scene is active
         playback_mode = get_playback_mode()
-        scene_active = is_scene_active()
-        
-        # Handle scene inactive state based on playback mode
-        if not scene_active:
+        if not is_scene_active():
+            # Stop playback for ALL modes when scene is inactive
             if is_playing():
                 if playback_mode == PLAYBACK_MODE_SINGLE:
                     log("Scene inactive in single mode, stopping playback")
-                    stop_current_playback()
-                    return
                 elif playback_mode == PLAYBACK_MODE_LOOP:
                     log("Scene inactive in loop mode, stopping playback")
                     # Clear loop video when scene becomes inactive
                     set_loop_video_id(None)
                     # Reset first video played flag so it can start fresh when scene becomes active
                     set_first_video_played(False)
-                    stop_current_playback()
-                    return
-                elif playback_mode == PLAYBACK_MODE_CONTINUOUS:
-                    # Don't return! Continue processing in continuous mode
-                    log("Scene inactive but continuing playback in continuous mode")
-            else:
-                # Not playing and scene inactive
-                if playback_mode != PLAYBACK_MODE_CONTINUOUS:
-                    # For single and loop modes, nothing to do
-                    _waiting_for_videos_logged = False
-                    return
-                # For continuous mode, continue processing to start next video
+                else:  # PLAYBACK_MODE_CONTINUOUS
+                    log("Scene inactive in continuous mode, stopping playback")
+                stop_current_playback()
+            # Reset waiting flag when scene is inactive
+            _waiting_for_videos_logged = False
+            return
         
         # Check if we have videos to play
         cached_videos = get_cached_videos()
@@ -183,7 +173,7 @@ def playback_controller():
                 obs.OBS_MEDIA_STATE_ENDED: "ENDED"
             }
             state_name = state_names.get(media_state, f"UNKNOWN({media_state})")
-            log(f"DEBUG: Media state = {state_name}, is_playing = {is_playing()}, scene_active = {scene_active}")
+            log(f"DEBUG: Media state = {state_name}, is_playing = {is_playing()}, scene_active = {is_scene_active()}")
         
         # Handle initial state mismatch (media playing but script thinks it's not)
         if not _initial_state_checked:
@@ -231,7 +221,7 @@ def playback_controller():
         
         # NEW: Check if we should start playback when scene is active but not playing
         # This handles the case where scene becomes active but media state isn't NONE
-        if scene_active and not is_playing() and cached_videos:
+        if is_scene_active() and not is_playing() and cached_videos:
             # Check mode restrictions
             if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
                 # Don't start new playback in single mode after first video
@@ -249,7 +239,7 @@ def playback_controller():
                     start_next_video()
                     return
         
-        # Handle different states - this now runs for continuous mode even when scene is inactive
+        # Handle different states
         if media_state == obs.OBS_MEDIA_STATE_PLAYING:
             handle_playing_state()
             
