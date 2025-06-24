@@ -22,19 +22,25 @@ if MODULES_DIR not in sys.path:
     sys.path.insert(0, MODULES_DIR)
 
 # Import modules after path is set
-from config import SCRIPT_VERSION, DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, SCENE_CHECK_DELAY
+from config import (
+    SCRIPT_VERSION, DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, SCENE_CHECK_DELAY,
+    PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, DEFAULT_PLAYBACK_MODE
+)
 from logger import log, cleanup_logging
 from state import (
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
     is_tools_ready, set_stop_threads,
-    set_gemini_api_key  # Use the correct function name
+    set_gemini_api_key,
+    get_playback_mode, set_playback_mode,
+    set_first_video_played, set_loop_video_id,
+    get_current_playback_video_id, is_playing
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
 from download import start_video_processing_thread
 from scene import verify_scene_setup, on_frontend_event
-from playback import start_playback_controller, stop_playback_controller
+from playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
 from metadata import clear_gemini_failures
 from reprocess import start_reprocess_thread
 
@@ -66,21 +72,18 @@ def script_properties():
         obs.OBS_TEXT_DEFAULT
     )
     
-    # Sync Now button
-    obs.obs_properties_add_button(
+    # Playback mode dropdown
+    playback_mode = obs.obs_properties_add_list(
         props,
-        "sync_now",
-        "Sync Playlist Now",
-        sync_now_callback
+        "playback_mode",
+        "Playback Mode",
+        obs.OBS_COMBO_TYPE_LIST,
+        obs.OBS_COMBO_FORMAT_STRING
     )
     
-    # Add separator for optional features
-    obs.obs_properties_add_text(
-        props,
-        "separator1",
-        "───── Optional Features ─────",
-        obs.OBS_TEXT_INFO
-    )
+    obs.obs_property_list_add_string(playback_mode, "Continuous (Play all videos)", PLAYBACK_MODE_CONTINUOUS)
+    obs.obs_property_list_add_string(playback_mode, "Single (Play one video and stop)", PLAYBACK_MODE_SINGLE)
+    obs.obs_property_list_add_string(playback_mode, "Loop (Repeat current video)", PLAYBACK_MODE_LOOP)
     
     # Gemini API key field (password type for security)
     obs.obs_properties_add_text(
@@ -90,12 +93,20 @@ def script_properties():
         obs.OBS_TEXT_PASSWORD
     )
     
-    # Help text for Gemini
+    # Add separator before sync button
     obs.obs_properties_add_text(
         props,
-        "gemini_help",
-        "For better metadata extraction. Get your free API key at:\nhttps://makersuite.google.com/app/apikey",
+        "separator",
+        "─────────────────────────────",
         obs.OBS_TEXT_INFO
+    )
+    
+    # Sync Now button at the bottom
+    obs.obs_properties_add_button(
+        props,
+        "sync_now",
+        "Sync Playlist Now",
+        sync_now_callback
     )
     
     return props
@@ -104,16 +115,47 @@ def script_defaults(settings):
     """Set default values for script properties."""
     obs.obs_data_set_default_string(settings, "playlist_url", DEFAULT_PLAYLIST_URL)
     obs.obs_data_set_default_string(settings, "cache_dir", DEFAULT_CACHE_DIR)
+    obs.obs_data_set_default_string(settings, "playback_mode", DEFAULT_PLAYBACK_MODE)
     obs.obs_data_set_default_string(settings, "gemini_api_key", "")
 
 def script_update(settings):
     """Called when script properties are updated."""
     playlist_url = obs.obs_data_get_string(settings, "playlist_url")
     cache_dir = obs.obs_data_get_string(settings, "cache_dir")
+    playback_mode = obs.obs_data_get_string(settings, "playback_mode")
     gemini_key = obs.obs_data_get_string(settings, "gemini_api_key")
+    
+    # Check if playback mode changed
+    old_mode = get_playback_mode()
     
     set_playlist_url(playlist_url)
     set_cache_dir(cache_dir)
+    set_playback_mode(playback_mode)
+    
+    # Reset playback state if mode changed
+    if old_mode != playback_mode:
+        set_first_video_played(False)
+        log(f"Playback mode changed to: {playback_mode}")
+        
+        # If changing to loop mode and a video is currently playing, set it as the loop video
+        if playback_mode == PLAYBACK_MODE_LOOP and is_playing():
+            # First try to get the current video ID from state
+            current_video_id = get_current_playback_video_id()
+            
+            # If not available, try to get it from the media source
+            if not current_video_id:
+                current_video_id = get_current_video_from_media_source()
+            
+            if current_video_id:
+                set_loop_video_id(current_video_id)
+                log(f"Loop mode enabled - will loop current video (ID: {current_video_id})")
+            else:
+                # Clear loop video ID so next video will be set as loop video
+                set_loop_video_id(None)
+                log("Loop mode enabled - will loop next video that plays")
+        else:
+            # Clear loop video ID when switching away from loop mode
+            set_loop_video_id(None)
     
     # Store Gemini API key in state if provided
     if gemini_key:
@@ -122,7 +164,7 @@ def script_update(settings):
     else:
         set_gemini_api_key(None)
     
-    log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}")
+    log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}")
 
 def script_load(settings):
     """Called when script is loaded."""
