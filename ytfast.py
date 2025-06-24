@@ -72,14 +72,6 @@ def script_properties():
         obs.OBS_TEXT_DEFAULT
     )
     
-    # Add separator for playback behavior
-    obs.obs_properties_add_text(
-        props,
-        "separator_playback",
-        "───── Playback Behavior ─────",
-        obs.OBS_TEXT_INFO
-    )
-    
     # Playback mode dropdown
     playback_mode = obs.obs_properties_add_list(
         props,
@@ -93,14 +85,6 @@ def script_properties():
     obs.obs_property_list_add_string(playback_mode, "Single (Play one video and stop)", PLAYBACK_MODE_SINGLE)
     obs.obs_property_list_add_string(playback_mode, "Loop (Repeat current video)", PLAYBACK_MODE_LOOP)
     
-    # Add separator for optional features
-    obs.obs_properties_add_text(
-        props,
-        "separator1",
-        "───── Optional Features ─────",
-        obs.OBS_TEXT_INFO
-    )
-    
     # Gemini API key field (password type for security)
     obs.obs_properties_add_text(
         props, 
@@ -112,7 +96,7 @@ def script_properties():
     # Add separator before sync button
     obs.obs_properties_add_text(
         props,
-        "separator2",
+        "separator",
         "─────────────────────────────",
         obs.OBS_TEXT_INFO
     )
