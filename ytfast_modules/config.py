@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.2.11"  # Removed all section separators for cleaner UI
+SCRIPT_VERSION = "3.2.12"  # Fixed loop mode to stop when scene inactive and select new random video when reactivated
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
