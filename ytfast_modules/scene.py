@@ -5,11 +5,12 @@ Handles scene verification and frontend events with transition awareness.
 
 import obspython as obs
 import time
-from config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
+from config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME, PLAYBACK_MODE_SINGLE
 from logger import log
 from state import (
     set_scene_active, is_scene_active, is_playing, 
-    set_stop_threads
+    set_stop_threads, get_playback_mode, is_first_video_played,
+    set_first_video_played
 )
 
 # Module-level variables for transition tracking
@@ -164,6 +165,13 @@ def handle_scene_change():
             # Scene becoming active - start immediately
             log(f"Scene activated: {scene_name}")
             set_scene_active(True)
+            
+            # If in single mode and first video was already played, reset it
+            # This allows playing one video each time the scene is activated
+            if get_playback_mode() == PLAYBACK_MODE_SINGLE and is_first_video_played():
+                log("Single mode: Resetting first video played flag for new scene activation")
+                set_first_video_played(False)
+            
             # Playback controller will handle starting
             
         else:
