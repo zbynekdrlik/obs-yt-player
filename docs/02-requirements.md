@@ -47,6 +47,10 @@ It is authoritative; later Phase prompts reference this spec.
 - Random no‑repeat playback; handle scene transitions.
 - **Transition handling**: Start playback immediately when transitioning TO scene, continue playing until transition completes when leaving scene.
 - Support both regular mode and Studio Mode (preview/program).
+- **Nested Scene Support** (v3.3.0+): Videos play when scene is included as a source within another scene
+  - Recursive detection of scene visibility
+  - Respects source visibility settings
+  - Supports multiple nesting levels
 - **Title display timing**:
   - Clear title 3.5 seconds before song ends (prevents text on black screen during fade)
   - Show title 1.5 seconds after song starts (allows video to establish before text appears)
