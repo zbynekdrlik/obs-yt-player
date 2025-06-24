@@ -34,13 +34,13 @@ from state import (
     set_gemini_api_key,
     get_playback_mode, set_playback_mode,
     set_first_video_played, set_loop_video_id,
-    get_current_playback_video_id
+    get_current_playback_video_id, is_playing
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
 from download import start_video_processing_thread
 from scene import verify_scene_setup, on_frontend_event
-from playback import start_playback_controller, stop_playback_controller
+from playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
 from metadata import clear_gemini_failures
 from reprocess import start_reprocess_thread
 
@@ -99,13 +99,13 @@ def script_properties():
     
     obs.obs_property_list_add_string(playback_mode, "Continuous (Play all videos)", PLAYBACK_MODE_CONTINUOUS)
     obs.obs_property_list_add_string(playback_mode, "Single (Play one video and stop)", PLAYBACK_MODE_SINGLE)
-    obs.obs_property_list_add_string(playback_mode, "Loop (Repeat first video)", PLAYBACK_MODE_LOOP)
+    obs.obs_property_list_add_string(playback_mode, "Loop (Repeat current video)", PLAYBACK_MODE_LOOP)
     
     # Help text for playback modes
     obs.obs_properties_add_text(
         props,
         "playback_help",
-        "• Continuous: Plays random videos forever\n• Single: Plays one video then stops\n• Loop: Repeats the first video",
+        "• Continuous: Plays random videos forever\n• Single: Plays one video then stops\n• Loop: Repeats the current video",
         obs.OBS_TEXT_INFO
     )
     
@@ -159,15 +159,27 @@ def script_update(settings):
     # Reset playback state if mode changed
     if old_mode != playback_mode:
         set_first_video_played(False)
-        set_loop_video_id(None)
         log(f"Playback mode changed to: {playback_mode}")
         
         # If changing to loop mode and a video is currently playing, set it as the loop video
-        if playback_mode == PLAYBACK_MODE_LOOP:
+        if playback_mode == PLAYBACK_MODE_LOOP and is_playing():
+            # First try to get the current video ID from state
             current_video_id = get_current_playback_video_id()
+            
+            # If not available, try to get it from the media source
+            if not current_video_id:
+                current_video_id = get_current_video_from_media_source()
+            
             if current_video_id:
                 set_loop_video_id(current_video_id)
-                log(f"Loop mode enabled - will loop current video")
+                log(f"Loop mode enabled - will loop current video (ID: {current_video_id})")
+            else:
+                # Clear loop video ID so next video will be set as loop video
+                set_loop_video_id(None)
+                log("Loop mode enabled - will loop next video that plays")
+        else:
+            # Clear loop video ID when switching away from loop mode
+            set_loop_video_id(None)
     
     # Store Gemini API key in state if provided
     if gemini_key:

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.2.5"  # Fixed loop mode by properly tracking restart state
+SCRIPT_VERSION = "3.2.6"  # Fixed loop mode to properly capture current video when switching modes
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
