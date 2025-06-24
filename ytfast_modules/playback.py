@@ -430,16 +430,22 @@ def playback_controller():
         # Ensure opacity filter exists
         ensure_opacity_filter()
         
-        # Priority 2: Check if scene is active (only matters for single mode)
+        # Priority 2: Check if scene is active
         playback_mode = get_playback_mode()
         if not is_scene_active():
-            # Only stop playback in single mode when scene is inactive
-            if playback_mode == PLAYBACK_MODE_SINGLE and is_playing():
-                log("Scene inactive in single mode, stopping playback")
-                stop_current_playback()
-            elif is_playing() and playback_mode != PLAYBACK_MODE_SINGLE:
-                # For continuous and loop modes, keep playing
-                log(f"Scene inactive but continuing playback in {playback_mode} mode")
+            # Stop playback in single and loop modes when scene is inactive
+            # Continuous mode keeps playing
+            if is_playing():
+                if playback_mode == PLAYBACK_MODE_SINGLE:
+                    log("Scene inactive in single mode, stopping playback")
+                    stop_current_playback()
+                elif playback_mode == PLAYBACK_MODE_LOOP:
+                    log("Scene inactive in loop mode, stopping playback")
+                    # Clear loop video when scene becomes inactive
+                    set_loop_video_id(None)
+                    stop_current_playback()
+                else:  # PLAYBACK_MODE_CONTINUOUS
+                    log("Scene inactive but continuing playback in continuous mode")
             # Reset waiting flag when scene is inactive
             _waiting_for_videos_logged = False
             return
