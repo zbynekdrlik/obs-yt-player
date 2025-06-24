@@ -56,13 +56,13 @@ def test_continuous_mode():
     # Test with scene active
     set_scene_active(True)
     print(f"Scene active: {is_scene_active()}")
-    print("Expected: Videos play normally")
+    print("Expected: Videos play normally, advancing to next random video forever")
     
     # Test with scene inactive
     set_scene_active(False)
     print(f"Scene active: {is_scene_active()}")
-    print("Expected: Videos continue playing in background")
-    print("✓ Continuous mode allows playback when scene is inactive")
+    print("Expected: Stop playback immediately")
+    print("✓ Continuous mode stops when scene becomes inactive")
 
 
 def test_single_mode():
@@ -132,10 +132,11 @@ def main():
     
     print("\n" + "=" * 40)
     print("All tests completed!")
-    print("\nKey fix implemented:")
-    print("- Continuous mode now properly continues playback when scene is inactive")
-    print("- The playback_controller no longer returns early for continuous mode")
-    print("- State handlers continue to be called even when scene is inactive")
+    print("\nKey behaviors implemented:")
+    print("- ALL modes stop playback when scene becomes inactive")
+    print("- Continuous mode plays random videos forever (while scene is active)")
+    print("- Single mode plays one video and stops")
+    print("- Loop mode repeats the same video (while scene is active)")
 
 
 if __name__ == "__main__":
