@@ -8,7 +8,7 @@ import threading
 import os
 from pathlib import Path
 from datetime import datetime
-from config import SCRIPT_NAME, DEFAULT_CACHE_DIR
+from ytfast_modules.config import SCRIPT_NAME, DEFAULT_CACHE_DIR
 
 # Global variables for file logging
 _log_file_handle = None
@@ -27,7 +27,7 @@ def _initialize_file_logging():
     
     try:
         # Use cache dir from state if available, otherwise use default
-        from state import get_cache_dir
+        from ytfast_modules.state import get_cache_dir
         cache_dir = get_cache_dir() or DEFAULT_CACHE_DIR
         
         # Create logs directory
@@ -138,3 +138,7 @@ def cleanup_logging():
 def get_current_log_path():
     """Get the path of the current log file."""
     return str(_log_file_path) if _log_file_path else None
+
+# For compatibility with old import names
+init_logger = lambda: None  # No-op, initialization happens automatically
+close_logger = cleanup_logging
