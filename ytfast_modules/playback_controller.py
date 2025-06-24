@@ -136,9 +136,12 @@ def playback_controller():
                     # Don't return! Continue processing in continuous mode
                     log("Scene inactive but continuing playback in continuous mode")
             else:
-                # Not playing and scene inactive - nothing to do
-                _waiting_for_videos_logged = False
-                return
+                # Not playing and scene inactive
+                if playback_mode != PLAYBACK_MODE_CONTINUOUS:
+                    # For single and loop modes, nothing to do
+                    _waiting_for_videos_logged = False
+                    return
+                # For continuous mode, continue processing to start next video
         
         # Check if we have videos to play
         cached_videos = get_cached_videos()
