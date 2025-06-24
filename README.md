@@ -15,6 +15,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **Multi-Instance Support**: Rename script to run multiple instances with separate caches
 - **Modular Architecture**: Clean, maintainable code structure with separated concerns
 - **Scene Management**: Automatic start/stop based on scene activation
+- **Nested Scene Playback**: Videos play even when scene is nested as a source within another scene (v3.3.0+)
 - **Transition Support**: Proper handling of scene transitions with configurable delays
 - **File-Based Logging**: Comprehensive logging to both OBS console and individual log files
 - **Automatic Retry**: Failed Gemini extractions are retried on next startup
@@ -51,6 +52,22 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 5. Click "Sync Playlist Now" to manually update the playlist
 6. Switch to your scene to begin random playback
 7. Switch away from scene to automatically stop playback
+
+### Nested Scene Usage (v3.3.0+)
+
+The YouTube player scene can be included as a source within other scenes:
+
+1. Create your YouTube player scene as described above
+2. In another scene, add a Scene source and select your YouTube player scene
+3. Videos will automatically play when the parent scene is active
+4. Hide/show the nested scene source to control playback
+5. Supports multiple nesting levels (scene within scene within scene)
+
+This is perfect for:
+- Multi-camera productions with YouTube content
+- Picture-in-picture layouts
+- Complex streaming setups
+- Dynamic scene compositions
 
 ## Metadata Extraction System
 
@@ -151,13 +168,13 @@ ytfast_modules/
     gemini_metadata.py      # Google Gemini AI integration
     normalize.py            # Audio normalization
     playback.py             # Playback control
-    scene.py                # Scene management
+    scene.py                # Scene management (includes nested scene detection)
     reprocess.py            # Gemini retry system
 ```
 
 ## Current Status
 
-Version 3.0.12 - Gemini-Only Metadata:
+Version 3.3.0 - Nested Scene Playback Support:
 - ✅ Complete foundation, processing, and playback system
 - ✅ Google Gemini AI as primary metadata source
 - ✅ Smart title parser as fallback
@@ -166,8 +183,16 @@ Version 3.0.12 - Gemini-Only Metadata:
 - ✅ Scene transition support
 - ✅ Multi-instance capability
 - ✅ Windows-optimized implementation
+- ✅ **NEW: Nested scene playback detection**
 
 ## Recent Updates
+
+### v3.3.0 - Nested Scene Playback
+- Added recursive scene detection for nested sources
+- Videos now play when YouTube player scene is included in other scenes
+- Supports multiple nesting levels with proper visibility checks
+- Enhanced logging for nested scene activation/deactivation
+- Maintains all existing playback modes and features
 
 ### v3.0.12 - Gemini-Only Metadata Branch
 - Removed AcoustID and iTunes metadata sources
@@ -187,6 +212,12 @@ Version 3.0.12 - Gemini-Only Metadata:
 5. Free tier includes generous limits for personal use
 
 ## Troubleshooting
+
+### Nested Scene Playback
+- Ensure the nested scene source is visible (eye icon enabled)
+- Check that source names match exactly (case-sensitive)
+- Look for log messages like "Scene activated as nested source in: [parent scene]"
+- Verify the YouTube player scene works when selected directly
 
 ### Gemini Metadata Failures
 - Check your internet connection
