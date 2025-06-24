@@ -4,7 +4,7 @@ This document describes the three playback modes implemented in the OBS YouTube 
 
 ## Overview
 
-The script supports three distinct playback modes that control how videos play when the scene is active or inactive:
+The script supports three distinct playback modes that control how videos play when the scene is active:
 
 1. **Continuous Mode** (default)
 2. **Single Mode**
@@ -15,10 +15,10 @@ Users can select the desired mode via a dropdown in the OBS script properties.
 ## Mode Behaviors
 
 ### Continuous Mode
-- **Default mode** - plays all videos in the playlist randomly
+- **Default mode** - plays all videos in the playlist randomly forever
 - **Scene Active**: Videos play normally, advancing to the next random video when one ends
-- **Scene Inactive**: Videos continue playing in the background
-- **Use Case**: Background music that keeps playing even when showing other scenes
+- **Scene Inactive**: Stops playback immediately
+- **Use Case**: Background music or video playlist that plays continuously while scene is live
 
 ### Single Mode
 - Plays **one video only** then stops
@@ -34,6 +34,14 @@ Users can select the desired mode via a dropdown in the OBS script properties.
 - **Restart Behavior**: When scene becomes active again, selects a new random video to loop
 - **Use Case**: Background ambience, hold music, repeated content
 
+## Common Behaviors
+
+All modes share these behaviors:
+- **Stop playback** when scene becomes inactive (switching to another scene)
+- **Start playback** when scene becomes active (if videos are available)
+- Respect title display timing (fade in/out)
+- Handle pre-loaded videos appropriately
+
 ## Implementation Details
 
 ### State Management
@@ -47,13 +55,15 @@ Users can select the desired mode via a dropdown in the OBS script properties.
 - State is reset appropriately when switching modes
 
 ### Scene Transition Handling
-- **Continuous**: Seamless playback through scene transitions
-- **Single/Loop**: Stop when scene becomes inactive
-- All modes respect the title display timing (fade in/out)
+- All modes stop playback when scene becomes inactive
+- When scene becomes active again:
+  - **Continuous**: Starts playing random videos
+  - **Single**: Plays one new random video
+  - **Loop**: Selects a new random video to loop
 
 ### Pre-loaded Video Handling
 - If OBS has a video pre-loaded when script starts:
-  - **Continuous**: Lets it play and continues normally
+  - **Continuous**: Lets it play and continues with playlist
   - **Single**: Counts it as the one video and stops after
   - **Loop**: Sets it as the loop video
 
