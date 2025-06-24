@@ -443,6 +443,8 @@ def playback_controller():
                     log("Scene inactive in loop mode, stopping playback")
                     # Clear loop video when scene becomes inactive
                     set_loop_video_id(None)
+                    # Reset first video played flag so it can start fresh when scene becomes active
+                    set_first_video_played(False)
                     stop_current_playback()
                 else:  # PLAYBACK_MODE_CONTINUOUS
                     log("Scene inactive but continuing playback in continuous mode")
@@ -789,10 +791,17 @@ def handle_none_state():
     if is_scene_active() and not is_playing():
         # Only start if we have videos available
         if get_cached_videos():
-            # Check if we're in single mode and already played first video
-            if get_playback_mode() == PLAYBACK_MODE_SINGLE and is_first_video_played():
+            playback_mode = get_playback_mode()
+            
+            # Check restrictions based on mode
+            if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
                 # Don't start new playback in single mode after first video
                 return
+            elif playback_mode == PLAYBACK_MODE_LOOP:
+                # In loop mode, always allow starting a new video when scene becomes active
+                # The first_video_played flag was reset when scene became inactive
+                pass
+                
             log("Scene active and videos available, starting playback")
             start_next_video()
     elif is_scene_active() and is_playing():
@@ -1190,7 +1199,7 @@ def start_next_video():
     # Check playback mode
     playback_mode = get_playback_mode()
     
-    # If in single or loop mode and first video has been played
+    # If in single mode and first video has been played
     if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
         log("Single mode: Already played first video, stopping")
         stop_current_playback()
