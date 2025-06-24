@@ -72,14 +72,6 @@ def script_properties():
         obs.OBS_TEXT_DEFAULT
     )
     
-    # Sync Now button
-    obs.obs_properties_add_button(
-        props,
-        "sync_now",
-        "Sync Playlist Now",
-        sync_now_callback
-    )
-    
     # Add separator for playback behavior
     obs.obs_properties_add_text(
         props,
@@ -101,14 +93,6 @@ def script_properties():
     obs.obs_property_list_add_string(playback_mode, "Single (Play one video and stop)", PLAYBACK_MODE_SINGLE)
     obs.obs_property_list_add_string(playback_mode, "Loop (Repeat current video)", PLAYBACK_MODE_LOOP)
     
-    # Help text for playback modes
-    obs.obs_properties_add_text(
-        props,
-        "playback_help",
-        "• Continuous: Plays random videos forever\n• Single: Plays one video then stops\n• Loop: Repeats the current video",
-        obs.OBS_TEXT_INFO
-    )
-    
     # Add separator for optional features
     obs.obs_properties_add_text(
         props,
@@ -125,12 +109,20 @@ def script_properties():
         obs.OBS_TEXT_PASSWORD
     )
     
-    # Help text for Gemini
+    # Add separator before sync button
     obs.obs_properties_add_text(
         props,
-        "gemini_help",
-        "For better metadata extraction. Get your free API key at:\nhttps://makersuite.google.com/app/apikey",
+        "separator2",
+        "─────────────────────────────",
         obs.OBS_TEXT_INFO
+    )
+    
+    # Sync Now button at the bottom
+    obs.obs_properties_add_button(
+        props,
+        "sync_now",
+        "Sync Playlist Now",
+        sync_now_callback
     )
     
     return props
