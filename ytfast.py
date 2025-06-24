@@ -134,8 +134,14 @@ def script_update(settings):
     
     # Reset playback state if mode changed
     if old_mode != playback_mode:
-        set_first_video_played(False)
         log(f"Playback mode changed to: {playback_mode}")
+        
+        # If changing to single mode while a video is playing, mark it as first video played
+        if playback_mode == PLAYBACK_MODE_SINGLE and is_playing():
+            set_first_video_played(True)
+            log("Single mode enabled - current video counts as first video")
+        else:
+            set_first_video_played(False)
         
         # If changing to loop mode and a video is currently playing, set it as the loop video
         if playback_mode == PLAYBACK_MODE_LOOP and is_playing():
