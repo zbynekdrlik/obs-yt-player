@@ -47,6 +47,7 @@ _last_playback_time = 0  # Track last playback position for seek detection
 _loop_restart_timer = None  # Timer reference for loop restart
 _loop_restart_pending = False  # Track if we're waiting to restart loop
 _loop_restart_video_id = None  # Track which video we're restarting
+_media_reload_timer = None  # Timer for delayed media reload
 
 # Opacity transition variables
 _opacity_timer = None
@@ -336,7 +337,7 @@ def show_title_after_start_callback():
 def cancel_title_timers():
     """Cancel any pending title timers."""
     global _title_clear_timer, _title_show_timer, _pending_title_info, _title_clear_scheduled
-    global _opacity_timer, _duration_check_timer, _loop_restart_timer
+    global _opacity_timer, _duration_check_timer, _loop_restart_timer, _media_reload_timer
     
     if _title_clear_timer:
         obs.timer_remove(_title_clear_timer)
@@ -357,6 +358,10 @@ def cancel_title_timers():
     if _loop_restart_timer:
         obs.timer_remove(_loop_restart_timer)
         _loop_restart_timer = None
+    
+    if _media_reload_timer:
+        obs.timer_remove(_media_reload_timer)
+        _media_reload_timer = None
         
     _pending_title_info = None
     _title_clear_scheduled = False
@@ -717,7 +722,7 @@ def schedule_loop_restart(video_id):
     
     # Schedule the restart with a longer delay to ensure media source is ready
     _loop_restart_timer = restart_callback
-    obs.timer_add(_loop_restart_timer, 250)  # Increased from 100ms to 250ms
+    obs.timer_add(_loop_restart_timer, 1000)  # Increased to 1 second for better stability
 
 def handle_stopped_state():
     """Handle video stopped state."""
@@ -894,20 +899,57 @@ def update_media_source(video_path, force_reload=False):
             # Check if we're trying to load the same file
             is_same_file = current_file == video_path
             
-            # If it's the same file or force_reload is True, clear first
+            # If it's the same file or force_reload is True, we need a multi-step reload
             if is_same_file or force_reload:
-                log(f"{'Force reloading' if force_reload else 'Same file detected, clearing first:'} {os.path.basename(video_path)}")
+                log(f"{'Force reloading' if force_reload else 'Same file detected, performing multi-step reload:'} {os.path.basename(video_path)}")
                 
-                # Clear the source first
+                # Step 1: Stop the media completely
+                obs.obs_source_media_stop(source)
+                
+                # Step 2: Clear the source
                 clear_settings = obs.obs_data_create()
                 obs.obs_data_set_string(clear_settings, "local_file", "")
                 obs.obs_source_update(source, clear_settings)
                 obs.obs_data_release(clear_settings)
                 
-                # Force a frame update to ensure the clear takes effect
-                obs.obs_source_media_stop(source)
+                # Release the source to apply changes
+                obs.obs_source_release(source)
+                
+                # Step 3: Schedule the reload after a delay
+                global _media_reload_timer
+                if _media_reload_timer:
+                    obs.timer_remove(_media_reload_timer)
+                    _media_reload_timer = None
+                
+                def reload_media():
+                    global _media_reload_timer
+                    if _media_reload_timer:
+                        obs.timer_remove(_media_reload_timer)
+                        _media_reload_timer = None
+                    
+                    reload_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+                    if reload_source:
+                        settings = obs.obs_data_create()
+                        obs.obs_data_set_string(settings, "local_file", video_path)
+                        obs.obs_data_set_bool(settings, "restart_on_activate", True)
+                        obs.obs_data_set_bool(settings, "close_when_inactive", True)
+                        obs.obs_data_set_bool(settings, "hw_decode", True)
+                        obs.obs_data_set_bool(settings, "looping", False)
+                        
+                        obs.obs_source_update(reload_source, settings)
+                        obs.obs_data_release(settings)
+                        
+                        # Force restart the media
+                        obs.obs_source_media_restart(reload_source)
+                        obs.obs_source_release(reload_source)
+                        
+                        log(f"Media source reloaded: {os.path.basename(video_path)}")
+                
+                _media_reload_timer = reload_media
+                obs.timer_add(_media_reload_timer, 500)  # Wait 500ms before reloading
+                return True
             
-            # Now set the new (or same) file
+            # Normal update (different file)
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "local_file", video_path)
             obs.obs_data_set_bool(settings, "restart_on_activate", True)
