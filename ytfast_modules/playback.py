@@ -677,12 +677,23 @@ def handle_ended_state():
             else:
                 log("Loop mode: Could not identify video to loop, selecting next")
         
-        # Handle non-loop modes or when we couldn't identify the video
+        # Handle non-loop modes
         if not _preloaded_video_handled and _is_preloaded_video:
-            log("Pre-loaded video ended, starting playlist")
+            log("Pre-loaded video ended")
             _preloaded_video_handled = True
             _is_preloaded_video = False
+            
+            # Check if we're in single mode
+            if playback_mode == PLAYBACK_MODE_SINGLE:
+                log("Single mode: Pre-loaded video counted as first video, stopping playback")
+                # Mark that first video has been played
+                set_first_video_played(True)
+                stop_current_playback()
+                return
+            else:
+                log("Starting playlist after pre-loaded video")
         else:
+            # Regular video ended (not pre-loaded)
             # Check playback mode to determine what to do next
             if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
                 log("Single mode: First video ended, stopping playback")
