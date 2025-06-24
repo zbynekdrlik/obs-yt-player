@@ -48,6 +48,7 @@ _loop_restart_timer = None  # Timer reference for loop restart
 _loop_restart_pending = False  # Track if we're waiting to restart loop
 _loop_restart_video_id = None  # Track which video we're restarting
 _media_reload_timer = None  # Timer for delayed media reload
+_manual_stop_detected = False  # Track if user manually stopped playback
 
 # Opacity transition variables
 _opacity_timer = None
@@ -429,11 +430,16 @@ def playback_controller():
         # Ensure opacity filter exists
         ensure_opacity_filter()
         
-        # Priority 2: Check if scene is active
+        # Priority 2: Check if scene is active (only matters for single mode)
+        playback_mode = get_playback_mode()
         if not is_scene_active():
-            if is_playing():
-                log("Scene inactive, stopping playback")
+            # Only stop playback in single mode when scene is inactive
+            if playback_mode == PLAYBACK_MODE_SINGLE and is_playing():
+                log("Scene inactive in single mode, stopping playback")
                 stop_current_playback()
+            elif is_playing() and playback_mode != PLAYBACK_MODE_SINGLE:
+                # For continuous and loop modes, keep playing
+                log(f"Scene inactive but continuing playback in {playback_mode} mode")
             # Reset waiting flag when scene is inactive
             _waiting_for_videos_logged = False
             return
@@ -544,7 +550,10 @@ def playback_controller():
 def handle_playing_state():
     """Handle currently playing video state."""
     global _is_preloaded_video, _last_playback_time, _title_clear_scheduled, _title_clear_timer
-    global _loop_restart_pending, _loop_restart_video_id
+    global _loop_restart_pending, _loop_restart_video_id, _manual_stop_detected
+    
+    # Clear manual stop flag when playing
+    _manual_stop_detected = False
     
     # Check if we were waiting for a loop restart
     if _loop_restart_pending and _loop_restart_video_id:
@@ -741,7 +750,23 @@ def schedule_loop_restart(video_id):
 
 def handle_stopped_state():
     """Handle video stopped state."""
+    global _manual_stop_detected
+    
     if is_playing():
+        # Check if this was a manual stop (we didn't initiate it)
+        if not _manual_stop_detected:
+            _manual_stop_detected = True
+            log("Manual stop detected - user clicked stop button")
+            
+            # Clear loop video if in loop mode
+            if get_playback_mode() == PLAYBACK_MODE_LOOP:
+                log("Clearing loop video due to manual stop")
+                set_loop_video_id(None)
+            
+            # Stop playback cleanly
+            stop_current_playback()
+            return
+        
         log("Playback stopped, attempting to resume or skip")
         # Try to resume or skip to next
         global _playback_retry_count
@@ -950,7 +975,7 @@ def update_media_source(video_path, force_reload=False):
                     if reload_source:
                         settings = obs.obs_data_create()
                         obs.obs_data_set_string(settings, "local_file", video_path)
-                        obs.obs_data_set_bool(settings, "restart_on_activate", True)
+                        obs.obs_data_set_bool(settings, "restart_on_activate", False)  # Changed to False
                         obs.obs_data_set_bool(settings, "close_when_inactive", True)
                         obs.obs_data_set_bool(settings, "hw_decode", True)
                         obs.obs_data_set_bool(settings, "looping", False)
@@ -971,7 +996,7 @@ def update_media_source(video_path, force_reload=False):
             # Normal update (different file)
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "local_file", video_path)
-            obs.obs_data_set_bool(settings, "restart_on_activate", True)
+            obs.obs_data_set_bool(settings, "restart_on_activate", False)  # Changed to False
             obs.obs_data_set_bool(settings, "close_when_inactive", True)
             obs.obs_data_set_bool(settings, "hw_decode", True)
             
@@ -1232,7 +1257,7 @@ def stop_current_playback():
     Must be called from main thread.
     """
     global _last_progress_log, _playback_retry_count, _current_opacity, _last_playback_time
-    global _loop_restart_pending, _loop_restart_video_id
+    global _loop_restart_pending, _loop_restart_video_id, _manual_stop_detected
     
     # Cancel any pending title timers
     cancel_title_timers()
@@ -1240,6 +1265,9 @@ def stop_current_playback():
     # Clear loop restart state
     _loop_restart_pending = False
     _loop_restart_video_id = None
+    
+    # Mark that we initiated this stop
+    _manual_stop_detected = True
     
     if not is_playing():
         log("No active playback to stop")
