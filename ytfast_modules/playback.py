@@ -869,10 +869,14 @@ def select_next_video():
     
     return selected
 
-def update_media_source(video_path):
+def update_media_source(video_path, force_reload=False):
     """
     Update OBS Media Source with new video.
     Must be called from main thread.
+    
+    Args:
+        video_path: Path to the video file
+        force_reload: If True, clears the source first to force a reload
     """
     try:
         # Validate file exists
@@ -882,6 +886,28 @@ def update_media_source(video_path):
         
         source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
         if source:
+            # Get current file path
+            current_settings = obs.obs_source_get_settings(source)
+            current_file = obs.obs_data_get_string(current_settings, "local_file")
+            obs.obs_data_release(current_settings)
+            
+            # Check if we're trying to load the same file
+            is_same_file = current_file == video_path
+            
+            # If it's the same file or force_reload is True, clear first
+            if is_same_file or force_reload:
+                log(f"{'Force reloading' if force_reload else 'Same file detected, clearing first:'} {os.path.basename(video_path)}")
+                
+                # Clear the source first
+                clear_settings = obs.obs_data_create()
+                obs.obs_data_set_string(clear_settings, "local_file", "")
+                obs.obs_source_update(source, clear_settings)
+                obs.obs_data_release(clear_settings)
+                
+                # Force a frame update to ensure the clear takes effect
+                obs.obs_source_media_stop(source)
+            
+            # Now set the new (or same) file
             settings = obs.obs_data_create()
             obs.obs_data_set_string(settings, "local_file", video_path)
             obs.obs_data_set_bool(settings, "restart_on_activate", True)
@@ -1031,8 +1057,8 @@ def start_specific_video(video_id):
     song = video_info.get('song', 'Unknown Song')
     artist = video_info.get('artist', 'Unknown Artist')
     
-    # Update media source
-    if update_media_source(video_info['path']):
+    # Update media source with force reload for loop mode
+    if update_media_source(video_info['path'], force_reload=True):
         # Schedule title display
         schedule_title_show(video_info)
         
