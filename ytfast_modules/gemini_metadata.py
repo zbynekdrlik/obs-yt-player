@@ -19,6 +19,8 @@ GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/g
 GEMINI_TIMEOUT = 30  # Increased timeout for Google Search grounding
 MAX_RETRIES = 2
 
+# Version 3.3.3 - Fix pipe-separated titles in Gemini
+
 def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """
     Extract artist and song metadata using Google Gemini API with Google Search grounding.
@@ -54,11 +56,14 @@ RULES:
 3. Remove feat./ft./featuring from artist name
 4. Remove (Official Video), (Live), etc from song titles
 5. Keep "/" in multi-part titles like "Faithful Then / Faithful Now"
-6. If no artist found, return empty string for artist
+6. For pipe-separated titles (|), take ONLY the first part as the song title
+7. If no artist found, return empty string for artist
 
 Examples:
 - "HOLYGHOST | Sons Of Sunday" → {{"artist": "Sons Of Sunday", "song": "HOLYGHOST"}}
 - "'COME RIGHT NOW' | Official Video" → {{"artist": "Planetshakers", "song": "COME RIGHT NOW"}}
+- "Supernatural Love | Show Me Your Glory - Live At Chapel | Planetshakers Official Music Video" → {{"artist": "Planetshakers", "song": "Supernatural Love"}}
+- "Forever | Live At Chapel" → {{"artist": "Kari Jobe", "song": "Forever"}}
 
 REMEMBER: Return ONLY valid JSON, nothing else."""
 
