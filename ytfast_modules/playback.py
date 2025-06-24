@@ -537,6 +537,26 @@ def playback_controller():
                         schedule_title_clear_from_current(remaining_ms)
                 return  # Let it play out
         
+        # NEW: Check if we should start playback when scene is active but not playing
+        # This handles the case where scene becomes active but media state isn't NONE
+        if is_scene_active() and not is_playing() and cached_videos:
+            # Check mode restrictions
+            if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
+                # Don't start new playback in single mode after first video
+                pass
+            else:
+                # For any media state (NONE, STOPPED, ENDED), if scene is active and we're not playing, start
+                if media_state in [obs.OBS_MEDIA_STATE_NONE, obs.OBS_MEDIA_STATE_STOPPED, obs.OBS_MEDIA_STATE_ENDED]:
+                    log(f"Scene active but not playing (state: {media_state}), starting playback")
+                    
+                    # In loop mode, clear the loop video to select a new random one
+                    if playback_mode == PLAYBACK_MODE_LOOP and get_loop_video_id():
+                        log("Loop mode: Clearing previous loop video to select new random video")
+                        set_loop_video_id(None)
+                    
+                    start_next_video()
+                    return
+        
         # Handle different states
         if media_state == obs.OBS_MEDIA_STATE_PLAYING:
             handle_playing_state()
