@@ -705,6 +705,10 @@ def handle_ended_state():
         
         start_next_video()
     elif is_scene_active() and get_cached_videos():
+        # Check if we're in single mode and already played first video
+        if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
+            # Don't start new playback in single mode after first video
+            return
         # Not playing but scene is active and we have videos - start playback
         log("Scene active and videos available, starting playback")
         start_next_video()
@@ -754,6 +758,10 @@ def handle_none_state():
     if is_scene_active() and not is_playing():
         # Only start if we have videos available
         if get_cached_videos():
+            # Check if we're in single mode and already played first video
+            if get_playback_mode() == PLAYBACK_MODE_SINGLE and is_first_video_played():
+                # Don't start new playback in single mode after first video
+                return
             log("Scene active and videos available, starting playback")
             start_next_video()
     elif is_scene_active() and is_playing():
