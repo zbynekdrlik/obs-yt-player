@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.2.15"  # Fixed continuous mode to correctly stop when scene is inactive
+SCRIPT_VERSION = "3.2.16"  # Prepare for PR merge - remove development test scripts
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
