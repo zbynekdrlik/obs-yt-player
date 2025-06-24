@@ -42,7 +42,6 @@ from ytfast_modules.state_handlers import (
 _playback_timer = None
 _waiting_for_videos_logged = False
 _last_cached_count = 0
-_first_run = True
 _sources_verified = False
 _initial_state_checked = False
 
@@ -97,7 +96,7 @@ def playback_controller():
     Main playback controller - runs on main thread via timer.
     Manages video playback state and transitions.
     """
-    global _waiting_for_videos_logged, _last_cached_count, _first_run, _initial_state_checked
+    global _waiting_for_videos_logged, _last_cached_count, _initial_state_checked
     
     try:
         # Priority 1: Check if we're shutting down
@@ -141,14 +140,10 @@ def playback_controller():
         if current_count != _last_cached_count:
             if _last_cached_count == 0 and current_count > 0:
                 log(f"First video available! Starting playback with {current_count} video(s)")
-                # Don't return here! Continue to process the state
             elif current_count > _last_cached_count:
                 log(f"New video added to cache. Total videos: {current_count}")
             _last_cached_count = current_count
             _waiting_for_videos_logged = False
-            # Reset first run flag when videos become available
-            if current_count > 0:
-                _first_run = True
         
         if not cached_videos:
             # Log waiting message only once
@@ -162,18 +157,6 @@ def playback_controller():
         
         # Get current media state
         media_state = get_media_state(MEDIA_SOURCE_NAME)
-        
-        # Debug logging on first run with videos
-        if _first_run and cached_videos:
-            _first_run = False
-            state_names = {
-                obs.OBS_MEDIA_STATE_NONE: "NONE",
-                obs.OBS_MEDIA_STATE_PLAYING: "PLAYING", 
-                obs.OBS_MEDIA_STATE_STOPPED: "STOPPED",
-                obs.OBS_MEDIA_STATE_ENDED: "ENDED"
-            }
-            state_name = state_names.get(media_state, f"UNKNOWN({media_state})")
-            log(f"DEBUG: Media state = {state_name}, is_playing = {is_playing()}, scene_active = {is_scene_active()}")
         
         # Handle initial state mismatch (media playing but script thinks it's not)
         if not _initial_state_checked:
@@ -219,7 +202,7 @@ def playback_controller():
                         schedule_title_clear_from_current(remaining_ms)
                 return  # Let it play out
         
-        # NEW: Check if we should start playback when scene is active but not playing
+        # Check if we should start playback when scene is active but not playing
         # This handles the case where scene becomes active but media state isn't NONE
         if is_scene_active() and not is_playing() and cached_videos:
             # Check mode restrictions
@@ -229,7 +212,7 @@ def playback_controller():
             else:
                 # For any media state (NONE, STOPPED, ENDED), if scene is active and we're not playing, start
                 if media_state in [obs.OBS_MEDIA_STATE_NONE, obs.OBS_MEDIA_STATE_STOPPED, obs.OBS_MEDIA_STATE_ENDED]:
-                    log(f"Scene active but not playing (state: {media_state}), starting playback")
+                    log(f"Scene active but not playing, starting playback")
                     
                     # In loop mode, clear the loop video to select a new random one
                     if playback_mode == PLAYBACK_MODE_LOOP and get_loop_video_id():
