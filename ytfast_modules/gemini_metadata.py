@@ -19,6 +19,8 @@ GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/g
 GEMINI_TIMEOUT = 30  # Increased timeout for Google Search grounding
 MAX_RETRIES = 2
 
+# Version 3.3.3 - Improve prompt to handle medleys and album names correctly
+
 def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """
     Extract artist and song metadata using Google Gemini API with Google Search grounding.
@@ -48,19 +50,26 @@ CRITICAL: Respond with ONLY a valid JSON object. No explanatory text allowed.
 Return EXACTLY this format:
 {{"artist": "Primary Artist Name", "song": "Song Title"}}
 
-RULES:
-1. Search for the YouTube URL to find the actual artist
-2. For worship/church music, identify the performing artist/band
+IMPORTANT RULES:
+1. Search for the YouTube URL to find the actual artist and song information
+2. For worship/church music, identify the performing artist/band (not the church name)
 3. Remove feat./ft./featuring from artist name
 4. Remove (Official Video), (Live), etc from song titles
-5. Keep "/" in multi-part titles like "Faithful Then / Faithful Now"
-6. If no artist found, return empty string for artist
+5. For single songs with "/" in their actual title (like "Faithful Then / Faithful Now"), keep the full title
+6. NEVER include album names in the song title - return only the actual song name
+7. If the video is a medley or contains multiple distinct songs, return ONLY the first song
+8. If no artist found, return empty string for artist
 
 Examples:
 - "HOLYGHOST | Sons Of Sunday" → {{"artist": "Sons Of Sunday", "song": "HOLYGHOST"}}
 - "'COME RIGHT NOW' | Official Video" → {{"artist": "Planetshakers", "song": "COME RIGHT NOW"}}
+- "Supernatural Love | Show Me Your Glory - Live At Chapel | Planetshakers Official Music Video" → {{"artist": "Planetshakers", "song": "Supernatural Love"}}
+- "Forever | Live At Chapel" → {{"artist": "Kari Jobe", "song": "Forever"}}
+- "The Blessing (Live) | Elevation Worship" → {{"artist": "Elevation Worship", "song": "The Blessing"}}
+- "Faithful Then / Faithful Now | Elevation Worship" → {{"artist": "Elevation Worship", "song": "Faithful Then / Faithful Now"}}
+- "There Is A King/What Would You Do | Live | Elevation Worship" → {{"artist": "Elevation Worship", "song": "There Is A King"}}
 
-REMEMBER: Return ONLY valid JSON, nothing else."""
+REMEMBER: Return ONLY valid JSON, nothing else. The song field should contain ONLY the song title, never album names or other metadata."""
 
     # Add system instruction to enforce JSON-only responses
     request_body = {
