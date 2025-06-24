@@ -503,6 +503,11 @@ def playback_controller():
                 if current_video_id:
                     set_current_playback_video_id(current_video_id)
                     log(f"Identified pre-loaded video: {current_video_id}")
+                    
+                    # If we're in loop mode, set this as the loop video
+                    if get_playback_mode() == PLAYBACK_MODE_LOOP and not get_loop_video_id():
+                        set_loop_video_id(current_video_id)
+                        log(f"Loop mode - Set pre-loaded video as loop video: {current_video_id}")
                 
                 # Check if we need to fade out the title for pre-loaded video
                 current_time = get_media_time(MEDIA_SOURCE_NAME)
@@ -564,6 +569,11 @@ def handle_playing_state():
             if current_video_id:
                 set_current_playback_video_id(current_video_id)
                 log(f"Identified current video: {current_video_id}")
+                
+                # If we're in loop mode and no loop video set, set this one
+                if get_playback_mode() == PLAYBACK_MODE_LOOP and not get_loop_video_id():
+                    set_loop_video_id(current_video_id)
+                    log(f"Loop mode - Set current video as loop video: {current_video_id}")
         
         return
     
@@ -635,7 +645,34 @@ def handle_ended_state():
         # Prevent loop mode from firing multiple times
         if playback_mode == PLAYBACK_MODE_LOOP and _loop_restart_pending:
             return  # Already scheduled a restart
+        
+        # Check if we need to loop
+        if playback_mode == PLAYBACK_MODE_LOOP:
+            # Get the video that just ended
+            current_video_id = get_current_playback_video_id()
+            if not current_video_id and _is_preloaded_video:
+                # Try to identify the pre-loaded video
+                current_video_id = get_current_video_from_media_source()
             
+            if current_video_id:
+                # Make sure it's set as the loop video
+                if not get_loop_video_id():
+                    set_loop_video_id(current_video_id)
+                    log(f"Loop mode - Set ended video as loop video: {current_video_id}")
+                
+                log("Loop mode: Replaying the same video")
+                _loop_restart_pending = True
+                # Mark pre-loaded video as handled if it was one
+                if _is_preloaded_video:
+                    _preloaded_video_handled = True
+                    _is_preloaded_video = False
+                # Schedule restart with a single timer
+                schedule_loop_restart(current_video_id)
+                return
+            else:
+                log("Loop mode: Could not identify video to loop, selecting next")
+        
+        # Handle non-loop modes or when we couldn't identify the video
         if not _preloaded_video_handled and _is_preloaded_video:
             log("Pre-loaded video ended, starting playlist")
             _preloaded_video_handled = True
@@ -646,18 +683,6 @@ def handle_ended_state():
                 log("Single mode: First video ended, stopping playback")
                 stop_current_playback()
                 return
-            elif playback_mode == PLAYBACK_MODE_LOOP:
-                # In loop mode, replay the same video
-                loop_video_id = get_loop_video_id()
-                if loop_video_id:
-                    log("Loop mode: Replaying the same video")
-                    _loop_restart_pending = True
-                    # Schedule restart with a single timer
-                    schedule_loop_restart(loop_video_id)
-                    return
-                else:
-                    log("Loop mode: No video ID set, selecting next video")
-                    # Will be set when we start the next video
             else:
                 # Continuous mode or first video not played yet
                 log("Playback ended, starting next video")
@@ -690,9 +715,9 @@ def schedule_loop_restart(video_id):
         # Don't clear _loop_restart_pending here - wait until video is actually playing
         start_specific_video(video_id)
     
-    # Schedule the restart
+    # Schedule the restart with a longer delay to ensure media source is ready
     _loop_restart_timer = restart_callback
-    obs.timer_add(_loop_restart_timer, 100)
+    obs.timer_add(_loop_restart_timer, 250)  # Increased from 100ms to 250ms
 
 def handle_stopped_state():
     """Handle video stopped state."""
@@ -954,7 +979,10 @@ def delayed_duration_check_callback():
         schedule_title_clear(duration)
         log(f"Got duration after delay: {duration/1000:.1f}s")
     else:
-        log("WARNING: Still no duration after delay")
+        # Try again after another delay
+        log("No duration yet, trying again...")
+        _duration_check_timer = delayed_duration_check_callback
+        obs.timer_add(_duration_check_timer, 500)
 
 def schedule_title_clear_with_delay():
     """Schedule title clear after a short delay to ensure accurate duration."""
