@@ -1,196 +1,137 @@
 """
-Audio normalization for OBS YouTube Player (Windows-only).
+Audio normalization for OBS YouTube Player.
 Normalizes audio to -14 LUFS using FFmpeg.
 """
 
-import os
-import re
-import json
 import subprocess
+import os
+import json
+from pathlib import Path
 
-from config import NORMALIZE_TIMEOUT
-from logger import log
-from state import get_cache_dir
-from utils import get_ffmpeg_path, sanitize_filename
+from ytfast_modules.logger import log
+from ytfast_modules.config import FFMPEG_FILENAME, TOOLS_SUBDIR, NORMALIZE_TIMEOUT
+from ytfast_modules.state import get_cache_dir
 
-def extract_loudnorm_stats(ffmpeg_output):
-    """Extract loudnorm statistics from FFmpeg output."""
+def get_ffmpeg_path():
+    """Get full path to FFmpeg executable."""
+    return os.path.join(get_cache_dir(), TOOLS_SUBDIR, FFMPEG_FILENAME)
+
+def analyze_loudness(input_path):
+    """Analyze audio loudness using FFmpeg loudnorm filter."""
+    ffmpeg_path = get_ffmpeg_path()
+    
+    cmd = [
+        ffmpeg_path,
+        '-i', input_path,
+        '-af', 'loudnorm=I=-14:LRA=11:TP=-1.5:print_format=json',
+        '-f', 'null',
+        '-'
+    ]
+    
     try:
-        # Find JSON output in stderr
-        json_start = ffmpeg_output.rfind('{')
-        json_end = ffmpeg_output.rfind('}') + 1
-        
-        if json_start == -1 or json_end == 0:
-            log("No JSON data found in FFmpeg output")
-            return None
-        
-        json_str = ffmpeg_output[json_start:json_end]
-        stats = json.loads(json_str)
-        
-        # Verify required fields
-        required_fields = ['input_i', 'input_tp', 'input_lra', 'input_thresh', 'target_offset']
-        for field in required_fields:
-            if field not in stats:
-                log(f"Missing required field: {field}")
-                return None
-        
-        return stats
-        
-    except json.JSONDecodeError as e:
-        log(f"Failed to parse loudnorm JSON: {e}")
-        return None
-    except Exception as e:
-        log(f"Error extracting loudnorm stats: {e}")
-        return None
-
-def normalize_audio(input_path, video_id, metadata, gemini_failed=False):
-    """
-    Normalize audio to -14 LUFS using FFmpeg's loudnorm filter.
-    Returns path to normalized file or None on failure.
-    If gemini_failed is True, adds '_gf' marker to filename.
-    """
-    try:
-        cache_dir = get_cache_dir()
-        
-        # Generate output filename based on metadata
-        safe_song = sanitize_filename(metadata.get('song', 'Unknown'))
-        safe_artist = sanitize_filename(metadata.get('artist', 'Unknown'))
-        
-        # Add gemini failed marker if needed
-        if gemini_failed:
-            output_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized_gf.mp4"
-        else:
-            output_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized.mp4"
-        
-        output_path = os.path.join(cache_dir, output_filename)
-        
-        # Skip if already normalized
-        if os.path.exists(output_path):
-            log(f"Already normalized: {output_filename}")
-            return output_path
-        
-        # Check if we need to rename an existing file (if gemini status changed)
-        # This handles the case where a file was processed before but now we know Gemini failed
-        if gemini_failed:
-            # Check if non-gf version exists
-            non_gf_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized.mp4"
-            non_gf_path = os.path.join(cache_dir, non_gf_filename)
-            if os.path.exists(non_gf_path):
-                try:
-                    os.rename(non_gf_path, output_path)
-                    log(f"Renamed existing file to mark Gemini failure: {output_filename}")
-                    return output_path
-                except Exception as e:
-                    log(f"Error renaming file: {e}")
-        
-        log(f"Starting normalization: {metadata['artist']} - {metadata['song']}")
-        
-        # First pass: Analyze audio
-        log("Running first pass audio analysis...")
-        analysis_cmd = [
-            get_ffmpeg_path(),
-            '-i', input_path,
-            '-af', 'loudnorm=I=-14:TP=-1:LRA=11:print_format=json',
-            '-f', 'null',
-            '-'
-        ]
-        
-        # Hide console window on Windows
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-        
-        # Run analysis
         result = subprocess.run(
-            analysis_cmd,
+            cmd,
             capture_output=True,
             text=True,
-            startupinfo=startupinfo,
             timeout=NORMALIZE_TIMEOUT
         )
         
-        if result.returncode != 0:
-            log(f"FFmpeg analysis failed: {result.stderr}")
-            return None
+        # Parse loudnorm output from stderr
+        lines = result.stderr.split('\n')
+        json_start = False
+        json_data = []
         
-        # Extract loudnorm stats from output
-        stats = extract_loudnorm_stats(result.stderr)
-        if not stats:
-            log("Failed to extract loudnorm statistics")
-            return None
+        for line in lines:
+            if '{' in line:
+                json_start = True
+            if json_start:
+                json_data.append(line)
+            if '}' in line and json_start:
+                break
         
-        log(f"Audio analysis complete - Input: {stats['input_i']} LUFS")
-        
-        # Second pass: Apply normalization
-        log("Running second pass normalization...")
-        
-        # Build normalization filter with measured values
-        loudnorm_filter = (
-            f"loudnorm=I=-14:TP=-1:LRA=11:"
-            f"measured_I={stats['input_i']}:"
-            f"measured_TP={stats['input_tp']}:"
-            f"measured_LRA={stats['input_lra']}:"
-            f"measured_thresh={stats['input_thresh']}:"
-            f"offset={stats['target_offset']}"
-        )
-        
-        normalize_cmd = [
-            get_ffmpeg_path(),
-            '-i', input_path,
-            '-af', loudnorm_filter,
-            '-c:v', 'copy',  # Copy video stream without re-encoding
-            '-c:a', 'aac',   # Re-encode audio to AAC
-            '-b:a', '192k',  # Audio bitrate
-            '-y',  # Overwrite output
-            output_path
-        ]
-        
-        # Show progress for long operation with hidden window
-        process = subprocess.Popen(
-            normalize_cmd,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            startupinfo=startupinfo
-        )
-        
-        # Monitor progress
-        for line in process.stderr:
-            if 'time=' in line:
-                # Extract time progress
-                time_match = re.search(r'time=(\d+):(\d+):(\d+)', line)
-                if time_match:
-                    hours, minutes, seconds = map(int, time_match.groups())
-                    total_seconds = hours * 3600 + minutes * 60 + seconds
-                    # Log progress every 30 seconds
-                    if total_seconds % 30 == 0:
-                        log(f"Normalizing... {total_seconds}s processed")
-        
-        process.wait()
-        
-        if process.returncode != 0:
-            log(f"FFmpeg normalization failed")
-            return None
-        
-        # Verify output file
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-            log(f"Normalization complete: {output_filename} ({file_size_mb:.1f} MB)")
-            
-            # Clean up temp file
-            try:
-                os.remove(input_path)
-                log(f"Removed temp file: {os.path.basename(input_path)}")
-            except Exception as e:
-                log(f"Error removing temp file: {e}")
-            
-            return output_path
+        if json_data:
+            loudness_data = json.loads('\n'.join(json_data))
+            return loudness_data
         else:
-            log("Normalization failed - output file missing or empty")
+            log("No loudness data found in FFmpeg output")
             return None
             
     except subprocess.TimeoutExpired:
-        log("Normalization timeout after 5 minutes")
+        log(f"Loudness analysis timed out after {NORMALIZE_TIMEOUT}s")
+        return None
+    except json.JSONDecodeError as e:
+        log(f"Failed to parse loudness data: {e}")
         return None
     except Exception as e:
-        log(f"Normalization error: {e}")
+        log(f"Error analyzing loudness: {e}")
         return None
+
+def normalize_audio(input_path, output_path):
+    """Normalize audio to -14 LUFS using two-pass loudnorm."""
+    ffmpeg_path = get_ffmpeg_path()
+    
+    # First pass: analyze
+    log("Analyzing audio loudness...")
+    loudness_data = analyze_loudness(input_path)
+    
+    if not loudness_data:
+        log("Falling back to simple normalization")
+        # Fallback to simple volume adjustment
+        cmd = [
+            ffmpeg_path,
+            '-i', input_path,
+            '-c:v', 'copy',
+            '-af', 'loudnorm=I=-14:LRA=11:TP=-1.5',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-movflags', '+faststart',
+            '-y',
+            output_path
+        ]
+    else:
+        # Second pass: normalize with measured values
+        measured_I = loudness_data.get('input_i', '-70.0')
+        measured_LRA = loudness_data.get('input_lra', '0.0')
+        measured_TP = loudness_data.get('input_tp', '-1.5')
+        measured_thresh = loudness_data.get('input_thresh', '-70.0')
+        target_offset = loudness_data.get('target_offset', '0.0')
+        
+        log(f"Normalizing: Input I={measured_I} LUFS")
+        
+        cmd = [
+            ffmpeg_path,
+            '-i', input_path,
+            '-c:v', 'copy',
+            '-af', f'loudnorm=I=-14:LRA=11:TP=-1.5:measured_I={measured_I}:measured_LRA={measured_LRA}:measured_TP={measured_TP}:measured_thresh={measured_thresh}:offset={target_offset}:linear=true',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-movflags', '+faststart',
+            '-y',
+            output_path
+        ]
+    
+    try:
+        # Run normalization
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=NORMALIZE_TIMEOUT
+        )
+        
+        if result.returncode == 0:
+            log("Audio normalization complete")
+            return True
+        else:
+            log(f"FFmpeg normalization failed: {result.stderr}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        log(f"Normalization timed out after {NORMALIZE_TIMEOUT}s")
+        # Clean up partial file
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        return False
+    except Exception as e:
+        log(f"Error during normalization: {e}")
+        return False

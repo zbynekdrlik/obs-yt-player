@@ -6,14 +6,14 @@ Handles existing cache scanning and cleanup.
 import os
 from pathlib import Path
 
-from logger import log
-from state import (
+from ytfast_modules.logger import log
+from ytfast_modules.state import (
     get_cache_dir, get_cached_videos, add_cached_video, 
     remove_cached_video, get_playlist_video_ids,
     is_video_being_processed, get_cached_video_info,
     get_current_playback_video_id
 )
-from utils import validate_youtube_id
+from ytfast_modules.utils import validate_youtube_id
 
 def validate_video_file(file_path):
     """Check if video file is valid and playable."""

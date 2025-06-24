@@ -1,234 +1,149 @@
 """
-Video downloading for OBS YouTube Player (Windows-only).
-Downloads videos using yt-dlp and manages the processing pipeline.
+Video downloading for OBS YouTube Player.
+Handles downloading videos using yt-dlp.
 """
 
-import os
-import re
 import subprocess
-import threading
-import queue
+import os
+import json
+from pathlib import Path
 
-from config import MAX_RESOLUTION, DOWNLOAD_TIMEOUT, SCRIPT_VERSION
-from logger import log
-from state import (
-    video_queue, process_videos_thread, should_stop_threads,
-    get_cache_dir, is_video_cached, add_cached_video,
-    download_progress_milestones
+from ytfast_modules.logger import log
+from ytfast_modules.config import (
+    YTDLP_FILENAME, TOOLS_SUBDIR, MAX_RESOLUTION, DOWNLOAD_TIMEOUT
 )
-from utils import get_ytdlp_path, get_ffmpeg_path
-from metadata import get_video_metadata
-from normalize import normalize_audio
+from ytfast_modules.state import get_cache_dir, download_progress_milestones
+from ytfast_modules.utils import sanitize_filename
 
-def download_video(video_id, title):
-    """Download video to temporary file."""
-    cache_dir = get_cache_dir()
-    output_path = os.path.join(cache_dir, f"{video_id}_temp.mp4")
+def get_ytdlp_path():
+    """Get full path to yt-dlp executable."""
+    return os.path.join(get_cache_dir(), TOOLS_SUBDIR, YTDLP_FILENAME)
+
+def progress_hook(line, video_id):
+    """Parse yt-dlp progress output and log milestones."""
+    try:
+        # Look for download percentage
+        if '[download]' in line and '%' in line:
+            # Extract percentage
+            parts = line.split()
+            for part in parts:
+                if part.endswith('%'):
+                    try:
+                        percent = float(part[:-1])
+                        # Log at 25%, 50%, 75%, 100%
+                        milestone = int(percent / 25) * 25
+                        if milestone > 0 and milestone not in download_progress_milestones.get(video_id, set()):
+                            if video_id not in download_progress_milestones:
+                                download_progress_milestones[video_id] = set()
+                            download_progress_milestones[video_id].add(milestone)
+                            log(f"Download progress: {milestone}%")
+                    except ValueError:
+                        pass
+    except Exception:
+        pass  # Ignore parsing errors
+
+def download_video(video_id, output_path):
+    """Download a video using yt-dlp."""
+    ytdlp_path = get_ytdlp_path()
     
-    # Remove existing temp file
-    if os.path.exists(output_path):
-        try:
-            os.remove(output_path)
-            log(f"Removed existing temp file: {output_path}")
-        except Exception as e:
-            log(f"Error removing temp file: {e}")
+    # Prepare yt-dlp command
+    cmd = [
+        ytdlp_path,
+        f'https://youtube.com/watch?v={video_id}',
+        '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]',
+        '--merge-output-format', 'mp4',
+        '-o', output_path,
+        '--no-playlist',
+        '--no-warnings',
+        '--quiet',
+        '--progress',
+        '--newline'
+    ]
     
     try:
-        # First, get video info to log quality
-        info_cmd = [
-            get_ytdlp_path(),
-            '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
-            '--print', '%(width)s,%(height)s,%(fps)s,%(vcodec)s,%(acodec)s',
-            '--no-warnings',
-            f'https://www.youtube.com/watch?v={video_id}'
-        ]
+        log(f"Starting download: {video_id}")
         
-        # Get video info (Windows-specific subprocess settings)
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
-        
-        try:
-            info_result = subprocess.run(
-                info_cmd,
-                capture_output=True,
-                text=True,
-                startupinfo=startupinfo,
-                timeout=10
-            )
-            
-            if info_result.returncode == 0 and info_result.stdout.strip():
-                info_parts = info_result.stdout.strip().split(',')
-                if len(info_parts) >= 2:
-                    width, height = info_parts[0], info_parts[1]
-                    fps = info_parts[2] if len(info_parts) > 2 else "?"
-                    vcodec = info_parts[3] if len(info_parts) > 3 else "?"
-                    acodec = info_parts[4] if len(info_parts) > 4 else "?"
-                    log(f"Video quality: {width}x{height} @ {fps}fps, video: {vcodec}, audio: {acodec}")
-        except Exception as e:
-            log(f"Could not get video info: {e}")
-        
-        # Now download the video
-        cmd = [
-            get_ytdlp_path(),
-            '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
-            '--merge-output-format', 'mp4',
-            '--ffmpeg-location', get_ffmpeg_path(),
-            '--no-playlist',
-            '--no-warnings',
-            '--progress',
-            '--newline',
-            '-o', output_path,
-            f'https://www.youtube.com/watch?v={video_id}'
-        ]
-        
-        log(f"Starting download: {title} ({video_id})")
-        
-        # Reset progress tracking for this video
+        # Clear progress tracking for this video
         download_progress_milestones[video_id] = set()
         
-        # Start download process with hidden window
+        # Run yt-dlp with timeout
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            startupinfo=startupinfo
+            text=True,
+            bufsize=1,
+            universal_newlines=True
         )
         
-        # Parse progress output
+        # Read output line by line for progress
         for line in process.stdout:
-            if '[download]' in line:
-                # Skip fragment/part download progress lines
-                if any(skip in line.lower() for skip in ['fragment', 'downloading', 'destination:']):
-                    continue
-                # Only parse percentage lines that show actual download progress
-                if '%' in line and 'of' in line:
-                    parse_progress(line, video_id, title)
+            line = line.strip()
+            if line:
+                progress_hook(line, video_id)
         
-        # Wait for process to complete
+        # Wait for completion
         process.wait(timeout=DOWNLOAD_TIMEOUT)
         
-        if process.returncode != 0:
-            log(f"Download failed for {title}: return code {process.returncode}")
-            return None
+        # Clean up progress tracking
+        if video_id in download_progress_milestones:
+            del download_progress_milestones[video_id]
         
-        # Verify file exists and has size
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-            log(f"Downloaded successfully: {title} ({file_size_mb:.1f} MB)")
-            return output_path
+        if process.returncode == 0:
+            log(f"Download complete: {video_id}")
+            return True
         else:
-            log(f"Download failed - file missing or empty: {title}")
-            return None
+            log(f"Download failed with return code: {process.returncode}")
+            return False
             
     except subprocess.TimeoutExpired:
-        log(f"Download timeout for {title} after {DOWNLOAD_TIMEOUT} seconds")
-        try:
-            process.kill()
-        except:
-            pass
+        log(f"Download timed out after {DOWNLOAD_TIMEOUT}s")
+        process.kill()
+        # Clean up partial download
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        return False
+    except Exception as e:
+        log(f"Download error: {e}")
+        return False
+
+def get_video_metadata(video_id):
+    """Get video title and metadata using yt-dlp."""
+    ytdlp_path = get_ytdlp_path()
+    
+    cmd = [
+        ytdlp_path,
+        f'https://youtube.com/watch?v={video_id}',
+        '--dump-json',
+        '--no-warnings',
+        '--no-playlist'
+    ]
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            metadata = json.loads(result.stdout)
+            return {
+                'title': metadata.get('title', 'Unknown'),
+                'uploader': metadata.get('uploader', 'Unknown'),
+                'duration': metadata.get('duration', 0)
+            }
+        else:
+            log(f"Failed to get metadata: {result.stderr}")
+            return None
+            
+    except json.JSONDecodeError:
+        log("Failed to parse video metadata")
+        return None
+    except subprocess.TimeoutExpired:
+        log("Metadata fetch timed out")
         return None
     except Exception as e:
-        log(f"Error downloading {title}: {e}")
+        log(f"Error getting metadata: {e}")
         return None
-    finally:
-        # Clean up progress tracking
-        download_progress_milestones.pop(video_id, None)
-
-def parse_progress(line, video_id, title):
-    """Parse yt-dlp progress output and log at milestones."""
-    # Look for: [download]  XX.X% of ~XXX.XXMiB at XXX.XXKiB/s
-    match = re.search(r'\[download\]\s+(\d+\.?\d*)%', line)
-    if match:
-        percent = float(match.group(1))
-        
-        # Get milestone set for this video
-        milestones = download_progress_milestones.get(video_id, set())
-        
-        # If we've already logged 50%, ignore further progress
-        if 50 in milestones:
-            return
-        
-        # Log only at 50%
-        if percent >= 50 and 50 not in milestones:
-            log(f"Downloading {title}: 50%")
-            milestones.add(50)
-            download_progress_milestones[video_id] = milestones
-
-def process_videos_worker():
-    """Process videos serially - download, metadata, normalize."""
-    while not should_stop_threads():
-        try:
-            # Get video from queue (timeout to check stop_threads)
-            try:
-                video_info = video_queue.get(timeout=1)
-            except queue.Empty:
-                continue
-            
-            # Process this video through all stages
-            video_id = video_info['id']
-            title = video_info['title']
-            
-            # Skip if already fully processed
-            if is_video_cached(video_id):
-                log(f"Skipping already cached video: {title}")
-                continue
-            
-            # Download video
-            temp_path = download_video(video_id, title)
-            if not temp_path:
-                log(f"Failed to download: {title}")
-                continue
-            
-            # Get metadata (from metadata module) - UPDATED to handle 4 return values
-            song, artist, metadata_source, gemini_failed = get_video_metadata(temp_path, title, video_id)
-            
-            # Log metadata source with detailed results
-            log(f"Metadata from {metadata_source}: {artist} - {song}")
-            if gemini_failed:
-                log(f"Note: Gemini extraction failed for this video")
-            
-            # Store metadata for normalization
-            metadata = {
-                'song': song,
-                'artist': artist,
-                'yt_title': title
-            }
-            
-            # Log final metadata decision
-            log(f"=== METADATA RESULT for '{title}' ===")
-            log(f"    Artist: {artist}")
-            log(f"    Song: {song}")
-            log(f"    Source: {metadata_source}")
-            log(f"    Gemini Failed: {gemini_failed}")
-            log(f"=====================================")
-            
-            # Normalize audio - PASS GEMINI_FAILED FLAG
-            normalized_path = normalize_audio(temp_path, video_id, metadata, gemini_failed)
-            if not normalized_path:
-                log(f"Failed to normalize: {title}")
-                continue
-            
-            # Update cached videos registry - include gemini_failed flag
-            add_cached_video(video_id, {
-                'path': normalized_path,
-                'song': metadata['song'],
-                'artist': metadata['artist'],
-                'normalized': True,
-                'gemini_failed': gemini_failed
-            })
-            
-            log(f"Video ready for playback: {metadata['artist']} - {metadata['song']}")
-            
-        except Exception as e:
-            log(f"Error processing video: {e}")
-    
-    log("Video processing thread exiting")
-
-def start_video_processing_thread():
-    """Start the video processing thread."""
-    global process_videos_thread
-    import state
-    state.process_videos_thread = threading.Thread(target=process_videos_worker, daemon=True)
-    state.process_videos_thread.start()
