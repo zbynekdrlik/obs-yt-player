@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.2.9"  # Improved loop mode fix with better media source handling
+SCRIPT_VERSION = "3.2.10"  # Cleaned up script UI - removed help text, moved sync button to bottom
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
