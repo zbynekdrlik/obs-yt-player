@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.3.1"  # Cleanup debug code and unused variables
+SCRIPT_VERSION = "3.3.2"  # Fix single mode playback issue when mode changed mid-playback
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))

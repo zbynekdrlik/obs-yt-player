@@ -211,14 +211,15 @@ def handle_ended_state():
         else:
             # Regular video ended (not pre-loaded)
             # Check playback mode to determine what to do next
-            if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
-                log("Single mode: First video ended, stopping playback")
+            if playback_mode == PLAYBACK_MODE_SINGLE:
+                # In single mode, always stop after ANY video ends
+                log("Single mode: Video ended, stopping playback")
                 # Import here to avoid circular dependency
                 from ytfast_modules.playback_controller import stop_current_playback
                 stop_current_playback()
                 return
             else:
-                # Continuous mode or first video not played yet
+                # Continuous mode - continue to next video
                 log("Playback ended, starting next video")
         
         # Import here to avoid circular dependency
