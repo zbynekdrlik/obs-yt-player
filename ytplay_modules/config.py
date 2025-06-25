@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.5.1"  # Module migration complete
+SCRIPT_VERSION = "3.5.2"  # Fixed SCENE_NAME import issue
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context
