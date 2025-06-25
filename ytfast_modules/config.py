@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.4.0"  # Added audio-only mode for minimal video quality
+SCRIPT_VERSION = "3.4.1"  # Updated Gemini API key label for clarity
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
