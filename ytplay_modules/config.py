@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.5.9"  # Fixed property callback crash during script unload
+SCRIPT_VERSION = "3.6.0"  # True multi-instance support with state isolation
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context
