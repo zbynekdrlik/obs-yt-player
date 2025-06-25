@@ -32,6 +32,7 @@ from config import (
 )
 from logger import log, cleanup_logging
 from state import (
+    initialize_script_context, cleanup_state,
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
     is_tools_ready, set_stop_threads,
@@ -42,6 +43,10 @@ from state import (
     is_audio_only_mode, set_audio_only_mode,
     set_script_name, set_script_dir
 )
+
+# v3.6.0: Initialize script-specific state using the script path as unique identifier
+# This ensures each script instance has its own isolated state
+state = initialize_script_context(SCRIPT_PATH)
 
 # Initialize script identification in state module
 set_script_name(SCRIPT_NAME)
@@ -314,6 +319,9 @@ def script_load(settings):
     _global_settings = settings
     _is_unloading = False
     
+    # v3.6.0: Ensure script context is properly initialized
+    initialize_script_context(SCRIPT_PATH)
+    
     set_stop_threads(False)
     
     log(f"Script version {SCRIPT_VERSION} loaded")
@@ -373,6 +381,9 @@ def script_unload():
     # Clean up logging
     cleanup_logging()
     
+    # v3.6.0: Clean up script-specific state
+    cleanup_state(SCRIPT_PATH)
+    
     log("Script unloaded")
 
 # ===== CALLBACK FUNCTIONS =====
@@ -398,6 +409,8 @@ def sync_now_callback(props, prop):
 def start_worker_threads():
     """Start all background worker threads."""
     log("Starting worker threads...")
+    
+    # v3.6.0: Each module's start function will handle script context inheritance
     
     # Start threads in order
     start_tools_thread()
