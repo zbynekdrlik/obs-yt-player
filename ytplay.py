@@ -45,10 +45,10 @@ from state import (
 )
 
 # v3.6.0: Initialize script-specific state using the script path as unique identifier
-# This ensures each script instance has its own isolated state
+# This MUST be done before any state access
 state = initialize_script_context(SCRIPT_PATH)
 
-# Initialize script identification in state module
+# Now we can safely set script identification in state module
 set_script_name(SCRIPT_NAME)
 set_script_dir(SCRIPT_DIR)
 
@@ -320,6 +320,7 @@ def script_load(settings):
     _is_unloading = False
     
     # v3.6.0: Ensure script context is properly initialized
+    # This was already done at module level, but ensure it's current
     initialize_script_context(SCRIPT_PATH)
     
     set_stop_threads(False)
