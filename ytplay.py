@@ -77,10 +77,11 @@ def check_configuration_warnings():
     if not scene_source:
         warnings.append(f"Scene '{SCRIPT_NAME}' not found")
     else:
+        # Get scene from source before releasing
+        scene = obs.obs_scene_from_source(scene_source)
         obs.obs_source_release(scene_source)
         
         # Check for missing sources within the scene
-        scene = obs.obs_scene_from_source(scene_source) if scene_source else None
         if scene:
             media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
             if not media_source:
