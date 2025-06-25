@@ -98,7 +98,7 @@ def script_properties():
     obs.obs_properties_add_text(
         props, 
         "gemini_api_key", 
-        "Google Gemini API Key", 
+        "Gemini API Key (for artist/song name detection)", 
         obs.OBS_TEXT_PASSWORD
     )
     
