@@ -16,10 +16,11 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **AI-Powered Metadata** (Optional): Google Gemini AI extracts accurate artist/song information
 - **Smart Title Parser**: Fallback parser ensures videos always play, even without Gemini
 - **Audio-Only Mode**: Option to download minimal video quality (144p) while preserving high audio quality
+- **True Multi-Instance Support** (v3.6.0): Run multiple scripts simultaneously without interference
 
 ### 🔧 Advanced Features
 - **Background Processing**: All heavy tasks run in separate threads (no OBS freezing)
-- **Multi-Instance Support**: Run multiple independent players sharing common modules
+- **Multi-Instance Support**: Run multiple independent players with complete state isolation
 - **Nested Scene Playback**: Videos play even when scene is nested within other scenes
 - **Scene Transition Support**: Proper handling with configurable delays
 - **Comprehensive Logging**: Both OBS console and file-based logs for debugging
@@ -134,13 +135,14 @@ While the script works perfectly without Gemini, using it provides significantly
 
 ### Multi-Instance Setup
 
-Run multiple independent players sharing the same modules:
+Run multiple independent players with complete state isolation (v3.6.0):
 
 1. Copy and rename the script (e.g., `yt_worship.py`, `yt_ambient.py`)
 2. Each instance automatically creates its own:
    - Scene name (matching the script name)
    - Cache directory (`yt_worship-cache/`, `yt_ambient-cache/`)
    - Settings and playlist configuration
+   - Isolated state that doesn't interfere with other instances
 3. All scripts share the common `ytplay_modules/` directory
 
 Example structure:
@@ -160,6 +162,7 @@ Benefits of shared modules:
 - **Consistent behavior**: All scripts use the same core logic
 - **Easy maintenance**: One set of modules to maintain
 - **Simplified setup**: Just copy the main script file
+- **Complete isolation**: Each script instance maintains its own state
 
 ### Nested Scene Usage
 
@@ -208,6 +211,12 @@ Note: The script works perfectly without a Gemini key - it will use the built-in
 - Files marked with `_gf` will retry Gemini on next startup
 - Check logs for metadata extraction details
 
+### Multi-Instance Issues?
+- Ensure each script has a unique filename
+- Check that scene names match script names
+- Verify logs show correct script identification
+- Each instance should have separate cache directories
+
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
 - Source names must match exactly
@@ -228,7 +237,7 @@ yt_worship.py             # Example additional instance
 ytplay_modules/           # SHARED modules for all scripts
 ├── config.py             # Configuration and constants
 ├── logger.py             # Thread-safe logging system
-├── state.py              # Global state management
+├── state.py              # Script-isolated state management
 ├── playback.py           # Playback mode logic
 ├── scene.py              # Scene activation detection
 ├── playlist.py           # YouTube playlist sync
@@ -240,6 +249,13 @@ ytplay_modules/           # SHARED modules for all scripts
 ```
 
 ## Recent Updates
+
+### v3.6.0 - True Multi-Instance Support
+- **FIXED**: Complete state isolation between script instances
+- **NEW**: Each script maintains its own isolated state
+- **IMPROVED**: Proper script identification in all logs
+- **ENHANCED**: Background threads correctly inherit script context
+- **MAINTAINED**: Full backward compatibility with existing setups
 
 ### v3.5.0 - Common Modules Architecture
 - **BREAKING**: Renamed default script from `ytfast.py` to `ytplay.py`
