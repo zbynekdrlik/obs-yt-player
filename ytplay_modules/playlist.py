@@ -101,6 +101,12 @@ def playlist_sync_worker():
             
             # Fetch playlist
             playlist_url = get_playlist_url()
+            
+            # Skip if no URL configured
+            if not playlist_url or playlist_url.strip() == "":
+                log("No playlist URL configured - skipping sync")
+                continue
+                
             videos = fetch_playlist_with_ytdlp(playlist_url)
             
             if not videos:
