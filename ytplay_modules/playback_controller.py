@@ -44,11 +44,12 @@ _waiting_for_videos_logged = False
 _last_cached_count = 0
 _sources_verified = False
 _initial_state_checked = False
+_scene_error_logged = False  # Track if we've already logged the missing scene error
 
 
 def verify_sources():
     """Verify that required sources exist and log their status."""
-    global _sources_verified
+    global _sources_verified, _scene_error_logged
     
     # Get scene name from state
     scene_name = get_script_name()
@@ -58,6 +59,8 @@ def verify_sources():
     scene_exists = scene_source is not None
     if scene_source:
         obs.obs_source_release(scene_source)
+        # Reset error flag if scene now exists
+        _scene_error_logged = False
     
     # Check media source
     media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
@@ -75,8 +78,8 @@ def verify_sources():
     if text_source:
         obs.obs_source_release(text_source)
     
-    # Log verification results
-    if not _sources_verified or not (scene_exists and media_exists and text_exists):
+    # Log verification results only once or when status changes
+    if not _sources_verified:
         log("=== SOURCE VERIFICATION ===")
         log(f"Scene '{scene_name}': {'✓ EXISTS' if scene_exists else '✗ MISSING'}")
         log(f"Media Source '{MEDIA_SOURCE_NAME}': {'✓ EXISTS' if media_exists else '✗ MISSING'} (type: {source_id})")
@@ -90,6 +93,11 @@ def verify_sources():
         
         log("==========================")
         _sources_verified = True
+    
+    # Log scene error only once
+    if not scene_exists and not _scene_error_logged:
+        log(f"ERROR: Required scene '{scene_name}' not found! Please create it.")
+        _scene_error_logged = True
     
     return scene_exists and media_exists and text_exists
 
@@ -413,11 +421,12 @@ def stop_current_playback():
 
 def start_playback_controller():
     """Start the playback controller timer."""
-    global _playback_timer, _initial_state_checked
+    global _playback_timer, _initial_state_checked, _scene_error_logged
     
     try:
-        # Reset initial state check
+        # Reset initial state check and error logging
         _initial_state_checked = False
+        _scene_error_logged = False
         
         # Remove existing timer if any
         if _playback_timer:
