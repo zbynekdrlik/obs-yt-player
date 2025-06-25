@@ -62,6 +62,9 @@ _warning_update_timer = None
 # Global settings reference for warnings update
 _global_settings = None
 
+# Track script unload state
+_is_unloading = False
+
 # ===== OBS SCRIPT INTERFACE =====
 def script_description():
     """Return script description for OBS."""
@@ -106,21 +109,27 @@ def check_configuration_warnings():
 
 def update_warning_visibility(props, prop, settings):
     """Update the visibility and content of warning label."""
-    if not props:
-        return
+    # v3.5.9: Safety check - don't access properties during unload
+    if _is_unloading or not props:
+        return False
         
-    warnings = check_configuration_warnings()
-    
-    # Update warning label
-    warning_prop = obs.obs_properties_get(props, "warnings")
-    if warning_prop:
-        if warnings:
-            # Join all warnings with " | " separator
-            warning_text = "⚠️ " + " | ".join(warnings)
-            obs.obs_property_set_description(warning_prop, warning_text)
-            obs.obs_property_set_visible(warning_prop, True)
-        else:
-            obs.obs_property_set_visible(warning_prop, False)
+    try:
+        warnings = check_configuration_warnings()
+        
+        # Update warning label
+        warning_prop = obs.obs_properties_get(props, "warnings")
+        if warning_prop:
+            if warnings:
+                # Join all warnings with " | " separator
+                warning_text = "⚠️ " + " | ".join(warnings)
+                obs.obs_property_set_description(warning_prop, warning_text)
+                obs.obs_property_set_visible(warning_prop, True)
+            else:
+                obs.obs_property_set_visible(warning_prop, False)
+    except Exception as e:
+        # v3.5.9: Catch any exceptions to prevent crashes
+        log(f"Error updating warnings: {e}")
+        return False
     
     return True
 
@@ -212,7 +221,7 @@ def script_properties():
     obs.obs_property_set_visible(warning_prop, False)
     
     # Force initial warning check
-    if _global_settings:
+    if _global_settings and not _is_unloading:
         update_warning_visibility(props, None, _global_settings)
     
     return props
@@ -301,8 +310,9 @@ def warnings_update_timer():
 
 def script_load(settings):
     """Called when script is loaded."""
-    global _verify_scene_timer, _warning_update_timer, _global_settings
+    global _verify_scene_timer, _warning_update_timer, _global_settings, _is_unloading
     _global_settings = settings
+    _is_unloading = False
     
     set_stop_threads(False)
     
@@ -322,7 +332,7 @@ def script_load(settings):
     obs.timer_add(_verify_scene_timer, SCENE_CHECK_DELAY)
     
     # Note: Warning timer temporarily disabled to prevent crashes
-    # TODO: Implement safer warning update mechanism in v3.5.9
+    # TODO: Implement safer warning update mechanism
     
     # Start worker threads
     start_worker_threads()
@@ -334,9 +344,12 @@ def script_load(settings):
 
 def script_unload():
     """Called when script is unloaded."""
-    global _verify_scene_timer, _warning_update_timer
+    global _verify_scene_timer, _warning_update_timer, _is_unloading
     
     log("Script unloading...")
+    
+    # v3.5.9: Set unloading flag to prevent property access
+    _is_unloading = True
     
     # Signal threads to stop
     set_stop_threads(True)
