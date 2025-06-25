@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.5.4"  # Fixed empty playlist URL handling
+SCRIPT_VERSION = "3.5.5"  # Fixed scene verification log spam
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context
