@@ -11,7 +11,7 @@
 - **Shared modules folder** (`ytplay_modules/`):
   - `config.py` - Configuration constants
   - `logger.py` - Logging system with script identification
-  - `state.py` - Thread-safe state management with script context
+  - `state.py` - Thread-safe state management with instance isolation (v3.6.0)
   - `utils.py` - Utility functions
   - Individual feature modules for each component
 
@@ -105,18 +105,20 @@ Before merging feature branch to main:
 - Each module should have clear docstring explaining its purpose
 - Modules must handle script identification through state module
 
-## Multi-Instance Support
-- Multiple scripts can run simultaneously sharing the same modules
+## Multi-Instance Support (v3.6.0)
+- Multiple scripts can run simultaneously with complete state isolation
 - Each script maintains its own:
   - Scene name (matching script filename)
   - Cache directory
   - Configuration and state
   - Log identification
+  - Independent thread contexts
+- State isolation is automatic and transparent
 - Example setup:
   ```
-  ytplay.py       → Scene: ytplay
-  yt_worship.py   → Scene: yt_worship
-  yt_ambient.py   → Scene: yt_ambient
+  ytplay.py       → Scene: ytplay (isolated state)
+  yt_worship.py   → Scene: yt_worship (isolated state)
+  yt_ambient.py   → Scene: yt_ambient (isolated state)
   ```
 
 ## Testing Version
