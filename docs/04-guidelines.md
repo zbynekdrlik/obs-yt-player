@@ -1,19 +1,25 @@
 # 04‑Guidelines (Output & Coding Style)
 
 ## Output Rules
-1. Claude outputs modular code: minimal `ytfast.py` plus modules in `<scriptname>_modules/` directory
+1. Claude outputs modular code: minimal main script plus modules in shared `ytplay_modules/` directory
 2. Main script contains only OBS interface functions; all logic goes in modules
 3. Include an OBS script description docstring ≤ 400 characters in main script
 4. No external dependencies besides Python std lib and OBS‑bundled libs
 
-## Module Structure
-- **Main script** (`ytfast.py`): Minimal OBS interface only
-- **Modules folder** (`<scriptname>_modules/`):
+## Module Structure (v3.5.0+ Common Modules Architecture)
+- **Main scripts** (`ytplay.py`, `yt_worship.py`, etc.): Minimal OBS interface only
+- **Shared modules folder** (`ytplay_modules/`):
   - `config.py` - Configuration constants
-  - `logger.py` - Logging system
-  - `state.py` - Thread-safe state management
+  - `logger.py` - Logging system with script identification
+  - `state.py` - Thread-safe state management with script context
   - `utils.py` - Utility functions
   - Individual feature modules for each component
+
+## Script Identification
+- Each script identifies itself by its filename
+- Script name is stored in state module on initialization
+- All modules access script name from state when needed
+- Enables proper logging and scene management for multiple instances
 
 ## Coding Style
 - Follow PEP‑8 (≤ 120 chars per line where practical)
@@ -25,9 +31,10 @@
 ## Logging Guidelines
 - Use thread-aware logging to handle OBS's behavior with background threads
 - Implement with a single `log(message)` function that detects thread context
+- Script name is retrieved from state module for identification
 - Format depends on whether code is running on main thread or background thread:
   - Main thread: `print(f"[{timestamp}] {message}")`
-  - Background thread: `print(f"[{timestamp}] [{SCRIPT_NAME}] {message}")`
+  - Background thread: `print(f"[{timestamp}] [{script_name}] {message}")`
 - This ensures script identification even when OBS shows `[Unknown Script]` for background threads
 - Final output in OBS logs:
   - Main thread: `[script.py] [timestamp] message`
@@ -45,11 +52,10 @@
 **Important**: The version must be incremented **every time** Claude outputs code, not just once per phase. This ensures that during testing, users can verify they are running the correct version of the code.
 
 Examples:
-- Phase 2 initial implementation: `1.0.0` → `1.1.0` (MINOR for new phase)
-- Bug fix during Phase 2 testing: `1.1.0` → `1.1.1` (PATCH for iteration)
-- Another iteration in Phase 2: `1.1.1` → `1.1.2` (PATCH for iteration)
-- Phase 3 implementation: `1.1.2` → `1.2.0` (MINOR for new phase)
-- Modular refactoring: `1.9.0` → `2.0.0` (MAJOR for architecture change)
+- Common modules implementation: `3.4.4` → `3.5.0` (MAJOR for architecture change)
+- Bug fix during testing: `3.5.0` → `3.5.1` (PATCH for iteration)
+- Another iteration: `3.5.1` → `3.5.2` (PATCH for iteration)
+- New feature addition: `3.5.2` → `3.6.0` (MINOR for new feature)
 
 ## Development Workflow & Feature Branch Updates
 
@@ -77,9 +83,9 @@ While working on a feature branch:
 ### Log Requirements
 Users should provide logs showing:
 ```
-[ytfast.py] [timestamp] Script version X.Y.Z loaded
-[ytfast.py] [timestamp] [Feature-specific success messages]
-[ytfast.py] [timestamp] [No critical errors]
+[ytplay.py] [timestamp] Script version X.Y.Z loaded
+[ytplay.py] [timestamp] [Feature-specific success messages]
+[ytplay.py] [timestamp] [No critical errors]
 ```
 
 ### Final PR Requirements
@@ -97,11 +103,26 @@ Before merging feature branch to main:
 - Heavy processing happens in background threads
 - OBS API calls only on main thread
 - Each module should have clear docstring explaining its purpose
+- Modules must handle script identification through state module
+
+## Multi-Instance Support
+- Multiple scripts can run simultaneously sharing the same modules
+- Each script maintains its own:
+  - Scene name (matching script filename)
+  - Cache directory
+  - Configuration and state
+  - Log identification
+- Example setup:
+  ```
+  ytplay.py       → Scene: ytplay
+  yt_worship.py   → Scene: yt_worship
+  yt_ambient.py   → Scene: yt_ambient
+  ```
 
 ## Testing Version
 Users should always check the OBS logs to verify the correct version is loaded:
 ```
-[ytfast.py] [timestamp] Script version X.Y.Z loaded
+[ytplay.py] [timestamp] Script version X.Y.Z loaded
 ```
 
 ## Development Workflow - Branches and Pull Requests
@@ -111,7 +132,7 @@ All changes to the codebase **MUST** be made through feature branches and pull r
 
 1. **Create Feature Branch**: 
    - Branch from `main` for each new feature or fix
-   - Use descriptive branch names: `feature/phase-10-playback`, `fix/metadata-parsing`, `refactor/windows-only`
+   - Use descriptive branch names: `feature/common-modules`, `fix/metadata-parsing`, `refactor/state-management`
 
 2. **Develop and Test**:
    - Make changes in the feature branch
@@ -140,7 +161,7 @@ All changes to the codebase **MUST** be made through feature branches and pull r
 ### Example Workflow
 ```bash
 # Working on feature branch
-git checkout feature/phase-11-scene-management
+git checkout feature/common-modules-redesign
 
 # Claude makes changes, they are immediately committed
 # User pulls and tests

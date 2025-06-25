@@ -19,7 +19,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 
 ### 🔧 Advanced Features
 - **Background Processing**: All heavy tasks run in separate threads (no OBS freezing)
-- **Multi-Instance Support**: Run multiple independent players by renaming the script
+- **Multi-Instance Support**: Run multiple independent players sharing common modules
 - **Nested Scene Playback**: Videos play even when scene is nested within other scenes
 - **Scene Transition Support**: Proper handling with configurable delays
 - **Comprehensive Logging**: Both OBS console and file-based logs for debugging
@@ -37,23 +37,23 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 
 ### 1. Installation
 
-1. Download the latest release (includes `ytfast.py` and `ytfast_modules/` folder)
+1. Download the latest release (includes `ytplay.py` and `ytplay_modules/` folder)
 2. Copy both to your OBS scripts directory
 3. In OBS Studio: Tools → Scripts → Add Script (+)
-4. Select `ytfast.py`
+4. Select `ytplay.py`
 
 ### 2. Configuration
 
 In script properties, configure:
-- **YouTube Playlist URL**: Your playlist URL
-- **Cache Directory**: Where to store videos (auto-created)
+- **YouTube Playlist URL**: Your playlist URL (no default - must be set)
+- **Cache Directory**: Where to store videos (defaults to `ytplay-cache/`)
 - **Gemini API Key** (Optional): For enhanced metadata extraction (see below)
 - **Playback Mode**: Choose between Continuous, Single, or Loop
 - **Audio Only Mode**: Enable for minimal video quality with high audio quality
 
 ### 3. Scene Setup
 
-1. Create a scene named `ytfast` (matching script name without .py)
+1. Create a scene named `ytplay` (matching script name without .py)
 2. Add these sources to the scene:
    - **Media Source** named `video`
    - **Text Source** named `title` (for song info display)
@@ -112,9 +112,9 @@ While the script works perfectly without Gemini, using it provides significantly
   - Videos with multiple artists, remixes, or features
 
 ### 🤖 Google Gemini AI (Optional but Recommended)
-- Uses Gemini 2.5 Flash with Google Search grounding for intelligent extraction
+- Uses Gemini 2.0 Flash with Google Search grounding for intelligent extraction
 - Provides the most accurate artist/song detection available
-- Free tier offers 2 requests/minute, 50 requests/day (plenty for most users)
+- Free tier offers 15 requests/minute, 1500 requests/day (plenty for most users)
 - When not configured, script automatically uses title parser
 
 ### 📝 Smart Title Parser (Always Available)
@@ -134,25 +134,32 @@ While the script works perfectly without Gemini, using it provides significantly
 
 ### Multi-Instance Setup
 
-Run multiple independent players:
+Run multiple independent players sharing the same modules:
 
-1. Copy and rename the script (e.g., `music-chill.py`, `stream-bgm.py`)
+1. Copy and rename the script (e.g., `yt_worship.py`, `yt_ambient.py`)
 2. Each instance automatically creates its own:
-   - Module folder (`music-chill_modules/`)
-   - Cache directory
-   - Settings and playlist
-3. Create matching scene names for each instance
+   - Scene name (matching the script name)
+   - Cache directory (`yt_worship-cache/`, `yt_ambient-cache/`)
+   - Settings and playlist configuration
+3. All scripts share the common `ytplay_modules/` directory
 
 Example structure:
 ```
 obs-scripts/
-├── ytfast.py              → Scene: ytfast
-├── ytfast_modules/        → Modules for ytfast
-├── music-chill.py         → Scene: music-chill
-├── music-chill_modules/   → Modules for music-chill
-└── stream-bgm.py          → Scene: stream-bgm
-└── stream-bgm_modules/    → Modules for stream-bgm
+├── ytplay.py              → Scene: ytplay
+├── yt_worship.py          → Scene: yt_worship
+├── yt_ambient.py          → Scene: yt_ambient
+└── ytplay_modules/        → SHARED modules for all scripts
+    ├── config.py
+    ├── logger.py
+    └── [other modules]
 ```
+
+Benefits of shared modules:
+- **Single update point**: Update modules once, all scripts benefit
+- **Consistent behavior**: All scripts use the same core logic
+- **Easy maintenance**: One set of modules to maintain
+- **Simplified setup**: Just copy the main script file
 
 ### Nested Scene Usage
 
@@ -177,17 +184,18 @@ While not required, a Gemini API key significantly improves metadata accuracy:
 2. Sign in with Google account
 3. Click "Create API Key"
 4. Copy key to OBS script settings
-5. Free tier = 2 requests/minute, 50 requests/day (plenty for most users)
+5. Free tier = 15 requests/minute, 1500 requests/day (plenty for most users)
 
 Note: The script works perfectly without a Gemini key - it will use the built-in title parser instead.
 
 ## Troubleshooting
 
 ### Videos Not Playing?
-1. **Check scene name** matches script name (without .py)
-2. **Verify source names** are exactly `video` and `title`
-3. **Confirm playlist URL** is valid and public
-4. **Check logs** in `{cache_dir}/logs/` for errors
+1. **Check playlist URL** is set (no default URL in v3.5.0+)
+2. **Check scene name** matches script name (without .py)
+3. **Verify source names** are exactly `video` and `title`
+4. **Confirm playlist** is valid and public
+5. **Check logs** in `{cache_dir}/logs/` for errors
 
 ### Playback Mode Issues?
 - Mode changes take effect immediately
@@ -215,8 +223,9 @@ Note: The script works perfectly without a Gemini key - it will use the built-in
 ## Project Structure
 
 ```
-ytfast.py                  # Main OBS interface
-ytfast_modules/
+ytplay.py                  # Default OBS interface script
+yt_worship.py             # Example additional instance
+ytplay_modules/           # SHARED modules for all scripts
 ├── config.py             # Configuration and constants
 ├── logger.py             # Thread-safe logging system
 ├── state.py              # Global state management
@@ -231,6 +240,13 @@ ytfast_modules/
 ```
 
 ## Recent Updates
+
+### v3.5.0 - Common Modules Architecture
+- **BREAKING**: Renamed default script from `ytfast.py` to `ytplay.py`
+- **NEW**: All scripts now share common `ytplay_modules/` directory
+- **CHANGE**: Default playlist URL is now empty (must be configured)
+- **IMPROVED**: Simplified multi-instance setup - just copy main script
+- **ENHANCED**: Better script identification in logs
 
 ### v3.4.1 - Documentation Clarity
 - Clarified that Gemini API key is optional
@@ -253,6 +269,17 @@ ytfast_modules/
 - Recursive scene detection for nested sources
 - Support for multiple nesting levels
 - Enhanced logging for scene activation
+
+## Migration from v3.4.x
+
+If upgrading from ytfast.py to the new architecture:
+
+1. **Rename your script**: `ytfast.py` → `ytplay.py` (or keep ytfast.py if preferred)
+2. **Rename modules folder**: `ytfast_modules/` → `ytplay_modules/`
+3. **Update scene name**: Scene `ytfast` → Scene `ytplay` (or match your script name)
+4. **Set playlist URL**: No default URL in v3.5.0+
+
+Note: You can keep using `ytfast.py` as your script name - just ensure the modules are in `ytplay_modules/`
 
 ## License
 

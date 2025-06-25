@@ -16,7 +16,8 @@ It is authoritative; later Phase prompts reference this spec.
 ## Caching & File Management
 - Store videos in user‑configurable cache dir (editable text field).  
 - **Default cache location**: `<script_directory>/<scriptname>-cache/`
-  - Example: `ytfast.py` → `./ytfast-cache/`
+  - Example: `ytplay.py` → `./ytplay-cache/`
+  - Example: `yt_worship.py` → `./yt_worship-cache/`
   - Allows multiple script instances with separate caches
   - Users can easily modify path in text field
 - Sanitise filenames: `<song>_<artist>_<id>_normalized.mp4`.  
@@ -46,7 +47,7 @@ It is authoritative; later Phase prompts reference this spec.
 - Ensures maximum accuracy over time without manual intervention
 
 ## Playback Logic
-- Scene name == script filename without extension (e.g. `ytfast.py` → scene `ytfast`).  
+- Scene name == script filename without extension (e.g. `ytplay.py` → scene `ytplay`).  
 - Media Source `video`, Text Source `title`.  
 - Random no‑repeat playback; handle scene transitions.
 - **Transition handling**: Start playback immediately when transitioning TO scene, continue playing until transition completes when leaving scene.
@@ -69,6 +70,16 @@ It is authoritative; later Phase prompts reference this spec.
 - Perfect for audio-only streaming scenarios (radio streams, etc.)
 - Logs clearly indicate when audio-only mode is active
 
+## Module Architecture (v3.5.0+)
+- **Common modules directory**: All scripts share `ytplay_modules/`
+- **Script identification**: Each script identifies itself by filename
+  - Script name stored in state module for access by all components
+  - Scene name, cache directory, and logs use script name
+- **Multi-instance support**: Copy main script with new name for additional instances
+  - Example: `ytplay.py`, `yt_worship.py`, `yt_ambient.py`
+  - Each maintains separate configuration and cache
+  - All share the same module codebase
+
 ## Threading
 - All OBS API calls **must** run on main thread (`obs.timer_add`).  
 - Separate worker threads/queues for download, normalisation, metadata.
@@ -88,7 +99,7 @@ It is authoritative; later Phase prompts reference this spec.
 - File-based logging to `{cache_dir}/logs/` with session management.
 
 ## Versioning
-- Maintain version constant in script (`SCRIPT_VERSION = "X.Y.Z"`)
+- Maintain version constant in `config.py` module
 - Increment version with each development iteration:
   - **MAJOR**: New phases, significant feature additions
   - **MINOR**: Enhancements within existing phases
@@ -97,8 +108,11 @@ It is authoritative; later Phase prompts reference this spec.
 - Log version on script startup
 
 ## Default Configuration
-- **Default Playlist URL**: `https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U`
-- Users can change this in OBS script properties to any valid YouTube playlist
+- **Default Playlist URL**: Empty string ("") - user must configure
+- **Default Cache Directory**: `<script_directory>/<scriptname>-cache/`
+- **Default Playback Mode**: Continuous
+- **Default Audio-Only Mode**: Disabled
+- **Gemini API Key**: Optional (empty by default)
 
 Refer back here from every Phase prompt to ensure no requirement is missed.  
 See **03‑OBS_API.md** for environment constraints and **04‑Guidelines.md** for coding style.
