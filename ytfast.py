@@ -106,7 +106,7 @@ def script_properties():
     obs.obs_properties_add_text(
         props,
         "gemini_description",
-        "Used for artist/song name detection",
+        "Note: Gemini API key is used for artist/song name detection",
         obs.OBS_TEXT_INFO
     )
     
