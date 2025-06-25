@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.5.5"  # Fixed scene verification log spam
+SCRIPT_VERSION = "3.5.6"  # Fixed scene verification to run only once
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context
