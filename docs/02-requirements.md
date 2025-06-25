@@ -57,6 +57,14 @@ It is authoritative; later Phase prompts reference this spec.
   - Use OBS timers for precise timing control
   - Smooth opacity transitions (1 second fade duration) using OBS color correction filter
 
+## Audio-Only Mode
+- **Optional feature**: Checkbox in script properties to enable/disable
+- When enabled, downloads videos with minimal video quality (144p) while preserving best audio quality
+- Significantly reduces bandwidth usage and file sizes (80-90% smaller)
+- Maintains full audio quality and normalization
+- Perfect for audio-only streaming scenarios (radio streams, etc.)
+- Logs clearly indicate when audio-only mode is active
+
 ## Threading
 - All OBS API calls **must** run on main thread (`obs.timer_add`).  
 - Separate worker threads/queues for download, normalisation, metadata.
@@ -76,7 +84,7 @@ It is authoritative; later Phase prompts reference this spec.
 - File-based logging to `{cache_dir}/logs/` with session management.
 
 ## Versioning
-- Maintain version constant in script (`SCRIPT_VERSION = "X.Y.Z"`)  
+- Maintain version constant in script (`SCRIPT_VERSION = "X.Y.Z"`)
 - Increment version with each development iteration:
   - **MAJOR**: New phases, significant feature additions
   - **MINOR**: Enhancements within existing phases
