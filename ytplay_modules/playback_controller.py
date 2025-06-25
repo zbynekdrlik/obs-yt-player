@@ -8,14 +8,14 @@ import os
 from logger import log
 from config import (
     PLAYBACK_CHECK_INTERVAL, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME, 
-    SCENE_NAME, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, PLAYBACK_MODE_CONTINUOUS
+    PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, PLAYBACK_MODE_CONTINUOUS
 )
 from state import (
     is_playing, set_playing, set_current_video_path,
     set_current_playback_video_id, get_cached_video_info,
     get_cached_videos, is_scene_active, should_stop_threads,
     get_playback_mode, is_first_video_played, set_first_video_played,
-    get_loop_video_id, set_loop_video_id
+    get_loop_video_id, set_loop_video_id, get_script_name
 )
 from media_control import (
     force_disable_media_loop, get_media_state, get_media_duration,
@@ -50,8 +50,11 @@ def verify_sources():
     """Verify that required sources exist and log their status."""
     global _sources_verified
     
+    # Get scene name from state
+    scene_name = get_script_name()
+    
     # Check scene
-    scene_source = obs.obs_get_source_by_name(SCENE_NAME)
+    scene_source = obs.obs_get_source_by_name(scene_name)
     scene_exists = scene_source is not None
     if scene_source:
         obs.obs_source_release(scene_source)
@@ -75,7 +78,7 @@ def verify_sources():
     # Log verification results
     if not _sources_verified or not (scene_exists and media_exists and text_exists):
         log("=== SOURCE VERIFICATION ===")
-        log(f"Scene '{SCENE_NAME}': {'✓ EXISTS' if scene_exists else '✗ MISSING'}")
+        log(f"Scene '{scene_name}': {'✓ EXISTS' if scene_exists else '✗ MISSING'}")
         log(f"Media Source '{MEDIA_SOURCE_NAME}': {'✓ EXISTS' if media_exists else '✗ MISSING'} (type: {source_id})")
         log(f"Text Source '{TEXT_SOURCE_NAME}': {'✓ EXISTS' if text_exists else '✗ MISSING'}")
         
