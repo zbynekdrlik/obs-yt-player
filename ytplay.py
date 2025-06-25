@@ -75,7 +75,7 @@ def check_configuration_warnings():
     # Check for missing scene
     scene_source = obs.obs_get_source_by_name(SCRIPT_NAME)
     if not scene_source:
-        warnings.append(f"⚠️ Scene '{SCRIPT_NAME}' not found! Create it in OBS.")
+        warnings.append(f"Scene '{SCRIPT_NAME}' not found")
     else:
         obs.obs_source_release(scene_source)
         
@@ -84,47 +84,43 @@ def check_configuration_warnings():
         if scene:
             media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
             if not media_source:
-                warnings.append(f"⚠️ Media Source '{MEDIA_SOURCE_NAME}' not found in scene!")
+                warnings.append(f"Media Source '{MEDIA_SOURCE_NAME}' not found")
             else:
                 obs.obs_source_release(media_source)
                 
             text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
             if not text_source:
-                warnings.append(f"⚠️ Text Source '{TEXT_SOURCE_NAME}' not found in scene!")
+                warnings.append(f"Text Source '{TEXT_SOURCE_NAME}' not found")
             else:
                 obs.obs_source_release(text_source)
     
     # Check for missing playlist URL
     if not get_playlist_url():
-        warnings.append("⚠️ No playlist URL configured!")
+        warnings.append("No playlist URL")
     
     # Check if tools are ready
     if not is_tools_ready():
-        warnings.append("⚠️ Tools (yt-dlp/ffmpeg) not ready yet...")
+        warnings.append("Tools not ready")
     
     return warnings
 
 def update_warning_visibility(props, prop, settings):
-    """Update the visibility and content of warning labels."""
+    """Update the visibility and content of warning label."""
     if not props:
         return
         
     warnings = check_configuration_warnings()
     
-    # Update each warning label
-    for i in range(5):  # Support up to 5 warnings
-        warning_prop = obs.obs_properties_get(props, f"warning_{i}")
-        if warning_prop:
-            if i < len(warnings):
-                obs.obs_property_set_visible(warning_prop, True)
-                obs.obs_property_set_description(warning_prop, warnings[i])
-            else:
-                obs.obs_property_set_visible(warning_prop, False)
-    
-    # Update the main warning header visibility
-    warning_header = obs.obs_properties_get(props, "warning_header")
-    if warning_header:
-        obs.obs_property_set_visible(warning_header, len(warnings) > 0)
+    # Update warning label
+    warning_prop = obs.obs_properties_get(props, "warnings")
+    if warning_prop:
+        if warnings:
+            # Join all warnings with " | " separator
+            warning_text = "⚠️ " + " | ".join(warnings)
+            obs.obs_property_set_description(warning_prop, warning_text)
+            obs.obs_property_set_visible(warning_prop, True)
+        else:
+            obs.obs_property_set_visible(warning_prop, False)
     
     return True
 
@@ -133,32 +129,6 @@ def script_properties():
     global _global_props
     props = obs.obs_properties_create()
     _global_props = props
-    
-    # Warning section at the top
-    obs.obs_properties_add_text(
-        props,
-        "warning_header",
-        "⚠️ CONFIGURATION WARNINGS:",
-        obs.OBS_TEXT_INFO
-    )
-    
-    # Add multiple warning slots (hidden by default)
-    for i in range(5):
-        warning_prop = obs.obs_properties_add_text(
-            props,
-            f"warning_{i}",
-            "",  # Content will be set dynamically
-            obs.OBS_TEXT_INFO
-        )
-        obs.obs_property_set_visible(warning_prop, False)
-    
-    # Add separator after warnings
-    obs.obs_properties_add_text(
-        props,
-        "separator_warnings",
-        "─────────────────────────────",
-        obs.OBS_TEXT_INFO
-    )
     
     # Playlist URL text field
     playlist_prop = obs.obs_properties_add_text(
@@ -221,7 +191,7 @@ def script_properties():
         obs.OBS_TEXT_INFO
     )
     
-    # Sync Now button at the bottom
+    # Sync Now button
     sync_button = obs.obs_properties_add_button(
         props,
         "sync_now",
@@ -229,13 +199,14 @@ def script_properties():
         sync_now_callback
     )
     
-    # Refresh warnings button
-    refresh_button = obs.obs_properties_add_button(
+    # Warning text at the bottom (hidden by default)
+    warning_prop = obs.obs_properties_add_text(
         props,
-        "refresh_warnings",
-        "Refresh Warnings",
-        lambda props, prop: update_warning_visibility(_global_props, prop, _global_settings)
+        "warnings",
+        "",  # Content will be set dynamically
+        obs.OBS_TEXT_INFO
     )
+    obs.obs_property_set_visible(warning_prop, False)
     
     # Initial warning check will happen after settings are loaded
     return props
