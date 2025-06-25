@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.6.0"  # True multi-instance support with state isolation
+SCRIPT_VERSION = "3.6.1"  # Fixed backward compatibility for download_progress_milestones
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context
