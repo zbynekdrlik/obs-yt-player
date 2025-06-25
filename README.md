@@ -1,6 +1,6 @@
 # OBS YouTube Player (Windows)
 
-A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them with multiple playback modes. Features AI-powered metadata extraction using Google Gemini.
+A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them with multiple playback modes. Features optional AI-powered metadata extraction using Google Gemini for superior artist/song detection.
 
 ## Key Features
 
@@ -13,8 +13,8 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **Automatic Playlist Sync**: Fetches and syncs YouTube playlists (on startup and manual trigger)
 - **Local Caching**: Downloads and stores videos locally for reliable offline playback
 - **Audio Normalization**: Normalizes all audio to -14 LUFS using FFmpeg for consistent volume
-- **AI-Powered Metadata**: Google Gemini AI extracts accurate artist/song information
-- **Smart Fallback**: Title parser handles cases when Gemini is unavailable
+- **AI-Powered Metadata** (Optional): Google Gemini AI extracts accurate artist/song information
+- **Smart Title Parser**: Fallback parser ensures videos always play, even without Gemini
 - **Audio-Only Mode**: Option to download minimal video quality (144p) while preserving high audio quality
 
 ### 🔧 Advanced Features
@@ -31,7 +31,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **OBS Studio** with Python scripting support
 - **Internet connection** for initial video downloads
 - **Disk space** for video cache (varies by playlist size)
-- **Google Gemini API key** for metadata extraction (free tier available)
+- **Google Gemini API key** (Optional but recommended - free tier available)
 
 ## Quick Start
 
@@ -47,7 +47,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 In script properties, configure:
 - **YouTube Playlist URL**: Your playlist URL
 - **Cache Directory**: Where to store videos (auto-created)
-- **Gemini API Key**: Get free at https://aistudio.google.com/app/apikey
+- **Gemini API Key** (Optional): For enhanced metadata extraction (see below)
 - **Playback Mode**: Choose between Continuous, Single, or Loop
 - **Audio Only Mode**: Enable for minimal video quality with high audio quality
 
@@ -96,6 +96,40 @@ Benefits:
 - **Same high-quality audio** as normal mode
 - **Lower CPU usage** during playback
 
+## Metadata System
+
+### Why Use Google Gemini? (Recommended)
+
+While the script works perfectly without Gemini, using it provides significantly better metadata extraction:
+
+- **Superior Accuracy**: Gemini uses AI with Google Search to understand complex video titles that simple parsers miss
+- **International Support**: Works with videos in any language, including non-Latin scripts
+- **Context Understanding**: Recognizes artists and songs even when titles use unusual formatting
+- **Handles Edge Cases**: Correctly extracts metadata from titles like:
+  - "HOLYGHOST | Sons Of Sunday" (reversed format)
+  - "'COME RIGHT NOW' | Official Video" (quotes and annotations)
+  - "Forever | Live At Chapel" (live performances)
+  - Videos with multiple artists, remixes, or features
+
+### 🤖 Google Gemini AI (Optional but Recommended)
+- Uses Gemini 2.0 Flash with Google Search grounding for intelligent extraction
+- Provides the most accurate artist/song detection available
+- Free tier offers 2 requests/minute, 50 requests/day (plenty for most users)
+- When not configured, script automatically uses title parser
+
+### 📝 Smart Title Parser (Always Available)
+- Built-in fallback that ensures the script always works
+- Handles common patterns: "Artist - Song", "Song | Artist"
+- While functional, it's less accurate than Gemini for complex titles
+- Perfect for simple playlists or when Gemini isn't needed
+
+### 🔄 File Naming & Automatic Retry
+- Videos processed without Gemini (or when Gemini fails) are marked with `_gf` suffix
+- Example: `song_artist_videoID_normalized_gf.mp4`
+- On each startup, the script automatically retries Gemini extraction for `_gf` files
+- If Gemini succeeds on retry, the file is renamed without the `_gf` marker
+- This ensures your library improves over time without manual intervention
+
 ## Advanced Usage
 
 ### Multi-Instance Setup
@@ -135,23 +169,17 @@ Perfect for:
 - Complex scene compositions
 - Dynamic streaming layouts
 
-## Metadata System
+## Getting a Gemini API Key (Optional)
 
-### 🤖 Google Gemini AI (Primary)
-- Uses Gemini 2.0 Flash with Google Search grounding
-- Extracts artist and song from video titles, descriptions, and context
-- Handles complex formats like "Song | Artist" or multiple separators
-- Especially accurate for music videos and international content
+While not required, a Gemini API key significantly improves metadata accuracy:
 
-### 📝 Smart Parser (Fallback)
-- Activates when Gemini is unavailable
-- Parses common patterns: "Artist - Song", "Song | Artist"
-- Ensures videos always play even without AI
+1. Visit https://aistudio.google.com/app/apikey
+2. Sign in with Google account
+3. Click "Create API Key"
+4. Copy key to OBS script settings
+5. Free tier = 2 requests/minute, 50 requests/day (plenty for most users)
 
-### 🔄 Automatic Retry
-- Failed extractions marked with `_gf` suffix
-- Retried automatically on next OBS startup
-- Successful extraction removes the suffix
+Note: The script works perfectly without a Gemini key - it will use the built-in title parser instead.
 
 ## Troubleshooting
 
@@ -167,10 +195,10 @@ Perfect for:
 - Scene must be reactivated for some mode changes
 
 ### Metadata Problems?
-- Verify Gemini API key is correct
-- Check internet connection
-- Failed extractions retry automatically
-- Title parser ensures playback continues
+- If using Gemini: Verify API key is correct
+- Without Gemini: Videos will play with basic title parsing
+- Files marked with `_gf` will retry Gemini on next startup
+- Check logs for metadata extraction details
 
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
@@ -202,15 +230,13 @@ ytfast_modules/
 └── [other modules]       # Additional functionality
 ```
 
-## Getting a Gemini API Key
-
-1. Visit https://aistudio.google.com/app/apikey
-2. Sign in with Google account
-3. Click "Create API Key"
-4. Copy key to OBS script settings
-5. Free tier = 2 requests/minute, 50 requests/day (plenty for most users)
-
 ## Recent Updates
+
+### v3.4.1 - Documentation Clarity
+- Clarified that Gemini API key is optional
+- Added detailed explanation of why Gemini provides better results
+- Documented _gf file naming behavior
+- Improved metadata system documentation
 
 ### v3.4.0 - Audio-Only Mode
 - Added option for minimal video quality downloads
@@ -227,11 +253,6 @@ ytfast_modules/
 - Recursive scene detection for nested sources
 - Support for multiple nesting levels
 - Enhanced logging for scene activation
-
-### v3.0.12 - Streamlined Metadata
-- Gemini AI as sole metadata source
-- Automatic retry system
-- Improved reliability
 
 ## License
 
