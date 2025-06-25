@@ -17,8 +17,10 @@ from config import (
 )
 from logger import log
 from state import (
-    tools_thread, set_tools_ready, is_tools_logged_waiting, 
-    set_tools_logged_waiting, should_stop_threads
+    get_current_script_path, set_thread_script_context,
+    set_tools_ready, is_tools_logged_waiting, 
+    set_tools_logged_waiting, should_stop_threads,
+    get_or_create_state
 )
 from utils import get_ytdlp_path, get_ffmpeg_path, get_tools_path, ensure_cache_directory
 
@@ -180,8 +182,11 @@ def setup_tools():
     log("All tools are ready and verified!")
     return True
 
-def tools_setup_worker():
+def tools_setup_worker(script_path):
     """Background thread for setting up tools."""
+    # v3.6.0: Set script context for this thread
+    set_thread_script_context(script_path)
+    
     while not should_stop_threads():
         try:
             # Ensure cache directory exists
@@ -215,7 +220,14 @@ def tools_setup_worker():
 
 def start_tools_thread():
     """Start the tools setup thread."""
-    global tools_thread
-    import state
-    state.tools_thread = threading.Thread(target=tools_setup_worker, daemon=True)
+    # v3.6.0: Get current script path to pass to thread
+    script_path = get_current_script_path()
+    state = get_or_create_state(script_path)
+    
+    # Create and start thread with script context
+    state.tools_thread = threading.Thread(
+        target=tools_setup_worker, 
+        args=(script_path,),
+        daemon=True
+    )
     state.tools_thread.start()
