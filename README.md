@@ -112,7 +112,7 @@ While the script works perfectly without Gemini, using it provides significantly
   - Videos with multiple artists, remixes, or features
 
 ### 🤖 Google Gemini AI (Optional but Recommended)
-- Uses Gemini 2.0 Flash with Google Search grounding for intelligent extraction
+- Uses Gemini 2.5 Flash with Google Search grounding for intelligent extraction
 - Provides the most accurate artist/song detection available
 - Free tier offers 2 requests/minute, 50 requests/day (plenty for most users)
 - When not configured, script automatically uses title parser
