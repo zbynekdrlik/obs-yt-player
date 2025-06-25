@@ -18,9 +18,12 @@ from state import (
 _last_scene_change_time = 0
 _pending_deactivation = False
 _deactivation_timer = None
+_scene_error_logged = False  # Track if we've already logged the missing scene error
 
 def verify_scene_setup():
     """Verify that required scene and sources exist."""
+    global _scene_error_logged
+    
     scene_name = get_script_name()  # Get scene name from state
     if not scene_name:
         log("ERROR: Script name not initialized!")
@@ -28,8 +31,13 @@ def verify_scene_setup():
     
     scene_source = obs.obs_get_source_by_name(scene_name)
     if not scene_source:
-        log(f"ERROR: Required scene '{scene_name}' not found! Please create it.")
+        if not _scene_error_logged:
+            log(f"ERROR: Required scene '{scene_name}' not found! Please create it.")
+            _scene_error_logged = True
         return
+    
+    # Scene exists, reset error flag
+    _scene_error_logged = False
     
     scene = obs.obs_scene_from_source(scene_source)
     if scene:
@@ -308,3 +316,8 @@ def handle_obs_exit():
     
     # Allow brief time for cleanup
     time.sleep(0.1)
+
+def reset_scene_error_flag():
+    """Reset the scene error flag - useful when reloading script."""
+    global _scene_error_logged
+    _scene_error_logged = False
