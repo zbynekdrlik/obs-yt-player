@@ -43,9 +43,7 @@
    - Uses its filename as the scene name
    - Creates its own cache directory
    - Maintains separate configuration
-   - Identifies itself in logs (v3.6.0: now works correctly)
+   - Identifies itself in logs correctly
 
-### Known Issues (Fixed in v3.6.0)
-- ~~Multiple scripts have state contamination when run simultaneously~~
-- ~~Wrong script names appear in logs~~
-- ~~Scripts show each other's configuration values~~
+### v3.6.0 - Now Fully Functional!
+Multiple script instances work correctly without any state contamination. The implementation uses a simple dictionary-based approach that maintains backward compatibility while providing complete isolation between instances.
