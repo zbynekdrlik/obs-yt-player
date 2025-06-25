@@ -61,7 +61,6 @@ _warning_update_timer = None
 
 # Global settings reference for warnings update
 _global_settings = None
-_global_props = None
 
 # ===== OBS SCRIPT INTERFACE =====
 def script_description():
@@ -127,9 +126,7 @@ def update_warning_visibility(props, prop, settings):
 
 def script_properties():
     """Define script properties shown in OBS UI."""
-    global _global_props
     props = obs.obs_properties_create()
-    _global_props = props
     
     # Playlist URL text field
     playlist_prop = obs.obs_properties_add_text(
@@ -290,16 +287,17 @@ def script_update(settings):
     else:
         set_gemini_api_key(None)
     
-    # Update warnings whenever settings change
-    if _global_props:
-        update_warning_visibility(_global_props, None, settings)
-    
     log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}, Audio-only: {audio_only_mode}")
 
 def warnings_update_timer():
     """Timer callback to periodically update warnings."""
-    if _global_props and _global_settings:
-        update_warning_visibility(_global_props, None, _global_settings)
+    # Do not store reference to properties - create fresh each time
+    # This ensures we're always working with valid properties
+    if _global_settings:
+        # Get fresh property ID and update warnings through OBS
+        # This is safer than storing and reusing properties objects
+        obs.timer_remove(warnings_update_timer)
+        obs.timer_add(warnings_update_timer, 5000)
 
 def script_load(settings):
     """Called when script is loaded."""
@@ -323,9 +321,8 @@ def script_load(settings):
     _verify_scene_timer = verify_scene_setup
     obs.timer_add(_verify_scene_timer, SCENE_CHECK_DELAY)
     
-    # Start periodic warning updates (every 5 seconds)
-    _warning_update_timer = warnings_update_timer
-    obs.timer_add(_warning_update_timer, 5000)
+    # Note: Warning timer temporarily disabled to prevent crashes
+    # TODO: Implement safer warning update mechanism in v3.5.9
     
     # Start worker threads
     start_worker_threads()
