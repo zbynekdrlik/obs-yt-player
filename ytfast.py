@@ -99,7 +99,7 @@ def script_properties():
     obs.obs_properties_add_text(
         props, 
         "gemini_api_key", 
-        "Gemini API Key (Optional)", 
+        "Gemini API Key", 
         obs.OBS_TEXT_PASSWORD
     )
     
