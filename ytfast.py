@@ -98,8 +98,16 @@ def script_properties():
     obs.obs_properties_add_text(
         props, 
         "gemini_api_key", 
-        "Google Gemini API Key", 
+        "Gemini API Key", 
         obs.OBS_TEXT_PASSWORD
+    )
+    
+    # Add description text below Gemini API key field
+    obs.obs_properties_add_text(
+        props,
+        "gemini_description",
+        "Note: Gemini API key is used for artist/song name detection",
+        obs.OBS_TEXT_INFO
     )
     
     # Add separator before sync button
