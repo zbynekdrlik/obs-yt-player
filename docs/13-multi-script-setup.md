@@ -3,6 +3,9 @@
 ## Overview
 The OBS YouTube Player architecture supports running multiple script instances simultaneously, each with its own playlist, cache, and configuration. All scripts share a common modules directory (`ytplay_modules`) for easier maintenance and updates.
 
+## v3.6.0 - True Multi-Instance Support
+With version 3.6.0, multiple scripts can run simultaneously with complete state isolation. Each script maintains its own independent state, eliminating any interference between instances.
+
 ## How Multi-Script Support Works
 
 ### 1. Common Modules Architecture
@@ -10,13 +13,20 @@ The OBS YouTube Player architecture supports running multiple script instances s
 - **Script-Specific Elements**:
   - Scene name matches script name (e.g., `ytplay.py` → scene `ytplay`)
   - Cache directories are script-specific (e.g., `ytplay-cache/`, `yt_worship-cache/`)
-  - Each script maintains its own state and configuration
+  - Each script maintains its own isolated state and configuration
 
 ### 2. Automatic Script Identification
 Each script automatically determines its identity from its filename:
 ```python
 SCRIPT_NAME = os.path.splitext(os.path.basename(__file__))[0]
 ```
+
+### 3. State Isolation (v3.6.0)
+Each script instance has completely isolated state:
+- Independent configuration values
+- Separate playlist URLs and settings
+- Correct script identification in all logs
+- No cross-contamination between instances
 
 ## Setting Up Multiple Scripts
 
@@ -61,7 +71,7 @@ obs-yt-player/
 ├── ytplay_modules/              # SHARED modules directory
 │   ├── config.py               # Configuration constants
 │   ├── logger.py               # Logging system
-│   ├── state.py                # State management
+│   ├── state.py                # State management (with isolation)
 │   └── ...                     # Other modules
 ├── ytplay-cache/                # Cache for ytplay
 │   └── videos/
@@ -109,13 +119,13 @@ Each script maintains independent settings:
 ## Monitoring Multiple Scripts
 
 ### Log Identification
-Logs clearly show which script they belong to:
+Logs clearly show which script they belong to (v3.6.0 ensures accuracy):
 ```
 # Main thread logs
-[ytplay.py] [2024-01-13 10:00:00] Script version 3.5.0 loaded
-[yt_worship.py] [2024-01-13 10:00:00] Script version 3.5.0 loaded
+[ytplay.py] [2024-01-13 10:00:00] Script version 3.6.0 loaded
+[yt_worship.py] [2024-01-13 10:00:00] Script version 3.6.0 loaded
 
-# Background thread logs
+# Background thread logs (now with correct script names)
 [Unknown Script] [2024-01-13 10:00:01] [ytplay] Starting playlist sync...
 [Unknown Script] [2024-01-13 10:00:02] [yt_worship] Starting playlist sync...
 ```
@@ -126,6 +136,7 @@ Logs clearly show which script they belong to:
 3. **Easier Maintenance**: One set of modules to maintain
 4. **Reduced Disk Usage**: No duplicate module files
 5. **Simplified Setup**: Just copy the main script file
+6. **Complete Isolation**: Each script runs independently (v3.6.0)
 
 ## Best Practices
 
@@ -142,10 +153,10 @@ Logs clearly show which script they belong to:
 - Check that scene name matches script name (without .py)
 - Verify playlist URL is set (no default URL)
 
-### Scripts Interfering
-- Confirm each uses different playlist URLs
-- Check cache directories are separate
-- Ensure Media/Text source names are `video` and `title`
+### Scripts Showing Wrong Configuration (Fixed in v3.6.0)
+- Update to v3.6.0 or later
+- Each script now maintains completely isolated state
+- No more cross-contamination between instances
 
 ### Module Updates
 - Changes to modules affect ALL scripts
@@ -173,5 +184,6 @@ Each maintains its own:
 - Cache directory
 - Playlist configuration
 - Playback settings
+- Isolated state (v3.6.0)
 
 While sharing the same reliable core modules!
