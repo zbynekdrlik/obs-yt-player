@@ -1,6 +1,7 @@
 """
 OBS YouTube Player - Syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), 
-and plays them randomly via Media Source with metadata display. All processing runs in background threads.
+and plays them randomly via Media Source. Features optional AI-powered metadata extraction using Google Gemini 
+for superior artist/song detection. All processing runs in background threads.
 """
 
 import obspython as obs
@@ -106,7 +107,7 @@ def script_properties():
     obs.obs_properties_add_text(
         props,
         "gemini_description",
-        "Note: Gemini API key is used for artist/song name detection",
+        "Optional: Provides better artist/song detection than title parsing",
         obs.OBS_TEXT_INFO
     )
     

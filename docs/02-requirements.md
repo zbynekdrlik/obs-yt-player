@@ -20,23 +20,27 @@ It is authoritative; later Phase prompts reference this spec.
   - Allows multiple script instances with separate caches
   - Users can easily modify path in text field
 - Sanitise filenames: `<song>_<artist>_<id>_normalized.mp4`.  
-- Add `_gf` suffix for videos where Gemini extraction failed.
+- Add `_gf` suffix for videos where Gemini extraction failed or was unavailable.
 - Retain only newest duplicate; clean temp `.part` files.
 
 ## Metadata Retrieval
-- Primary: **Google Gemini API** (required, must be configured with API key).
+- Primary: **Google Gemini API** (optional but recommended, configured via API key).
   - Uses AI with Google Search grounding to extract artist/song
-  - Most accurate for complex titles
+  - Provides significantly more accurate results than title parsing
+  - Handles complex formats, international content, and edge cases
   - Failed extractions marked with `_gf` for automatic retry
-- Fallback: Smart title parser when Gemini unavailable or fails
+- Fallback: Smart title parser (always available)
+  - Activates when Gemini API key not configured or when Gemini fails
   - Handles "Artist - Song" and "Song | Artist" patterns
   - Conservative fallback ensures videos always play
+  - Files processed without Gemini are marked with `_gf` suffix
 - Apply universal song title cleaning to ALL results
 - Remove annotations like (Live), [Official], (feat. Artist)
 - Log all cleaning transformations for debugging
 
 ## Automatic Retry System
 - Videos with `_gf` marker are automatically retried on startup
+- Retry only occurs if Gemini API key is now configured
 - If Gemini succeeds on retry, file is renamed without marker
 - Metadata is updated in cache registry
 - Ensures maximum accuracy over time without manual intervention
