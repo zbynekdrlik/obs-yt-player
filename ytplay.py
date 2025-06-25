@@ -208,7 +208,10 @@ def script_properties():
     )
     obs.obs_property_set_visible(warning_prop, False)
     
-    # Initial warning check will happen after settings are loaded
+    # Force initial warning check
+    if _global_settings:
+        update_warning_visibility(props, None, _global_settings)
+    
     return props
 
 def script_defaults(settings):
