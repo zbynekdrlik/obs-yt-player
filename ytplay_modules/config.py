@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.5.6"  # Fixed scene verification to run only once
+SCRIPT_VERSION = "3.5.7"  # Added configuration warnings in script properties UI
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context

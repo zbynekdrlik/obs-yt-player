@@ -28,7 +28,7 @@ if MODULES_DIR not in sys.path:
 from config import (
     SCRIPT_VERSION, SCENE_CHECK_DELAY,
     PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, DEFAULT_PLAYBACK_MODE,
-    DEFAULT_AUDIO_ONLY_MODE
+    DEFAULT_AUDIO_ONLY_MODE, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
 )
 from logger import log, cleanup_logging
 from state import (
@@ -50,33 +50,127 @@ set_script_dir(SCRIPT_DIR)
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
 from download import start_video_processing_thread
-from scene import verify_scene_setup, on_frontend_event
+from scene import verify_scene_setup, on_frontend_event, reset_scene_error_flag
 from playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
 from metadata import clear_gemini_failures
 from reprocess import start_reprocess_thread
 
 # Store timer references
 _verify_scene_timer = None
+_warning_update_timer = None
+
+# Global settings reference for warnings update
+_global_settings = None
+_global_props = None
 
 # ===== OBS SCRIPT INTERFACE =====
 def script_description():
     """Return script description for OBS."""
     return __doc__.strip()
 
+def check_configuration_warnings():
+    """Check for configuration issues and return warning messages."""
+    warnings = []
+    
+    # Check for missing scene
+    scene_source = obs.obs_get_source_by_name(SCRIPT_NAME)
+    if not scene_source:
+        warnings.append(f"⚠️ Scene '{SCRIPT_NAME}' not found! Create it in OBS.")
+    else:
+        obs.obs_source_release(scene_source)
+        
+        # Check for missing sources within the scene
+        scene = obs.obs_scene_from_source(scene_source) if scene_source else None
+        if scene:
+            media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+            if not media_source:
+                warnings.append(f"⚠️ Media Source '{MEDIA_SOURCE_NAME}' not found in scene!")
+            else:
+                obs.obs_source_release(media_source)
+                
+            text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+            if not text_source:
+                warnings.append(f"⚠️ Text Source '{TEXT_SOURCE_NAME}' not found in scene!")
+            else:
+                obs.obs_source_release(text_source)
+    
+    # Check for missing playlist URL
+    if not get_playlist_url():
+        warnings.append("⚠️ No playlist URL configured!")
+    
+    # Check if tools are ready
+    if not is_tools_ready():
+        warnings.append("⚠️ Tools (yt-dlp/ffmpeg) not ready yet...")
+    
+    return warnings
+
+def update_warning_visibility(props, prop, settings):
+    """Update the visibility and content of warning labels."""
+    if not props:
+        return
+        
+    warnings = check_configuration_warnings()
+    
+    # Update each warning label
+    for i in range(5):  # Support up to 5 warnings
+        warning_prop = obs.obs_properties_get(props, f"warning_{i}")
+        if warning_prop:
+            if i < len(warnings):
+                obs.obs_property_set_visible(warning_prop, True)
+                obs.obs_property_set_description(warning_prop, warnings[i])
+            else:
+                obs.obs_property_set_visible(warning_prop, False)
+    
+    # Update the main warning header visibility
+    warning_header = obs.obs_properties_get(props, "warning_header")
+    if warning_header:
+        obs.obs_property_set_visible(warning_header, len(warnings) > 0)
+    
+    return True
+
 def script_properties():
     """Define script properties shown in OBS UI."""
+    global _global_props
     props = obs.obs_properties_create()
+    _global_props = props
+    
+    # Warning section at the top
+    obs.obs_properties_add_text(
+        props,
+        "warning_header",
+        "⚠️ CONFIGURATION WARNINGS:",
+        obs.OBS_TEXT_INFO
+    )
+    
+    # Add multiple warning slots (hidden by default)
+    for i in range(5):
+        warning_prop = obs.obs_properties_add_text(
+            props,
+            f"warning_{i}",
+            "",  # Content will be set dynamically
+            obs.OBS_TEXT_INFO
+        )
+        obs.obs_property_set_visible(warning_prop, False)
+    
+    # Add separator after warnings
+    obs.obs_properties_add_text(
+        props,
+        "separator_warnings",
+        "─────────────────────────────",
+        obs.OBS_TEXT_INFO
+    )
     
     # Playlist URL text field
-    obs.obs_properties_add_text(
+    playlist_prop = obs.obs_properties_add_text(
         props, 
         "playlist_url", 
         "YouTube Playlist URL", 
         obs.OBS_TEXT_DEFAULT
     )
+    obs.obs_property_set_modified_callback(playlist_prop, update_warning_visibility)
     
     # Cache directory text field - editable for easy customization
-    obs.obs_properties_add_text(
+    cache_prop = obs.obs_properties_add_text(
         props,
         "cache_dir",
         "Cache Directory",
@@ -128,13 +222,22 @@ def script_properties():
     )
     
     # Sync Now button at the bottom
-    obs.obs_properties_add_button(
+    sync_button = obs.obs_properties_add_button(
         props,
         "sync_now",
         "Sync Playlist Now",
         sync_now_callback
     )
     
+    # Refresh warnings button
+    refresh_button = obs.obs_properties_add_button(
+        props,
+        "refresh_warnings",
+        "Refresh Warnings",
+        lambda props, prop: update_warning_visibility(_global_props, prop, _global_settings)
+    )
+    
+    # Initial warning check will happen after settings are loaded
     return props
 
 def script_defaults(settings):
@@ -152,6 +255,9 @@ def script_defaults(settings):
 
 def script_update(settings):
     """Called when script properties are updated."""
+    global _global_settings
+    _global_settings = settings
+    
     playlist_url = obs.obs_data_get_string(settings, "playlist_url")
     cache_dir = obs.obs_data_get_string(settings, "cache_dir")
     playback_mode = obs.obs_data_get_string(settings, "playback_mode")
@@ -204,15 +310,28 @@ def script_update(settings):
     else:
         set_gemini_api_key(None)
     
+    # Update warnings whenever settings change
+    if _global_props:
+        update_warning_visibility(_global_props, None, settings)
+    
     log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}, Audio-only: {audio_only_mode}")
+
+def warnings_update_timer():
+    """Timer callback to periodically update warnings."""
+    if _global_props and _global_settings:
+        update_warning_visibility(_global_props, None, _global_settings)
 
 def script_load(settings):
     """Called when script is loaded."""
-    global _verify_scene_timer
+    global _verify_scene_timer, _warning_update_timer, _global_settings
+    _global_settings = settings
     
     set_stop_threads(False)
     
     log(f"Script version {SCRIPT_VERSION} loaded")
+    
+    # Reset scene error flag
+    reset_scene_error_flag()
     
     # Clear Gemini failure cache on script restart
     clear_gemini_failures()
@@ -224,6 +343,10 @@ def script_load(settings):
     _verify_scene_timer = verify_scene_setup
     obs.timer_add(_verify_scene_timer, SCENE_CHECK_DELAY)
     
+    # Start periodic warning updates (every 5 seconds)
+    _warning_update_timer = warnings_update_timer
+    obs.timer_add(_warning_update_timer, 5000)
+    
     # Start worker threads
     start_worker_threads()
     
@@ -234,7 +357,7 @@ def script_load(settings):
 
 def script_unload():
     """Called when script is unloaded."""
-    global _verify_scene_timer
+    global _verify_scene_timer, _warning_update_timer
     
     log("Script unloading...")
     
@@ -247,6 +370,9 @@ def script_unload():
     # Remove timers
     if _verify_scene_timer:
         obs.timer_remove(_verify_scene_timer)
+    
+    if _warning_update_timer:
+        obs.timer_remove(_warning_update_timer)
     
     stop_playback_controller()
     
