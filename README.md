@@ -46,7 +46,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 In script properties, configure:
 - **YouTube Playlist URL**: Your playlist URL
 - **Cache Directory**: Where to store videos (auto-created)
-- **Gemini API Key**: Get free at https://makersuite.google.com/app/apikey
+- **Gemini API Key**: Get free at https://aistudio.google.com/app/apikey
 - **Playback Mode**: Choose between Continuous, Single, or Loop
 
 ### 3. Scene Setup
@@ -182,7 +182,7 @@ ytfast_modules/
 
 ## Getting a Gemini API Key
 
-1. Visit https://makersuite.google.com/app/apikey
+1. Visit https://aistudio.google.com/app/apikey
 2. Sign in with Google account
 3. Click "Create API Key"
 4. Copy key to OBS script settings
