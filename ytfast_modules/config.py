@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.3.1"  # Improved README documentation
+SCRIPT_VERSION = "3.4.0"  # Added audio-only mode for minimal video quality
 
 # Get script information from environment or defaults
 SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
@@ -23,6 +23,9 @@ PLAYBACK_MODE_CONTINUOUS = "continuous"  # Play videos forever (default)
 PLAYBACK_MODE_SINGLE = "single"  # Play only first video and stop
 PLAYBACK_MODE_LOOP = "loop"  # Loop the first video
 DEFAULT_PLAYBACK_MODE = PLAYBACK_MODE_CONTINUOUS
+
+# Audio-only mode settings
+DEFAULT_AUDIO_ONLY_MODE = False
 
 # OBS Scene and Source names
 SCENE_NAME = SCRIPT_NAME  # Scene name matches script filename without extension
@@ -42,6 +45,7 @@ TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
 
 # Video settings
 MAX_RESOLUTION = "1440"
+MIN_VIDEO_HEIGHT = "144"  # Minimum video quality for audio-only mode
 
 # Network timeouts (seconds)
 DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads

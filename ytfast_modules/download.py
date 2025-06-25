@@ -9,12 +9,12 @@ import subprocess
 import threading
 import queue
 
-from config import MAX_RESOLUTION, DOWNLOAD_TIMEOUT, SCRIPT_VERSION
+from config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT, SCRIPT_VERSION
 from logger import log
 from state import (
     video_queue, process_videos_thread, should_stop_threads,
     get_cache_dir, is_video_cached, add_cached_video,
-    download_progress_milestones
+    download_progress_milestones, is_audio_only_mode
 )
 from utils import get_ytdlp_path, get_ffmpeg_path
 from metadata import get_video_metadata
@@ -34,10 +34,22 @@ def download_video(video_id, title):
             log(f"Error removing temp file: {e}")
     
     try:
+        # Check if audio-only mode is enabled
+        audio_only_mode = is_audio_only_mode()
+        
+        # Set video quality format based on mode
+        if audio_only_mode:
+            # Minimal video quality (144p) with best audio
+            format_string = f'bestvideo[height<={MIN_VIDEO_HEIGHT}]+bestaudio/worst[height<={MIN_VIDEO_HEIGHT}]+bestaudio/bestaudio'
+            log(f"Audio-only mode: downloading minimal video quality ({MIN_VIDEO_HEIGHT}p) with best audio")
+        else:
+            # Normal quality settings
+            format_string = f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best'
+        
         # First, get video info to log quality
         info_cmd = [
             get_ytdlp_path(),
-            '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
+            '-f', format_string,
             '--print', '%(width)s,%(height)s,%(fps)s,%(vcodec)s,%(acodec)s',
             '--no-warnings',
             f'https://www.youtube.com/watch?v={video_id}'
@@ -64,14 +76,15 @@ def download_video(video_id, title):
                     fps = info_parts[2] if len(info_parts) > 2 else "?"
                     vcodec = info_parts[3] if len(info_parts) > 3 else "?"
                     acodec = info_parts[4] if len(info_parts) > 4 else "?"
-                    log(f"Video quality: {width}x{height} @ {fps}fps, video: {vcodec}, audio: {acodec}")
+                    quality_mode = "Audio-only mode" if audio_only_mode else "Normal mode"
+                    log(f"{quality_mode} - Video quality: {width}x{height} @ {fps}fps, video: {vcodec}, audio: {acodec}")
         except Exception as e:
             log(f"Could not get video info: {e}")
         
         # Now download the video
         cmd = [
             get_ytdlp_path(),
-            '-f', f'bestvideo[height<={MAX_RESOLUTION}]+bestaudio/best[height<={MAX_RESOLUTION}]/best',
+            '-f', format_string,
             '--merge-output-format', 'mp4',
             '--ffmpeg-location', get_ffmpeg_path(),
             '--no-playlist',

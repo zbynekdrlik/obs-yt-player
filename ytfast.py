@@ -24,7 +24,8 @@ if MODULES_DIR not in sys.path:
 # Import modules after path is set
 from config import (
     SCRIPT_VERSION, DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, SCENE_CHECK_DELAY,
-    PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, DEFAULT_PLAYBACK_MODE
+    PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, DEFAULT_PLAYBACK_MODE,
+    DEFAULT_AUDIO_ONLY_MODE
 )
 from logger import log, cleanup_logging
 from state import (
@@ -34,7 +35,8 @@ from state import (
     set_gemini_api_key,
     get_playback_mode, set_playback_mode,
     set_first_video_played, set_loop_video_id,
-    get_current_playback_video_id, is_playing
+    get_current_playback_video_id, is_playing,
+    is_audio_only_mode, set_audio_only_mode
 )
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
@@ -85,6 +87,13 @@ def script_properties():
     obs.obs_property_list_add_string(playback_mode, "Single (Play one video and stop)", PLAYBACK_MODE_SINGLE)
     obs.obs_property_list_add_string(playback_mode, "Loop (Repeat current video)", PLAYBACK_MODE_LOOP)
     
+    # Audio-only mode checkbox
+    obs.obs_properties_add_bool(
+        props,
+        "audio_only_mode",
+        "Audio Only Mode (Minimal video quality, high audio quality)"
+    )
+    
     # Gemini API key field (password type for security)
     obs.obs_properties_add_text(
         props, 
@@ -116,6 +125,7 @@ def script_defaults(settings):
     obs.obs_data_set_default_string(settings, "playlist_url", DEFAULT_PLAYLIST_URL)
     obs.obs_data_set_default_string(settings, "cache_dir", DEFAULT_CACHE_DIR)
     obs.obs_data_set_default_string(settings, "playback_mode", DEFAULT_PLAYBACK_MODE)
+    obs.obs_data_set_default_bool(settings, "audio_only_mode", DEFAULT_AUDIO_ONLY_MODE)
     obs.obs_data_set_default_string(settings, "gemini_api_key", "")
 
 def script_update(settings):
@@ -123,6 +133,7 @@ def script_update(settings):
     playlist_url = obs.obs_data_get_string(settings, "playlist_url")
     cache_dir = obs.obs_data_get_string(settings, "cache_dir")
     playback_mode = obs.obs_data_get_string(settings, "playback_mode")
+    audio_only_mode = obs.obs_data_get_bool(settings, "audio_only_mode")
     gemini_key = obs.obs_data_get_string(settings, "gemini_api_key")
     
     # Check if playback mode changed
@@ -131,6 +142,7 @@ def script_update(settings):
     set_playlist_url(playlist_url)
     set_cache_dir(cache_dir)
     set_playback_mode(playback_mode)
+    set_audio_only_mode(audio_only_mode)
     
     # Reset playback state if mode changed
     if old_mode != playback_mode:
@@ -170,7 +182,7 @@ def script_update(settings):
     else:
         set_gemini_api_key(None)
     
-    log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}")
+    log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}, Audio-only: {audio_only_mode}")
 
 def script_load(settings):
     """Called when script is loaded."""

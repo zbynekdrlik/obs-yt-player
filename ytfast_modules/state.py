@@ -4,7 +4,7 @@ Thread-safe state variables and accessors.
 """
 
 import threading
-from config import DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, DEFAULT_PLAYBACK_MODE
+from config import DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, DEFAULT_PLAYBACK_MODE, DEFAULT_AUDIO_ONLY_MODE
 
 # Threading synchronization
 _state_lock = threading.Lock()
@@ -14,6 +14,7 @@ _playlist_url = DEFAULT_PLAYLIST_URL
 _cache_dir = DEFAULT_CACHE_DIR
 _gemini_api_key = None  # Add Gemini API key state
 _playback_mode = DEFAULT_PLAYBACK_MODE  # Playback behavior mode
+_audio_only_mode = DEFAULT_AUDIO_ONLY_MODE  # Audio-only mode flag
 
 # System state flags
 _tools_ready = False
@@ -91,6 +92,17 @@ def set_playback_mode(mode):
     global _playback_mode
     with _state_lock:
         _playback_mode = mode
+
+def is_audio_only_mode():
+    """Get the audio-only mode setting."""
+    with _state_lock:
+        return _audio_only_mode
+
+def set_audio_only_mode(enabled):
+    """Set the audio-only mode."""
+    global _audio_only_mode
+    with _state_lock:
+        _audio_only_mode = enabled
 
 # ===== STATE FLAG ACCESSORS =====
 def is_tools_ready():

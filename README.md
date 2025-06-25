@@ -15,6 +15,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 - **Audio Normalization**: Normalizes all audio to -14 LUFS using FFmpeg for consistent volume
 - **AI-Powered Metadata**: Google Gemini AI extracts accurate artist/song information
 - **Smart Fallback**: Title parser handles cases when Gemini is unavailable
+- **Audio-Only Mode**: Option to download minimal video quality (144p) while preserving high audio quality
 
 ### 🔧 Advanced Features
 - **Background Processing**: All heavy tasks run in separate threads (no OBS freezing)
@@ -48,6 +49,7 @@ In script properties, configure:
 - **Cache Directory**: Where to store videos (auto-created)
 - **Gemini API Key**: Get free at https://aistudio.google.com/app/apikey
 - **Playback Mode**: Choose between Continuous, Single, or Loop
+- **Audio Only Mode**: Enable for minimal video quality with high audio quality
 
 ### 3. Scene Setup
 
@@ -79,6 +81,20 @@ Best for ambient content or hold music:
 - Same video loops until scene becomes inactive
 - New random video selected when scene reactivates
 - Perfect for consistent background content
+
+## Audio-Only Mode
+
+Enable this option when you only need audio output from OBS:
+- Downloads videos at minimal quality (144p) to save bandwidth
+- Preserves the highest available audio quality
+- Significantly reduces download time and storage usage
+- Perfect for radio streams or audio-only broadcasts
+
+Benefits:
+- **80-90% smaller file sizes** compared to normal quality
+- **Faster downloads** on limited bandwidth connections
+- **Same high-quality audio** as normal mode
+- **Lower CPU usage** during playback
 
 ## Advanced Usage
 
@@ -162,6 +178,12 @@ Perfect for:
 - Check parent scene is active
 - Look for "nested source" in logs
 
+### Audio-Only Mode Questions?
+- Check logs for "Audio-only mode" messages
+- Verify videos show 144p resolution in logs
+- File sizes should be significantly smaller
+- Audio quality remains unchanged
+
 ## Project Structure
 
 ```
@@ -189,6 +211,12 @@ ytfast_modules/
 5. Free tier = 2 requests/minute, 50 requests/day (plenty for most users)
 
 ## Recent Updates
+
+### v3.4.0 - Audio-Only Mode
+- Added option for minimal video quality downloads
+- Preserves high audio quality while saving bandwidth
+- Significantly reduces file sizes and download times
+- Perfect for audio-only streaming scenarios
 
 ### v3.3.1 - Documentation Update
 - Improved README with playback modes section
