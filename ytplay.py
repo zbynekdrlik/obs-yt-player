@@ -41,7 +41,8 @@ from state import (
     set_first_video_played, set_loop_video_id,
     get_current_playback_video_id, is_playing,
     is_audio_only_mode, set_audio_only_mode,
-    set_script_name, set_script_dir
+    set_script_name, set_script_dir,
+    set_thread_script_context
 )
 
 # v3.6.0: Initialize script-specific state using the script path as unique identifier
@@ -55,7 +56,7 @@ set_script_dir(SCRIPT_DIR)
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
 from download import start_video_processing_thread
-from scene import schedule_scene_verification, on_frontend_event, reset_scene_error_flag
+from scene import verify_scene_setup, on_frontend_event, reset_scene_error_flag
 from playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
 from metadata import clear_gemini_failures
 from reprocess import start_reprocess_thread
@@ -314,6 +315,17 @@ def warnings_update_timer():
         obs.timer_remove(warnings_update_timer)
         obs.timer_add(warnings_update_timer, 5000)
 
+def verify_scene_timer():
+    """Timer callback for scene verification with proper script context."""
+    # v3.6.6: Set script context for timer callback
+    set_thread_script_context(SCRIPT_PATH)
+    
+    # Verify scene setup
+    verify_scene_setup()
+    
+    # Remove this timer - only run once
+    obs.timer_remove(verify_scene_timer)
+
 def script_load(settings):
     """Called when script is loaded."""
     global _verify_scene_timer, _warning_update_timer, _global_settings, _is_unloading
@@ -340,9 +352,8 @@ def script_load(settings):
     # Apply initial settings
     script_update(settings)
     
-    # v3.6.4: Schedule scene verification using the proper wrapper function
-    _verify_scene_timer = schedule_scene_verification(SCRIPT_PATH)
-    obs.timer_add(_verify_scene_timer, SCENE_CHECK_DELAY)
+    # v3.6.6: Schedule scene verification using a timer with proper context
+    obs.timer_add(verify_scene_timer, SCENE_CHECK_DELAY)
     
     # Note: Warning timer temporarily disabled to prevent crashes
     # TODO: Implement safer warning update mechanism
@@ -371,8 +382,7 @@ def script_unload():
     stop_worker_threads()
     
     # Remove timers
-    if _verify_scene_timer:
-        obs.timer_remove(_verify_scene_timer)
+    obs.timer_remove(verify_scene_timer)
     
     if _warning_update_timer:
         obs.timer_remove(_warning_update_timer)
