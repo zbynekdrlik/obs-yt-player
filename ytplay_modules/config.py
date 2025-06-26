@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.6.7"  # Fixed warning system cross-contamination between scripts
+SCRIPT_VERSION = "3.6.8"  # Fixed frontend event handler and timer context issues
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context
