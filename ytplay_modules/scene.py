@@ -19,69 +19,66 @@ from state import (
 _last_scene_change_time = 0
 _pending_deactivation = False
 _deactivation_timer = None
-_scene_error_logged = False  # Track if we've already logged the missing scene error
-_verify_timer_script_path = None  # Track which script registered the verify timer
 
-def verify_scene_setup_with_context():
-    """Wrapper for verify_scene_setup that sets proper script context."""
-    global _verify_timer_script_path
-    
-    # v3.6.2: Set script context for timer callback
-    if _verify_timer_script_path:
-        set_thread_script_context(_verify_timer_script_path)
-    
-    verify_scene_setup()
+# v3.6.5: Script-specific scene error tracking
+# Dictionary to track scene errors per script path
+_scene_errors_logged = {}
 
 def verify_scene_setup():
     """Verify that required scene and sources exist."""
-    global _scene_error_logged
+    # Get current script path for tracking
+    script_path = get_current_script_path()
+    if not script_path:
+        log("ERROR: Script path not available!")
+        return
     
     scene_name = get_script_name()  # Get scene name from state
     if not scene_name:
         log("ERROR: Script name not initialized!")
         return
     
+    # Check if we've already logged error for this script
+    scene_error_logged = _scene_errors_logged.get(script_path, False)
+    
+    # Log the scene verification with script name prefix for clarity
+    log(f"=== SOURCE VERIFICATION ===")
+    
     scene_source = obs.obs_get_source_by_name(scene_name)
     if not scene_source:
-        if not _scene_error_logged:
-            log(f"ERROR: Required scene '{scene_name}' not found! Please create it.")
-            _scene_error_logged = True
-        return
-    
-    # Scene exists, reset error flag
-    _scene_error_logged = False
-    
-    scene = obs.obs_scene_from_source(scene_source)
-    if scene:
-        # Check for required sources
-        media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-        text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+        log(f"Scene '{scene_name}': ✗ MISSING")
+        if not scene_error_logged:
+            _scene_errors_logged[script_path] = True
+    else:
+        log(f"Scene '{scene_name}': ✓ EXISTS")
+        # Scene exists, reset error flag for this script
+        _scene_errors_logged[script_path] = False
         
-        if not media_source:
-            log(f"WARNING: Media Source '{MEDIA_SOURCE_NAME}' not found in scene")
-        else:
-            obs.obs_source_release(media_source)
-            
-        if not text_source:
-            log(f"WARNING: Text Source '{TEXT_SOURCE_NAME}' not found in scene")
-        else:
-            obs.obs_source_release(text_source)
+        scene = obs.obs_scene_from_source(scene_source)
+        if scene:
+            # Check for required sources
+            media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+            if not media_source:
+                log(f"Media Source '{MEDIA_SOURCE_NAME}': ✗ MISSING")
+            else:
+                media_source_type = obs.obs_source_get_id(media_source)
+                log(f"Media Source '{MEDIA_SOURCE_NAME}': ✓ EXISTS (type: {media_source_type})")
+                obs.obs_source_release(media_source)
+                
+            text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
+            if not text_source:
+                log(f"Text Source '{TEXT_SOURCE_NAME}': ✗ MISSING")
+            else:
+                log(f"Text Source '{TEXT_SOURCE_NAME}': ✓ EXISTS")
+                obs.obs_source_release(text_source)
+        
+        obs.obs_source_release(scene_source)
     
-    obs.obs_source_release(scene_source)
+    log("NOTE: Script will disable OBS 'Loop' checkbox to manage playback behavior")
+    log("==========================")
     
-    # Remove this timer - only run once
-    obs.timer_remove(verify_scene_setup_with_context)
-    _verify_timer_script_path = None
-
-def schedule_scene_verification(script_path):
-    """Schedule scene verification with proper script context."""
-    global _verify_timer_script_path
-    
-    # v3.6.2: Store script path for timer callback
-    _verify_timer_script_path = script_path
-    
-    # Return the wrapper function that will be used as timer callback
-    return verify_scene_setup_with_context
+    # Log error message after the verification block if scene is missing
+    if not scene_source and not scene_error_logged:
+        log(f"ERROR: Required scene '{scene_name}' not found! Please create it.")
 
 def is_scene_visible_nested(scene_name, check_scene_source=None):
     """
@@ -342,6 +339,8 @@ def handle_obs_exit():
 
 def reset_scene_error_flag():
     """Reset the scene error flag - useful when reloading script."""
-    global _scene_error_logged, _verify_timer_script_path
-    _scene_error_logged = False
-    _verify_timer_script_path = None
+    global _scene_errors_logged
+    # v3.6.5: Clear the script-specific error tracking
+    script_path = get_current_script_path()
+    if script_path and script_path in _scene_errors_logged:
+        _scene_errors_logged[script_path] = False
