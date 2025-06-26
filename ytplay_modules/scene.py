@@ -11,7 +11,8 @@ from logger import log
 from state import (
     set_scene_active, is_scene_active, is_playing, 
     set_stop_threads, get_playback_mode, is_first_video_played,
-    set_first_video_played, get_script_name
+    set_first_video_played, get_script_name, get_current_script_path,
+    set_thread_script_context
 )
 
 # Module-level variables for transition tracking
@@ -19,6 +20,17 @@ _last_scene_change_time = 0
 _pending_deactivation = False
 _deactivation_timer = None
 _scene_error_logged = False  # Track if we've already logged the missing scene error
+_verify_timer_script_path = None  # Track which script registered the verify timer
+
+def verify_scene_setup_with_context():
+    """Wrapper for verify_scene_setup that sets proper script context."""
+    global _verify_timer_script_path
+    
+    # v3.6.2: Set script context for timer callback
+    if _verify_timer_script_path:
+        set_thread_script_context(_verify_timer_script_path)
+    
+    verify_scene_setup()
 
 def verify_scene_setup():
     """Verify that required scene and sources exist."""
@@ -58,7 +70,18 @@ def verify_scene_setup():
     obs.obs_source_release(scene_source)
     
     # Remove this timer - only run once
-    obs.timer_remove(verify_scene_setup)
+    obs.timer_remove(verify_scene_setup_with_context)
+    _verify_timer_script_path = None
+
+def schedule_scene_verification(script_path):
+    """Schedule scene verification with proper script context."""
+    global _verify_timer_script_path
+    
+    # v3.6.2: Store script path for timer callback
+    _verify_timer_script_path = script_path
+    
+    # Return the wrapper function that will be used as timer callback
+    return verify_scene_setup_with_context
 
 def is_scene_visible_nested(scene_name, check_scene_source=None):
     """
@@ -319,5 +342,6 @@ def handle_obs_exit():
 
 def reset_scene_error_flag():
     """Reset the scene error flag - useful when reloading script."""
-    global _scene_error_logged
+    global _scene_error_logged, _verify_timer_script_path
     _scene_error_logged = False
+    _verify_timer_script_path = None
