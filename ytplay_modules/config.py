@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.0"  # Phase 14: Modular architecture redesign
+SCRIPT_VERSION = "4.0.1"  # Phase 14: Module migration in progress
 
 # Default settings
 DEFAULT_PLAYLIST_URL = ""  # No default - users must configure their own
