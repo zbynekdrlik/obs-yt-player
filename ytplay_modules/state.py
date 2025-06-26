@@ -2,7 +2,7 @@
 Global state management for OBS YouTube Player.
 Thread-safe state variables with true multi-instance support.
 
-v3.6.1: Fixed backward compatibility for download_progress_milestones
+v3.6.1: Fixed backward compatibility and thread isolation
 Each script instance maintains its own isolated state.
 """
 
@@ -61,6 +61,7 @@ class ScriptState:
         self.tools_thread = None
         self.playlist_sync_thread = None
         self.process_videos_thread = None
+        self.reprocess_thread = None  # v3.6.1: Added missing thread reference
 
         # Progress tracking
         self.download_progress_milestones = {}  # Track logged milestones per video
@@ -412,6 +413,7 @@ video_queue = None
 tools_thread = None
 playlist_sync_thread = None
 process_videos_thread = None
+reprocess_thread = None  # v3.6.1: Added
 download_progress_milestones = {}  # v3.6.1: Fixed - was missing
 
 # This function should be called by each script to set up its context
@@ -421,12 +423,13 @@ def initialize_script_context(script_path):
     state = get_or_create_state(script_path)
     
     # Update module-level references for backward compatibility
-    global sync_event, video_queue, tools_thread, playlist_sync_thread, process_videos_thread, download_progress_milestones
+    global sync_event, video_queue, tools_thread, playlist_sync_thread, process_videos_thread, reprocess_thread, download_progress_milestones
     sync_event = state.sync_event
     video_queue = state.video_queue
     tools_thread = state.tools_thread
     playlist_sync_thread = state.playlist_sync_thread
     process_videos_thread = state.process_videos_thread
+    reprocess_thread = state.reprocess_thread
     download_progress_milestones = state.download_progress_milestones
     
     return state
