@@ -59,6 +59,7 @@ def initialize_script_context(script_path: str) -> Dict[str, Any]:
                 # Scene state
                 'scene_verified': False,
                 'scene_error_shown': False,
+                'scene_active': False,
                 
                 # Threads
                 'threads': {}
@@ -238,6 +239,11 @@ def set_current_file_path(path: Optional[str]):
     state = get_state()
     state['current_file_path'] = path
 
+# Additional alias for compatibility
+def set_current_video_path(path: Optional[str]):
+    """Set current video path (alias for set_current_file_path)."""
+    set_current_file_path(path)
+
 def get_last_played_video() -> Optional[str]:
     """Get last played video ID."""
     state = get_state()
@@ -351,6 +357,16 @@ def reset_scene_error_flag():
     state = get_state()
     state['scene_error_shown'] = False
 
+def is_scene_active() -> bool:
+    """Check if scene is active."""
+    state = get_state()
+    return state.get('scene_active', False)
+
+def set_scene_active(active: bool):
+    """Set scene active state."""
+    state = get_state()
+    state['scene_active'] = active
+
 # ===== THREAD MANAGEMENT =====
 def register_thread(name: str, thread):
     """Register a thread for this script instance."""
@@ -367,3 +383,13 @@ def unregister_thread(name: str):
     state = get_state()
     if name in state['threads']:
         del state['threads'][name]
+
+# ===== CACHED VIDEO INFO =====
+def get_cached_videos() -> set:
+    """Get set of cached video IDs."""
+    return get_local_videos()
+
+def get_cached_video_info(video_id: str) -> Optional[dict]:
+    """Get cached video info."""
+    metadata = get_metadata_cache()
+    return metadata.get(video_id)
