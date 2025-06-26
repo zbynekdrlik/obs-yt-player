@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.6.6"  # Fixed ytplay.py import after scene module refactor
+SCRIPT_VERSION = "3.6.7"  # Fixed warning system cross-contamination between scripts
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context
