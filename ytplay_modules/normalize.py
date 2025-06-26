@@ -8,11 +8,12 @@ import re
 import json
 import subprocess
 
-from config import NORMALIZE_TIMEOUT
-from logger import log
-from state import get_cache_dir
-from tools import get_ffmpeg_path
-from utils import sanitize_filename
+# Use absolute imports to fix module loading issue
+from ytplay_modules.config import NORMALIZE_TIMEOUT
+from ytplay_modules.logger import log
+from ytplay_modules.state import get_cache_dir
+from ytplay_modules.tools import get_ffmpeg_path
+from ytplay_modules.utils import sanitize_filename
 
 def extract_loudnorm_stats(ffmpeg_output):
     """Extract loudnorm statistics from FFmpeg output."""
