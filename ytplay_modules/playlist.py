@@ -1,5 +1,4 @@
-"""
-Playlist synchronization for OBS YouTube Player.
+"""Playlist synchronization for OBS YouTube Player.
 Handles fetching and managing YouTube playlist videos.
 """
 
@@ -10,8 +9,9 @@ import json
 import queue
 import os
 
-from logger import log
-from state import (
+# Use absolute imports to fix module loading issue
+from ytplay_modules.logger import log
+from ytplay_modules.state import (
     get_playlist_url, is_tools_ready, should_stop_threads,
     is_manual_sync_triggered, set_manual_sync_triggered,
     get_playlist_videos, set_playlist_videos,
@@ -19,7 +19,7 @@ from state import (
     get_download_queue, set_download_queue,
     get_local_videos, get_metadata_cache
 )
-from tools import get_ytdlp_path
+from ytplay_modules.tools import get_ytdlp_path
 
 # Flag to trigger startup sync
 _startup_sync_triggered = False
@@ -97,7 +97,7 @@ def sync_playlist():
         log("Starting playlist synchronization")
         
         # First scan existing cache
-        from cache import scan_existing_cache, cleanup_removed_videos
+        from ytplay_modules.cache import scan_existing_cache, cleanup_removed_videos
         scan_existing_cache()
         
         # Fetch playlist
@@ -205,7 +205,7 @@ def start_playlist_sync_thread():
     
     if not script_path:
         # Try to get from main thread state
-        import state
+        import ytplay_modules.state as state
         script_path = getattr(state._thread_local, 'script_path', None)
     
     if not script_path:
