@@ -6,15 +6,16 @@ Handles property definitions and configuration warnings.
 import obspython as obs
 import os
 
-from .config import (
+# Use absolute imports to fix module loading issue
+from ytplay_modules.config import (
     PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, 
     DEFAULT_PLAYBACK_MODE, DEFAULT_AUDIO_ONLY_MODE, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
 )
-from .state import (
+from ytplay_modules.state import (
     get_playlist_url, is_tools_ready, get_script_name, get_script_dir,
     set_current_script_path
 )
-from .logger import log
+from ytplay_modules.logger import log
 
 def check_configuration_warnings(script_path):
     """Check for configuration issues and return warning messages."""
@@ -173,7 +174,7 @@ def create_properties(script_path, script_data):
     # Sync Now button
     def sync_now_callback_wrapper(props, prop):
         # Import here to avoid circular dependency
-        from .main import sync_now_callback
+        from ytplay_modules.main import sync_now_callback
         # Set script path in props for the callback
         props._script_path = script_path
         return sync_now_callback(props, prop)
