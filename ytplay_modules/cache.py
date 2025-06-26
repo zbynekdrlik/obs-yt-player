@@ -6,8 +6,9 @@ Handles existing cache scanning and cleanup.
 import os
 from pathlib import Path
 
-from logger import log
-from state import (
+# Use absolute imports to fix module loading issue
+from ytplay_modules.logger import log
+from ytplay_modules.state import (
     get_cache_dir, get_local_videos, get_playlist_videos,
     get_current_playback_video_id, get_metadata_cache,
     get_gemini_failures
