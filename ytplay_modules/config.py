@@ -1,73 +1,73 @@
 """
 Configuration constants for OBS YouTube Player.
-Central location for all script settings and constants.
 """
 
-import os
-from pathlib import Path
+# Script version
+SCRIPT_VERSION = "4.0.6"
 
-# Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.5"  # Fixed module import issue
+# Scene and source names
+MEDIA_SOURCE_NAME = "YouTube Player Media"
+TEXT_SOURCE_NAME = "YouTube Player Title"
+
+# Download settings
+DOWNLOAD_CHECK_INTERVAL = 30 * 1000  # 30 seconds in milliseconds
+NORMALIZATION_THREADS = 2  # Number of parallel normalization threads
+
+# Playlist sync settings
+PLAYLIST_SYNC_INTERVAL = 300 * 1000  # 5 minutes in milliseconds
+SYNC_ON_STARTUP_DELAY = 10 * 1000   # 10 seconds delay before first sync
+
+# Progress tracking
+PROGRESS_LOG_POINTS = [10, 25, 50, 75, 90]  # Log at these percentages
+
+# Audio normalization
+TARGET_LUFS = -14.0  # YouTube standard
+
+# Playback settings
+PLAYBACK_CHECK_INTERVAL = 500  # 500ms check interval
+TITLE_SHOW_DELAY = 3.0  # Seconds to wait before showing title
+TITLE_CLEAR_BEFORE_END = 5.0  # Seconds before end to clear title
+
+# Scene check delay
+SCENE_CHECK_DELAY = 3000  # 3 seconds in milliseconds
+
+# Playback modes
+PLAYBACK_MODE_CONTINUOUS = "continuous"
+PLAYBACK_MODE_SINGLE = "single"
+PLAYBACK_MODE_LOOP = "loop"
 
 # Default settings
-DEFAULT_PLAYLIST_URL = ""  # Empty by default - user must configure
-DEFAULT_CACHE_DIR = None  # Will be set dynamically based on script name
-
-# Playback behavior modes
-PLAYBACK_MODE_CONTINUOUS = "continuous"  # Play videos forever (default)
-PLAYBACK_MODE_SINGLE = "single"  # Play only first video and stop
-PLAYBACK_MODE_LOOP = "loop"  # Loop the first video
 DEFAULT_PLAYBACK_MODE = PLAYBACK_MODE_CONTINUOUS
-
-# Audio-only mode settings
 DEFAULT_AUDIO_ONLY_MODE = False
 
-# OBS Source names (scene name is dynamic based on script name)
-MEDIA_SOURCE_NAME = "video"
-TEXT_SOURCE_NAME = "title"
-OPACITY_FILTER_NAME = "Title Opacity"
-
-# Tool settings
-TOOLS_SUBDIR = "tools"
-YTDLP_FILENAME = "yt-dlp.exe" if os.name == 'nt' else "yt-dlp"
-FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
-
-# Timing intervals (milliseconds)
-PLAYBACK_CHECK_INTERVAL = 1000  # 1 second
-SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
-TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
-
-# Title display settings
-TITLE_SHOW_DELAY = 3  # Seconds after video starts to show title
-TITLE_CLEAR_BEFORE_END = 10  # Seconds before video ends to clear title
-
-# Video settings
-MAX_RESOLUTION = "1440"
-MIN_VIDEO_HEIGHT = "144"  # Minimum video quality for audio-only mode
-
-# Network timeouts (seconds)
-DOWNLOAD_TIMEOUT = 600  # 10 minutes timeout for downloads
-NORMALIZE_TIMEOUT = 300  # 5 minutes timeout for normalization
-
-# URLs for tool downloads
-YTDLP_URL_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
-YTDLP_URL_WIN = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-
-# For Windows tools.py compatibility
-YTDLP_URL = YTDLP_URL_WIN
+# Tool URLs
+TOOLS_BASE_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/"
 FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 
-# FFmpeg URLs by platform (for future cross-platform support)
-FFMPEG_URLS = {
-    "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-    "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
-    "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-}
+# Error retry settings
+MAX_DOWNLOAD_RETRIES = 3
+RETRY_DELAY = 60  # seconds
 
-# Title opacity transition settings
-TITLE_FADE_DURATION = 1000  # Total duration for fade (milliseconds)
-TITLE_FADE_STEPS = 20  # Number of steps in the fade
-TITLE_FADE_INTERVAL = TITLE_FADE_DURATION // TITLE_FADE_STEPS  # Time between steps
+# File size limits
+MAX_VIDEO_SIZE_MB = 500  # Maximum video size to download
+MIN_FREE_SPACE_GB = 1  # Minimum free space required
 
-# Gemini API settings
-GEMINI_API_KEY_PROPERTY = "gemini_api_key"
+# Metadata settings
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_TIMEOUT = 30  # seconds
+GEMINI_MAX_RETRIES = 2
+GEMINI_RATE_LIMIT_DELAY = 60  # seconds
+
+# Cache cleanup
+TEMP_FILE_MAX_AGE_HOURS = 24  # Clean up temp files older than this
+CACHE_CLEANUP_INTERVAL = 3600 * 1000  # 1 hour in milliseconds
+
+# Thread management
+THREAD_SHUTDOWN_TIMEOUT = 5  # seconds to wait for threads to stop
+
+# UI settings
+WARNING_UPDATE_INTERVAL = 1000  # 1 second in milliseconds
+
+# Reprocess settings
+REPROCESS_CHECK_INTERVAL = 300 * 1000  # 5 minutes
+REPROCESS_BATCH_SIZE = 5  # Number of videos to reprocess at once
