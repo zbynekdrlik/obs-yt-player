@@ -25,6 +25,7 @@ if MODULES_DIR not in sys.path:
     sys.path.insert(0, MODULES_DIR)
 
 # Import main entry points with error handling
+import_error = None
 try:
     from main import (
         script_description as _script_description,
@@ -59,12 +60,14 @@ try:
         return _script_save(settings, SCRIPT_PATH)
     
 except ImportError as e:
+    import_error = str(e)
+    
     # Provide minimal functionality if modules can't be loaded
     def script_description():
-        return f"Error loading ytplay_modules: {e}\n\nPlease ensure ytplay_modules directory exists with all required files."
+        return f"Error loading ytplay_modules: {import_error}\n\nPlease ensure ytplay_modules directory exists with all required files."
     
     def script_load(settings):
-        obs.script_log(obs.LOG_ERROR, f"[{SCRIPT_NAME}] Failed to load modules: {e}")
+        obs.script_log(obs.LOG_ERROR, f"[{SCRIPT_NAME}] Failed to load modules: {import_error}")
     
     def script_unload():
         pass
@@ -74,7 +77,7 @@ except ImportError as e:
         obs.obs_properties_add_text(
             props,
             "error",
-            f"Error: {e}",
+            f"Error: {import_error}",
             obs.OBS_TEXT_INFO
         )
         return props
