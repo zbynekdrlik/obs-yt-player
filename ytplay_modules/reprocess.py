@@ -6,8 +6,9 @@ Handles reprocessing videos that failed Gemini extraction.
 import threading
 import time
 
-from logger import log
-from state import (
+# Use absolute imports to fix module loading issue
+from ytplay_modules.logger import log
+from ytplay_modules.state import (
     should_stop_threads, get_gemini_failures, get_gemini_api_key,
     set_thread_script_context, register_thread, unregister_thread
 )
@@ -57,9 +58,17 @@ def reprocess_worker(script_path):
 
 def start_reprocess_thread():
     """Start the reprocess thread."""
-    # Get current script path from thread context
-    import threading
-    script_path = getattr(threading.local(), 'script_path', None)
+    # Get current script path from thread-local storage
+    script_path = getattr(threading.current_thread(), '_script_path', None)
+    
+    if not script_path:
+        # Try to get from main thread state
+        import ytplay_modules.state as state
+        script_path = getattr(state._thread_local, 'script_path', None)
+    
+    if not script_path:
+        log("ERROR: No script path available for reprocess thread")
+        return
     
     thread = threading.Thread(
         target=reprocess_worker,
