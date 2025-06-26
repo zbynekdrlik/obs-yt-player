@@ -11,7 +11,7 @@ import random
 
 from .logger import log
 from .config import (
-    SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME,
+    MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME,
     PLAYBACK_CHECK_INTERVAL, TITLE_SHOW_DELAY, TITLE_CLEAR_BEFORE_END,
     PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP
 )
@@ -212,8 +212,11 @@ def verify_sources():
     """Verify that required sources exist."""
     global _sources_verified
     
+    # Get dynamic scene name from script name
+    scene_name = get_script_name()
+    
     # Check scene
-    scene_source = obs.obs_get_source_by_name(SCENE_NAME)
+    scene_source = obs.obs_get_source_by_name(scene_name)
     scene_exists = scene_source is not None
     if scene_source:
         obs.obs_source_release(scene_source)
@@ -233,7 +236,7 @@ def verify_sources():
     # Log verification results
     if not _sources_verified or not (scene_exists and media_exists and text_exists):
         log("=== SOURCE VERIFICATION ===")
-        log(f"Scene '{SCENE_NAME}': {'✓ EXISTS' if scene_exists else '✗ MISSING'}")
+        log(f"Scene '{scene_name}': {'✓ EXISTS' if scene_exists else '✗ MISSING'}")
         log(f"Media Source '{MEDIA_SOURCE_NAME}': {'✓ EXISTS' if media_exists else '✗ MISSING'}")
         log(f"Text Source '{TEXT_SOURCE_NAME}': {'✓ EXISTS' if text_exists else '✗ MISSING'}")
         log("==========================")
