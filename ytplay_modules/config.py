@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.6.2"  # Fixed thread isolation when one script is unloaded
+SCRIPT_VERSION = "3.6.3"  # Improved subprocess logging identification
 
 # Script identification is now handled by the main script
 # SCRIPT_NAME is imported from the main script context

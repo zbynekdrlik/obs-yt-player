@@ -9,14 +9,15 @@ import subprocess
 import threading
 import queue
 
-from config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT, SCRIPT_VERSION
+from config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT
 from logger import log
 from state import (
     get_current_script_path, set_thread_script_context,
     get_or_create_state, should_stop_threads_safe,
     video_queue, 
     get_cache_dir, is_video_cached, add_cached_video,
-    download_progress_milestones, is_audio_only_mode
+    download_progress_milestones, is_audio_only_mode,
+    get_script_name
 )
 from utils import get_ytdlp_path, get_ffmpeg_path
 from metadata import get_video_metadata
@@ -184,6 +185,10 @@ def process_videos_worker(script_path):
         log("Video processing thread exiting - state not found")
         return
     
+    # Log thread startup with script name
+    script_name = get_script_name()
+    log(f"Video processing thread started for {script_name}")
+    
     while not should_stop_threads_safe(script_path):
         try:
             # Get video from queue (timeout to check stop_threads)
@@ -262,7 +267,7 @@ def process_videos_worker(script_path):
         except Exception as e:
             log(f"Error processing video: {e}")
     
-    log("Video processing thread exiting")
+    log(f"Video processing thread exiting for {script_name}")
 
 def start_video_processing_thread():
     """Start the video processing thread."""
