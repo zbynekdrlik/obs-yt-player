@@ -1,5 +1,4 @@
-"""
-Playback control module for OBS YouTube Player.
+"""Playback control module for OBS YouTube Player.
 Manages video playback through OBS Media Source.
 """
 
@@ -9,13 +8,14 @@ import time
 import os
 import random
 
-from .logger import log
-from .config import (
+# Use absolute imports to fix module loading issue
+from ytplay_modules.logger import log
+from ytplay_modules.config import (
     MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME,
     PLAYBACK_CHECK_INTERVAL, TITLE_SHOW_DELAY, TITLE_CLEAR_BEFORE_END,
     PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP
 )
-from .state import (
+from ytplay_modules.state import (
     should_stop_threads, is_playing, set_playing,
     set_thread_script_context, register_thread, unregister_thread,
     get_script_name, set_current_file_path, set_current_playback_video_id,
