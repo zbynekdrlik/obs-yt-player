@@ -1,13 +1,18 @@
-"""Placeholder module - to be implemented."""
+"""Playback control for OBS YouTube Player."""
+
+import obspython as obs
+from logger import log
+from state import get_state
 
 def start_playback_controller():
-    """Placeholder."""
-    pass
+    """Start the playback controller."""
+    log("Playback controller started")
 
 def stop_playback_controller():
-    """Placeholder."""
-    pass
+    """Stop the playback controller."""
+    log("Playback controller stopped")
 
 def get_current_video_from_media_source():
-    """Placeholder."""
+    """Get current video from media source."""
+    # Placeholder implementation
     return None
