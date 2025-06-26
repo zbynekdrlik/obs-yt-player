@@ -6,12 +6,13 @@ Handles Gemini AI extraction and fallback parsing.
 import re
 import os
 
-from logger import log
-from state import get_gemini_failures, get_gemini_api_key
+# Use absolute imports to fix module loading issue
+from ytplay_modules.logger import log
+from ytplay_modules.state import get_gemini_failures, get_gemini_api_key
 
 # Import Gemini integration
 try:
-    from gemini_metadata import extract_metadata_with_gemini
+    from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
     _gemini_available = True
 except ImportError:
     _gemini_available = False
@@ -191,7 +192,7 @@ def get_current_video_from_media_source():
     """Get current video ID from media source filename."""
     # This needs OBS integration
     import obspython as obs
-    from config import MEDIA_SOURCE_NAME
+    from ytplay_modules.config import MEDIA_SOURCE_NAME
     
     try:
         # Get media source
