@@ -230,9 +230,17 @@ def tools_setup_worker(script_path):
 
 def start_tools_thread():
     """Start the tools setup thread."""
-    # Get current script path from thread context
-    import threading
-    script_path = getattr(threading.local(), 'script_path', None)
+    # Get current script path from thread-local storage
+    script_path = getattr(threading.current_thread(), '_script_path', None)
+    
+    if not script_path:
+        # Try to get from main thread state
+        import state
+        script_path = getattr(state._thread_local, 'script_path', None)
+    
+    if not script_path:
+        log("ERROR: No script path available for tools thread")
+        return
     
     thread = threading.Thread(
         target=tools_setup_worker, 
