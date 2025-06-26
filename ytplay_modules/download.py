@@ -12,7 +12,9 @@ import queue
 from config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT, SCRIPT_VERSION
 from logger import log
 from state import (
-    video_queue, process_videos_thread, should_stop_threads,
+    get_current_script_path, set_thread_script_context,
+    get_or_create_state,
+    video_queue, should_stop_threads,
     get_cache_dir, is_video_cached, add_cached_video,
     download_progress_milestones, is_audio_only_mode
 )
@@ -169,13 +171,19 @@ def parse_progress(line, video_id, title):
             milestones.add(50)
             download_progress_milestones[video_id] = milestones
 
-def process_videos_worker():
+def process_videos_worker(script_path):
     """Process videos serially - download, metadata, normalize."""
+    # v3.6.1: Set script context for this thread
+    set_thread_script_context(script_path)
+    
+    # Get state objects for this script
+    state = get_or_create_state(script_path)
+    
     while not should_stop_threads():
         try:
             # Get video from queue (timeout to check stop_threads)
             try:
-                video_info = video_queue.get(timeout=1)
+                video_info = state.video_queue.get(timeout=1)
             except queue.Empty:
                 continue
             
@@ -241,7 +249,14 @@ def process_videos_worker():
 
 def start_video_processing_thread():
     """Start the video processing thread."""
-    global process_videos_thread
-    import state
-    state.process_videos_thread = threading.Thread(target=process_videos_worker, daemon=True)
+    # v3.6.1: Get current script path to pass to thread
+    script_path = get_current_script_path()
+    state = get_or_create_state(script_path)
+    
+    # Create and start thread with script context
+    state.process_videos_thread = threading.Thread(
+        target=process_videos_worker,
+        args=(script_path,),
+        daemon=True
+    )
     state.process_videos_thread.start()
