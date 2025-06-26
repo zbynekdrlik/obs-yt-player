@@ -1,9 +1,26 @@
 # Phase 14: Modular Architecture Redesign
 
+## ⚠️ CRITICAL IMPLEMENTATION NOTE ⚠️
+
+**This phase MUST be implemented ON TOP OF the existing main branch functionality, NOT as a replacement.**
+
+All existing features from the main branch (v3.4.x) must be preserved:
+- Full video downloading with yt-dlp
+- Gemini AI metadata extraction with fallback parsing
+- Audio normalization to -14 LUFS
+- Complete playback control (continuous, single, loop modes)
+- Title display with opacity animation
+- Audio-only mode support
+- All error handling and edge cases
+
+The goal is to REFACTOR the existing code into a modular architecture while maintaining 100% feature parity.
+
 ## Version Target: 4.0.0
 
 ## Overview
 This phase aims to solve the recurring issues with multi-instance support by implementing a cleaner, more maintainable shared modules architecture. The key insight is to minimize the main script file and maximize the use of shared, well-isolated modules.
+
+**Implementation Approach**: Take the existing ytfast.py and its modules from main branch and refactor them into the new architecture, preserving ALL functionality.
 
 ## Important Migration Notes
 
@@ -27,6 +44,7 @@ This phase aims to solve the recurring issues with multi-instance support by imp
 2. **Complete Instance Isolation**: Each script instance maintains its own state without cross-contamination
 3. **Minimal Main Script**: Keep ytplay.py as thin as possible (target: <5KB)
 4. **Zero-Copy Architecture**: Eliminate the need to copy scripts - just rename and use
+5. **100% Feature Parity**: All functionality from main branch must work identically
 
 ### Secondary Goals
 1. **Simplified State Management**: Clean, dictionary-based state isolation
@@ -71,8 +89,50 @@ obs-scripts/
     ├── state.py           # State isolation manager
     ├── main.py            # Main entry points
     ├── ui.py              # UI property definitions with warnings
-    └── [other modules]    # All other functionality
+    ├── logger.py          # Thread-aware logging
+    ├── tools.py           # yt-dlp and ffmpeg management
+    ├── playlist.py        # YouTube playlist sync
+    ├── download.py        # Video downloading with progress
+    ├── metadata.py        # Gemini AI + fallback parsing
+    ├── normalize.py       # Audio normalization (-14 LUFS)
+    ├── playback.py        # Full playback control
+    ├── scene.py           # OBS scene management
+    ├── cache.py           # Cache registry and management
+    ├── utils.py           # Utility functions
+    └── reprocess.py       # Background reprocessing
 ```
+
+### Migration Strategy from Main Branch
+
+Each module in the new architecture should contain the FULL functionality from the corresponding main branch modules:
+
+1. **download.py** - Must include:
+   - Complete yt-dlp integration
+   - Progress tracking with 50% milestone logging
+   - Audio-only mode support
+   - Windows subprocess handling
+   - Error handling and timeouts
+
+2. **playback.py** - Must include:
+   - Full playback controller functionality
+   - All sub-modules (media_control, opacity_control, title_manager, etc.)
+   - Playback modes (continuous, single, loop)
+   - State management for playing/paused/ended
+   - Title animation with opacity filters
+
+3. **metadata.py** - Must include:
+   - Gemini API integration
+   - Fallback title parsing
+   - Metadata caching
+   - Error handling and retry logic
+
+4. **normalize.py** - Must include:
+   - FFmpeg integration
+   - -14 LUFS target processing
+   - File management
+   - Error handling
+
+5. **All other modules** - Complete functionality, not placeholders
 
 ### Key Design Principles
 
@@ -123,10 +183,11 @@ except ImportError as e:
 - `main.py` - Entry point orchestration
 - `ui.py` - Property definitions with warning system
 
-##### Feature Modules (Lazy Loaded)
-- Group by functionality
-- Load only when needed
-- Clear interfaces between modules
+##### Feature Modules (With Full Functionality)
+- All modules must contain complete implementations
+- No placeholders or stubs
+- Full error handling and edge cases
+- Maintain exact behavior from main branch
 
 #### 4. Instance Detection
 - Use script filename for scene name (ytplay → scene "ytplay")
@@ -150,29 +211,23 @@ except ImportError as e:
    - Function wrapping with context
 3. Target: <5KB file size
 
-### Phase 2: Refactor State Management
+### Phase 2: Migrate Existing Functionality
+1. Copy ALL code from main branch ytfast_modules/
+2. Refactor for state isolation (add script_path context)
+3. Ensure ALL features work identically
+4. No functionality should be lost or simplified
+
+### Phase 3: State Management Refactor
 1. Implement proper state isolation
 2. Use script path as unique key
 3. Add context propagation for threads
 4. Ensure complete cleanup on unload
 
-### Phase 3: Module Consolidation
-1. Combine related small modules
-2. Create clear module boundaries
-3. Minimize inter-module dependencies
-4. Use dependency injection where needed
-
-### Phase 4: UI and Configuration Migration
-1. Port UI improvements from feature/common-modules-redesign
-2. Implement warning system
-3. Remove all default configuration values
-4. Enhance user experience
-
-### Phase 5: Testing and Validation
-1. Test with 3+ simultaneous scripts
-2. Verify no state contamination
-3. Test script add/remove scenarios
-4. Validate thread cleanup
+### Phase 4: Testing and Validation
+1. Test single instance - must work exactly like main branch
+2. Test with 3+ simultaneous scripts
+3. Verify no state contamination
+4. Test all features: download, metadata, normalize, playback
 5. Ensure backward compatibility
 
 ## Migration Path for Users
@@ -188,78 +243,57 @@ except ImportError as e:
    - Uses the new `ytplay.py` script
    - Cleaner setup going forward
 
-### From feature/common-modules-redesign:
-- Direct upgrade path since naming is already aligned
-- All UI improvements preserved
-- State isolation issues finally resolved
+## Testing Checklist
 
-## Module Design Guidelines
+Before Phase 14 is considered complete, ALL of these must work:
 
-### 1. State Access
-```python
-# Always get state through context
-from state import get_state
-
-def some_function():
-    state = get_state()  # Automatically uses correct script context
-    return state.get('some_value')
-```
-
-### 2. Thread Safety
-```python
-# Set context at thread start
-def background_thread(script_path):
-    set_thread_script_context(script_path)
-    # Now all state access uses correct context
-```
-
-### 3. Module Interfaces
-```python
-# Clear, minimal interfaces
-class ModuleInterface:
-    def initialize(self, script_path): pass
-    def cleanup(self): pass
-    def get_properties(self): pass
-```
-
-## Benefits of This Approach
-
-1. **Maintainability**: Update modules once, all scripts benefit
-2. **Simplicity**: Trivial to create new instances (just copy 5KB file)
-3. **Isolation**: Complete separation between instances
-4. **Flexibility**: Easy to add/remove features via modules
-5. **Performance**: Shared modules reduce memory usage
-6. **User Experience**: Clear configuration with helpful warnings
+- [ ] Video downloading with yt-dlp
+- [ ] Progress tracking (50% milestone)
+- [ ] Audio-only mode
+- [ ] Gemini metadata extraction
+- [ ] Fallback title parsing
+- [ ] Audio normalization to -14 LUFS
+- [ ] Continuous playback mode
+- [ ] Single playback mode
+- [ ] Loop playback mode
+- [ ] Title display with opacity fade
+- [ ] Scene and source verification
+- [ ] Cache management
+- [ ] Tool downloading (yt-dlp, ffmpeg)
+- [ ] Error handling for all edge cases
+- [ ] Multi-instance support without conflicts
+- [ ] Clean shutdown without errors
 
 ## Success Criteria
 
 1. Main script size: <5KB (from 16KB+)
 2. Zero cross-contamination between instances
-3. Updates to modules immediately available to all scripts
-4. Clean thread shutdown without errors
-5. Each script maintains independent:
+3. **100% feature parity with main branch**
+4. All existing functionality works identically
+5. Clean thread shutdown without errors
+6. Each script maintains independent:
    - Configuration
    - State
    - Warnings
    - Cache
    - Logs
-6. Improved user experience with clear configuration feedback
+7. Improved user experience with clear configuration feedback
 
 ## Risk Mitigation
 
-1. **Import Errors**: Comprehensive error handling in main script
-2. **State Leaks**: Strict isolation enforcement
-3. **Thread Issues**: Proper context management
-4. **Module Dependencies**: Clear dependency graph
-5. **Backwards Compatibility**: Provide ytfast.py copy for existing users
-6. **User Confusion**: Clear migration documentation
+1. **Feature Loss**: Test extensively against main branch
+2. **Import Errors**: Comprehensive error handling in main script
+3. **State Leaks**: Strict isolation enforcement
+4. **Thread Issues**: Proper context management
+5. **Module Dependencies**: Clear dependency graph
+6. **Backwards Compatibility**: Provide ytfast.py copy for existing users
 
 ## Next Steps
 
-1. Create proof-of-concept ultra-minimal main script
-2. Test state isolation with 3 instances
-3. Port UI improvements from feature/common-modules-redesign
-4. Gradually migrate functionality to shared modules
-5. Extensive testing with multiple scenarios
-6. Document migration process for users
+1. Start with main branch as the base
+2. Create ultra-minimal main script
+3. Migrate ALL functionality from ytfast_modules/ to ytplay_modules/
+4. Add state isolation without changing behavior
+5. Test extensively to ensure feature parity
+6. Document any behavioral differences (there should be none)
 7. Prepare backward compatibility layer (ytfast.py)
