@@ -55,7 +55,7 @@ set_script_dir(SCRIPT_DIR)
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
 from download import start_video_processing_thread
-from scene import verify_scene_setup, on_frontend_event, reset_scene_error_flag
+from scene import schedule_scene_verification, on_frontend_event, reset_scene_error_flag
 from playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
 from metadata import clear_gemini_failures
 from reprocess import start_reprocess_thread
@@ -102,8 +102,9 @@ def check_configuration_warnings():
             else:
                 obs.obs_source_release(text_source)
     
-    # Check for missing playlist URL
-    if not get_playlist_url():
+    # Check for missing playlist URL - use state from current script instance
+    playlist_url = get_playlist_url()
+    if not playlist_url or playlist_url.strip() == "":
         warnings.append("No playlist URL")
     
     # Check if tools are ready
@@ -327,6 +328,9 @@ def script_load(settings):
     
     log(f"Script version {SCRIPT_VERSION} loaded")
     
+    # Log Gemini failure tracking info
+    log("Gemini failures are tracked via filename markers (_gf) and retried on restart")
+    
     # Reset scene error flag
     reset_scene_error_flag()
     
@@ -336,8 +340,8 @@ def script_load(settings):
     # Apply initial settings
     script_update(settings)
     
-    # Schedule scene verification after delay
-    _verify_scene_timer = verify_scene_setup
+    # v3.6.4: Schedule scene verification using the proper wrapper function
+    _verify_scene_timer = schedule_scene_verification(SCRIPT_PATH)
     obs.timer_add(_verify_scene_timer, SCENE_CHECK_DELAY)
     
     # Note: Warning timer temporarily disabled to prevent crashes
