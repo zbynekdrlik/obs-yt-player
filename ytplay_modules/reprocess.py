@@ -10,6 +10,8 @@ from pathlib import Path
 
 from logger import log
 from state import (
+    get_current_script_path, set_thread_script_context,
+    get_or_create_state,
     get_cache_dir, get_cached_videos, get_cached_video_info,
     should_stop_threads, is_tools_ready,
     add_cached_video, get_gemini_api_key, get_playlist_url
@@ -18,8 +20,6 @@ from metadata import get_video_metadata
 from utils import sanitize_filename
 import subprocess
 import json
-
-_reprocess_thread = None
 
 def get_video_title_from_youtube(video_id):
     """Fetch video title from YouTube for a specific video ID."""
@@ -146,8 +146,11 @@ def reprocess_video(video_info):
             log(f"Gemini extraction failed again for: {title}")
         return False
 
-def reprocess_worker():
+def reprocess_worker(script_path):
     """Background worker to reprocess videos with failed Gemini extraction."""
+    # v3.6.1: Set script context for this thread
+    set_thread_script_context(script_path)
+    
     # Wait for tools to be ready
     while not is_tools_ready() and not should_stop_threads():
         time.sleep(1)
@@ -191,10 +194,15 @@ def reprocess_worker():
 
 def start_reprocess_thread():
     """Start the reprocess thread if needed."""
-    global _reprocess_thread
+    # v3.6.1: Get current script path to pass to thread
+    script_path = get_current_script_path()
+    state = get_or_create_state(script_path)
     
-    # Only start if not already running
-    if _reprocess_thread is None or not _reprocess_thread.is_alive():
-        _reprocess_thread = threading.Thread(target=reprocess_worker, daemon=True)
-        _reprocess_thread.start()
-        log("Started Gemini reprocess thread")
+    # Create and start thread with script context
+    state.reprocess_thread = threading.Thread(
+        target=reprocess_worker,
+        args=(script_path,),
+        daemon=True
+    )
+    state.reprocess_thread.start()
+    log("Started Gemini reprocess thread")
