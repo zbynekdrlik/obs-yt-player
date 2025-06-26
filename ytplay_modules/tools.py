@@ -10,14 +10,15 @@ import urllib.request
 import threading
 from pathlib import Path
 
-from config import (
+# Use absolute imports to fix module loading issue
+from ytplay_modules.config import (
     YTDLP_FILENAME, FFMPEG_FILENAME,
     YTDLP_URL, FFMPEG_URL,
     TOOLS_CHECK_INTERVAL,
     TOOLS_SUBDIR
 )
-from logger import log
-from state import (
+from ytplay_modules.logger import log
+from ytplay_modules.state import (
     set_tools_ready, should_stop_threads,
     get_cache_dir, register_thread, unregister_thread,
     set_thread_script_context
@@ -207,7 +208,7 @@ def tools_setup_worker(script_path):
                     # Tools are ready, trigger startup sync
                     log("Tools setup complete")
                     # Import here to avoid circular import
-                    from playlist import trigger_startup_sync
+                    from ytplay_modules.playlist import trigger_startup_sync
                     trigger_startup_sync()
                     break
                 
@@ -235,7 +236,7 @@ def start_tools_thread():
     
     if not script_path:
         # Try to get from main thread state
-        import state
+        import ytplay_modules.state as state
         script_path = getattr(state._thread_local, 'script_path', None)
     
     if not script_path:
