@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.4"  # Fixed NameError in exception handling
+SCRIPT_VERSION = "4.0.5"  # Fixed module import issue
 
 # Default settings
 DEFAULT_PLAYLIST_URL = ""  # Empty by default - user must configure
