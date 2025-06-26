@@ -20,7 +20,7 @@ from state import (
     get_current_script_path, set_thread_script_context,
     set_tools_ready, is_tools_logged_waiting, 
     set_tools_logged_waiting, should_stop_threads_safe,
-    get_or_create_state
+    get_or_create_state, get_script_name
 )
 from utils import get_ytdlp_path, get_ffmpeg_path, get_tools_path, ensure_cache_directory
 
@@ -187,6 +187,10 @@ def tools_setup_worker(script_path):
     # v3.6.2: Set script context for this thread
     set_thread_script_context(script_path)
     
+    # Log thread startup with script name
+    script_name = get_script_name()
+    log(f"Tools setup thread started for {script_name}")
+    
     while not should_stop_threads_safe(script_path):
         try:
             # Ensure cache directory exists
@@ -216,7 +220,7 @@ def tools_setup_worker(script_path):
             log(f"Error in tools setup: {e}")
             time.sleep(TOOLS_CHECK_INTERVAL)
     
-    log("Tools setup thread exiting")
+    log(f"Tools setup thread exiting for {script_name}")
 
 def start_tools_thread():
     """Start the tools setup thread."""

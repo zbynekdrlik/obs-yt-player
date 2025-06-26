@@ -16,7 +16,8 @@ from state import (
     get_or_create_state, should_stop_threads_safe,
     is_tools_ready, get_playlist_url,
     is_sync_on_startup_done, set_sync_on_startup_done,
-    set_playlist_video_ids, is_video_cached
+    set_playlist_video_ids, is_video_cached,
+    get_script_name
 )
 from utils import get_ytdlp_path
 from cache import scan_existing_cache, cleanup_removed_videos
@@ -88,6 +89,10 @@ def playlist_sync_worker(script_path):
         log("Playlist sync thread exiting - state not found")
         return
     
+    # Log thread startup with script name
+    script_name = get_script_name()
+    log(f"Playlist sync thread started for {script_name}")
+    
     while not should_stop_threads_safe(script_path):
         # Wait for sync signal or timeout
         if not state.sync_event.wait(timeout=1):
@@ -153,7 +158,7 @@ def playlist_sync_worker(script_path):
         except Exception as e:
             log(f"Error in playlist sync: {e}")
     
-    log("Playlist sync thread exiting")
+    log(f"Playlist sync thread exiting for {script_name}")
 
 def trigger_startup_sync():
     """Trigger one-time sync on startup after tools are ready."""
