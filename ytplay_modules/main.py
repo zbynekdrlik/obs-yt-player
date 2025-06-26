@@ -7,12 +7,12 @@ import obspython as obs
 import os
 from pathlib import Path
 
-from config import (
+from .config import (
     SCRIPT_VERSION, SCENE_CHECK_DELAY,
     PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, DEFAULT_PLAYBACK_MODE,
     DEFAULT_AUDIO_ONLY_MODE, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
 )
-from state import (
+from .state import (
     initialize_script_context, cleanup_state,
     get_playlist_url, set_playlist_url, 
     get_cache_dir, set_cache_dir,
@@ -26,16 +26,16 @@ from state import (
     set_thread_script_context, set_current_script_path,
     get_script_name, get_script_dir
 )
-from logger import log, cleanup_logging
-from ui import create_properties, check_configuration_warnings
-from tools import start_tools_thread
-from playlist import start_playlist_sync_thread, trigger_manual_sync
-from download import start_video_processing_thread
-from scene import verify_scene_setup, reset_scene_error_flag, on_frontend_event as scene_frontend_event
-from playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
-from metadata import clear_gemini_failures
-from reprocess import start_reprocess_thread
-from cache import cleanup_temp_files
+from .logger import log, cleanup_logging
+from .ui import create_properties, check_configuration_warnings
+from .tools import start_tools_thread
+from .playlist import start_playlist_sync_thread, trigger_manual_sync
+from .download import start_video_processing_thread
+from .scene import verify_scene_setup, reset_scene_error_flag, on_frontend_event as scene_frontend_event
+from .playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
+from .metadata import clear_gemini_failures
+from .reprocess import start_reprocess_thread
+from .cache import cleanup_temp_files
 
 # Store timer references and settings per script
 _script_data = {}
