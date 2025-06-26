@@ -56,7 +56,7 @@ set_script_dir(SCRIPT_DIR)
 from tools import start_tools_thread
 from playlist import start_playlist_sync_thread, trigger_manual_sync
 from download import start_video_processing_thread
-from scene import verify_scene_setup, on_frontend_event, reset_scene_error_flag
+from scene import verify_scene_setup, reset_scene_error_flag
 from playback import start_playback_controller, stop_playback_controller, get_current_video_from_media_source
 from metadata import clear_gemini_failures
 from reprocess import start_reprocess_thread
@@ -332,14 +332,23 @@ def warnings_update_timer():
 
 def verify_scene_timer():
     """Timer callback for scene verification with proper script context."""
-    # v3.6.6: Set script context for timer callback
-    set_thread_script_context(SCRIPT_PATH)
+    # v3.6.8: Use set_current_script_path for main thread context
+    set_current_script_path(SCRIPT_PATH)
     
     # Verify scene setup
     verify_scene_setup()
     
     # Remove this timer - only run once
     obs.timer_remove(verify_scene_timer)
+
+def on_frontend_event_wrapper(event):
+    """Wrapper for frontend event handler that sets proper script context."""
+    # v3.6.8: Set script context before handling event
+    set_current_script_path(SCRIPT_PATH)
+    
+    # Import and call the actual handler from scene module
+    from scene import on_frontend_event
+    on_frontend_event(event)
 
 def script_load(settings):
     """Called when script is loaded."""
@@ -367,7 +376,7 @@ def script_load(settings):
     # Apply initial settings
     script_update(settings)
     
-    # v3.6.6: Schedule scene verification using a timer with proper context
+    # v3.6.8: Schedule scene verification using a timer with proper context
     obs.timer_add(verify_scene_timer, SCENE_CHECK_DELAY)
     
     # Note: Warning timer temporarily disabled to prevent crashes
@@ -376,8 +385,8 @@ def script_load(settings):
     # Start worker threads
     start_worker_threads()
     
-    # Register frontend event callbacks
-    obs.obs_frontend_add_event_callback(on_frontend_event)
+    # v3.6.8: Register frontend event callbacks with wrapper
+    obs.obs_frontend_add_event_callback(on_frontend_event_wrapper)
     
     log("Script loaded successfully")
 
