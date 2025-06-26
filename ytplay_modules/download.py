@@ -1,5 +1,4 @@
-"""
-Video download module for OBS YouTube Player.
+"""Video download module for OBS YouTube Player.
 Handles downloading videos from YouTube using yt-dlp.
 """
 
@@ -10,15 +9,16 @@ import os
 import re
 import subprocess
 
-from config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT
-from logger import log
-from state import (
+# Use absolute imports to fix module loading issue
+from ytplay_modules.config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT
+from ytplay_modules.logger import log
+from ytplay_modules.state import (
     should_stop_threads, get_download_queue, set_download_queue,
     set_thread_script_context, register_thread, unregister_thread,
     get_cache_dir, is_audio_only_mode,
     get_local_videos, get_metadata_cache
 )
-from tools import get_ytdlp_path, get_ffmpeg_path
+from ytplay_modules.tools import get_ytdlp_path, get_ffmpeg_path
 
 # Track download progress per video
 _download_progress = {}
@@ -199,8 +199,8 @@ def process_video(video_info):
         return
     
     # Get metadata
-    from metadata import extract_metadata, get_gemini_api_key
-    from state import get_gemini_api_key as state_get_gemini_api_key
+    from ytplay_modules.metadata import extract_metadata, get_gemini_api_key
+    from ytplay_modules.state import get_gemini_api_key as state_get_gemini_api_key
     
     gemini_key = state_get_gemini_api_key()
     metadata_result = extract_metadata({'id': video_id, 'title': title}, gemini_key)
@@ -213,7 +213,7 @@ def process_video(video_info):
     log(f"Metadata extracted - Artist: {artist}, Song: {song}")
     
     # Normalize audio
-    from normalize import normalize_audio
+    from ytplay_modules.normalize import normalize_audio
     normalized_path = normalize_audio(temp_path, video_id, {
         'song': song,
         'artist': artist,
@@ -279,7 +279,7 @@ def start_video_processing_thread():
     
     if not script_path:
         # Try to get from main thread state
-        import state
+        import ytplay_modules.state as state
         script_path = getattr(state._thread_local, 'script_path', None)
     
     if not script_path:
