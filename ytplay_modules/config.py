@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.0"  # Phase 14: Modular Architecture Redesign
+SCRIPT_VERSION = "4.0.1"  # Fixed relative imports to prevent OBS crash
 
 # Default settings
 DEFAULT_PLAYLIST_URL = ""  # Empty by default - user must configure
@@ -36,6 +36,10 @@ FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
 PLAYBACK_CHECK_INTERVAL = 1000  # 1 second
 SCENE_CHECK_DELAY = 3000  # 3 seconds after startup
 TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
+
+# Title display settings
+TITLE_SHOW_DELAY = 3  # Seconds after video starts to show title
+TITLE_CLEAR_BEFORE_END = 10  # Seconds before video ends to clear title
 
 # Video settings
 MAX_RESOLUTION = "1440"
