@@ -2,7 +2,7 @@
 Global state management for OBS YouTube Player.
 Thread-safe state variables with true multi-instance support.
 
-v3.6.1: Fixed backward compatibility and thread isolation
+v3.6.2: Fixed thread isolation when scripts are unloaded
 Each script instance maintains its own isolated state.
 """
 
@@ -91,6 +91,11 @@ def set_thread_script_context(script_path):
     """Set script context for the current thread."""
     threading.current_thread()._script_path = script_path
 
+def script_state_exists(script_path):
+    """Check if a script's state still exists."""
+    with _master_lock:
+        return script_path in _script_states
+
 def get_or_create_state(script_path=None):
     """Get or create state for the given script path."""
     if script_path is None:
@@ -108,6 +113,12 @@ def cleanup_state(script_path):
     """Clean up state for a script that's being unloaded."""
     with _master_lock:
         if script_path in _script_states:
+            # Signal all threads to stop before cleaning up
+            state = _script_states[script_path]
+            state.stop_threads = True
+            # Signal any waiting events
+            state.sync_event.set()
+            # Then remove the state
             del _script_states[script_path]
 
 # ===== CONVENIENCE FUNCTIONS =====
@@ -116,6 +127,28 @@ def cleanup_state(script_path):
 def _get_state():
     """Get the current script's state."""
     return get_or_create_state()
+
+def _get_state_safe(script_path=None):
+    """Safely get state, returns None if state doesn't exist."""
+    if script_path is None:
+        script_path = get_current_script_path()
+    
+    if not script_path:
+        return None
+        
+    with _master_lock:
+        return _script_states.get(script_path)
+
+# ===== THREAD-SAFE STATE ACCESSORS =====
+def should_stop_threads_safe(script_path=None):
+    """Thread-safe check if threads should stop, handles missing state."""
+    state = _get_state_safe(script_path)
+    if state is None:
+        # If state doesn't exist, threads should stop
+        return True
+    
+    with state.lock:
+        return state.stop_threads
 
 # ===== SCRIPT IDENTIFICATION ACCESSORS =====
 def get_script_name():
