@@ -4,9 +4,9 @@ Verifies scene setup and handles frontend events.
 """
 
 import obspython as obs
-from config import MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
-from logger import log
-from state import (
+from .config import MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
+from .logger import log
+from .state import (
     get_script_name, is_scene_verified, set_scene_verified,
     is_scene_error_shown, set_scene_error_shown
 )
