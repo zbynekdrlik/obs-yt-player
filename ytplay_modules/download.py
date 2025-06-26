@@ -13,8 +13,8 @@ from config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT, SCRIPT_VE
 from logger import log
 from state import (
     get_current_script_path, set_thread_script_context,
-    get_or_create_state,
-    video_queue, should_stop_threads,
+    get_or_create_state, should_stop_threads_safe,
+    video_queue, 
     get_cache_dir, is_video_cached, add_cached_video,
     download_progress_milestones, is_audio_only_mode
 )
@@ -173,19 +173,28 @@ def parse_progress(line, video_id, title):
 
 def process_videos_worker(script_path):
     """Process videos serially - download, metadata, normalize."""
-    # v3.6.1: Set script context for this thread
+    # v3.6.2: Set script context for this thread
     set_thread_script_context(script_path)
     
     # Get state objects for this script
-    state = get_or_create_state(script_path)
+    try:
+        state = get_or_create_state(script_path)
+    except:
+        # State doesn't exist, exit thread
+        log("Video processing thread exiting - state not found")
+        return
     
-    while not should_stop_threads():
+    while not should_stop_threads_safe(script_path):
         try:
             # Get video from queue (timeout to check stop_threads)
             try:
                 video_info = state.video_queue.get(timeout=1)
             except queue.Empty:
                 continue
+            
+            # Double-check if we should stop
+            if should_stop_threads_safe(script_path):
+                break
             
             # Process this video through all stages
             video_id = video_info['id']
@@ -201,6 +210,10 @@ def process_videos_worker(script_path):
             if not temp_path:
                 log(f"Failed to download: {title}")
                 continue
+            
+            # Check again if we should stop
+            if should_stop_threads_safe(script_path):
+                break
             
             # Get metadata (from metadata module) - UPDATED to handle 4 return values
             song, artist, metadata_source, gemini_failed = get_video_metadata(temp_path, title, video_id)
@@ -224,6 +237,10 @@ def process_videos_worker(script_path):
             log(f"    Source: {metadata_source}")
             log(f"    Gemini Failed: {gemini_failed}")
             log(f"=====================================")
+            
+            # Check one more time before normalization
+            if should_stop_threads_safe(script_path):
+                break
             
             # Normalize audio - PASS GEMINI_FAILED FLAG
             normalized_path = normalize_audio(temp_path, video_id, metadata, gemini_failed)
@@ -249,14 +266,17 @@ def process_videos_worker(script_path):
 
 def start_video_processing_thread():
     """Start the video processing thread."""
-    # v3.6.1: Get current script path to pass to thread
+    # v3.6.2: Get current script path to pass to thread
     script_path = get_current_script_path()
-    state = get_or_create_state(script_path)
-    
-    # Create and start thread with script context
-    state.process_videos_thread = threading.Thread(
-        target=process_videos_worker,
-        args=(script_path,),
-        daemon=True
-    )
-    state.process_videos_thread.start()
+    try:
+        state = get_or_create_state(script_path)
+        
+        # Create and start thread with script context
+        state.process_videos_thread = threading.Thread(
+            target=process_videos_worker,
+            args=(script_path,),
+            daemon=True
+        )
+        state.process_videos_thread.start()
+    except Exception as e:
+        log(f"Error starting video processing thread: {e}")

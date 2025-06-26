@@ -11,9 +11,9 @@ from pathlib import Path
 from logger import log
 from state import (
     get_current_script_path, set_thread_script_context,
-    get_or_create_state,
+    get_or_create_state, should_stop_threads_safe,
     get_cache_dir, get_cached_videos, get_cached_video_info,
-    should_stop_threads, is_tools_ready,
+    is_tools_ready,
     add_cached_video, get_gemini_api_key, get_playlist_url
 )
 from metadata import get_video_metadata
@@ -148,14 +148,15 @@ def reprocess_video(video_info):
 
 def reprocess_worker(script_path):
     """Background worker to reprocess videos with failed Gemini extraction."""
-    # v3.6.1: Set script context for this thread
+    # v3.6.2: Set script context for this thread
     set_thread_script_context(script_path)
     
     # Wait for tools to be ready
-    while not is_tools_ready() and not should_stop_threads():
+    while not is_tools_ready() and not should_stop_threads_safe(script_path):
         time.sleep(1)
     
-    if should_stop_threads():
+    if should_stop_threads_safe(script_path):
+        log("Gemini reprocess thread exiting - stop requested")
         return
     
     # Wait a bit to ensure cache scan is complete
@@ -178,7 +179,7 @@ def reprocess_worker(script_path):
     # Process each video
     success_count = 0
     for video_info in videos_to_reprocess:
-        if should_stop_threads():
+        if should_stop_threads_safe(script_path):
             break
         
         if reprocess_video(video_info):
@@ -194,15 +195,18 @@ def reprocess_worker(script_path):
 
 def start_reprocess_thread():
     """Start the reprocess thread if needed."""
-    # v3.6.1: Get current script path to pass to thread
+    # v3.6.2: Get current script path to pass to thread
     script_path = get_current_script_path()
-    state = get_or_create_state(script_path)
-    
-    # Create and start thread with script context
-    state.reprocess_thread = threading.Thread(
-        target=reprocess_worker,
-        args=(script_path,),
-        daemon=True
-    )
-    state.reprocess_thread.start()
-    log("Started Gemini reprocess thread")
+    try:
+        state = get_or_create_state(script_path)
+        
+        # Create and start thread with script context
+        state.reprocess_thread = threading.Thread(
+            target=reprocess_worker,
+            args=(script_path,),
+            daemon=True
+        )
+        state.reprocess_thread.start()
+        log("Started Gemini reprocess thread")
+    except Exception as e:
+        log(f"Error starting reprocess thread: {e}")

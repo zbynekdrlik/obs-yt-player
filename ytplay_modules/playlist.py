@@ -13,8 +13,8 @@ from config import SCRIPT_VERSION
 from logger import log
 from state import (
     get_current_script_path, set_thread_script_context,
-    get_or_create_state,
-    is_tools_ready, should_stop_threads, get_playlist_url,
+    get_or_create_state, should_stop_threads_safe,
+    is_tools_ready, get_playlist_url,
     is_sync_on_startup_done, set_sync_on_startup_done,
     set_playlist_video_ids, is_video_cached
 )
@@ -77,13 +77,18 @@ def fetch_playlist_with_ytdlp(playlist_url):
 
 def playlist_sync_worker(script_path):
     """Background thread for playlist synchronization - NO PERIODIC SYNC."""
-    # v3.6.0: Set script context for this thread
+    # v3.6.2: Set script context for this thread
     set_thread_script_context(script_path)
     
     # Get state objects for this script
-    state = get_or_create_state(script_path)
+    try:
+        state = get_or_create_state(script_path)
+    except:
+        # State doesn't exist, exit thread
+        log("Playlist sync thread exiting - state not found")
+        return
     
-    while not should_stop_threads():
+    while not should_stop_threads_safe(script_path):
         # Wait for sync signal or timeout
         if not state.sync_event.wait(timeout=1):
             continue
@@ -92,7 +97,7 @@ def playlist_sync_worker(script_path):
         state.sync_event.clear()
         
         # Check if we should exit
-        if should_stop_threads():
+        if should_stop_threads_safe(script_path):
             break
             
         # Wait for tools to be ready
@@ -158,26 +163,35 @@ def trigger_startup_sync():
     set_sync_on_startup_done(True)
     log("Starting one-time playlist sync on startup")
     
-    # Get current script's sync event
-    state = get_or_create_state()
-    state.sync_event.set()  # Signal playlist sync thread to run
+    try:
+        # Get current script's sync event
+        state = get_or_create_state()
+        state.sync_event.set()  # Signal playlist sync thread to run
+    except Exception as e:
+        log(f"Error triggering startup sync: {e}")
 
 def trigger_manual_sync():
     """Trigger manual playlist sync."""
-    # Get current script's sync event
-    state = get_or_create_state()
-    state.sync_event.set()
+    try:
+        # Get current script's sync event
+        state = get_or_create_state()
+        state.sync_event.set()
+    except Exception as e:
+        log(f"Error triggering manual sync: {e}")
 
 def start_playlist_sync_thread():
     """Start the playlist sync thread."""
-    # v3.6.0: Get current script path to pass to thread
+    # v3.6.2: Get current script path to pass to thread
     script_path = get_current_script_path()
-    state = get_or_create_state(script_path)
-    
-    # Create and start thread with script context
-    state.playlist_sync_thread = threading.Thread(
-        target=playlist_sync_worker, 
-        args=(script_path,),
-        daemon=True
-    )
-    state.playlist_sync_thread.start()
+    try:
+        state = get_or_create_state(script_path)
+        
+        # Create and start thread with script context
+        state.playlist_sync_thread = threading.Thread(
+            target=playlist_sync_worker, 
+            args=(script_path,),
+            daemon=True
+        )
+        state.playlist_sync_thread.start()
+    except Exception as e:
+        log(f"Error starting playlist sync thread: {e}")

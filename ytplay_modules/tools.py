@@ -19,7 +19,7 @@ from logger import log
 from state import (
     get_current_script_path, set_thread_script_context,
     set_tools_ready, is_tools_logged_waiting, 
-    set_tools_logged_waiting, should_stop_threads,
+    set_tools_logged_waiting, should_stop_threads_safe,
     get_or_create_state
 )
 from utils import get_ytdlp_path, get_ffmpeg_path, get_tools_path, ensure_cache_directory
@@ -184,10 +184,10 @@ def setup_tools():
 
 def tools_setup_worker(script_path):
     """Background thread for setting up tools."""
-    # v3.6.0: Set script context for this thread
+    # v3.6.2: Set script context for this thread
     set_thread_script_context(script_path)
     
-    while not should_stop_threads():
+    while not should_stop_threads_safe(script_path):
         try:
             # Ensure cache directory exists
             if not ensure_cache_directory():
@@ -208,7 +208,7 @@ def tools_setup_worker(script_path):
             
             # Sleep in small increments to check stop_threads
             for _ in range(TOOLS_CHECK_INTERVAL):
-                if should_stop_threads():
+                if should_stop_threads_safe(script_path):
                     break
                 time.sleep(1)
                 
@@ -220,14 +220,17 @@ def tools_setup_worker(script_path):
 
 def start_tools_thread():
     """Start the tools setup thread."""
-    # v3.6.0: Get current script path to pass to thread
+    # v3.6.2: Get current script path to pass to thread
     script_path = get_current_script_path()
-    state = get_or_create_state(script_path)
-    
-    # Create and start thread with script context
-    state.tools_thread = threading.Thread(
-        target=tools_setup_worker, 
-        args=(script_path,),
-        daemon=True
-    )
-    state.tools_thread.start()
+    try:
+        state = get_or_create_state(script_path)
+        
+        # Create and start thread with script context
+        state.tools_thread = threading.Thread(
+            target=tools_setup_worker, 
+            args=(script_path,),
+            daemon=True
+        )
+        state.tools_thread.start()
+    except Exception as e:
+        log(f"Error starting tools thread: {e}")
