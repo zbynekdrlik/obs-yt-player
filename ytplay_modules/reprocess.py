@@ -14,7 +14,8 @@ from state import (
     get_or_create_state, should_stop_threads_safe,
     get_cache_dir, get_cached_videos, get_cached_video_info,
     is_tools_ready,
-    add_cached_video, get_gemini_api_key, get_playlist_url
+    add_cached_video, get_gemini_api_key, get_playlist_url,
+    get_script_name
 )
 from metadata import get_video_metadata
 from utils import sanitize_filename
@@ -151,12 +152,16 @@ def reprocess_worker(script_path):
     # v3.6.2: Set script context for this thread
     set_thread_script_context(script_path)
     
+    # Log thread startup with script name
+    script_name = get_script_name()
+    log(f"Gemini reprocess thread started for {script_name}")
+    
     # Wait for tools to be ready
     while not is_tools_ready() and not should_stop_threads_safe(script_path):
         time.sleep(1)
     
     if should_stop_threads_safe(script_path):
-        log("Gemini reprocess thread exiting - stop requested")
+        log(f"Gemini reprocess thread exiting for {script_name} - stop requested")
         return
     
     # Wait a bit to ensure cache scan is complete
@@ -192,6 +197,7 @@ def reprocess_worker(script_path):
         log(f"Successfully reprocessed {success_count} videos with Gemini")
     
     log("Gemini reprocessing complete")
+    log(f"Gemini reprocess thread exiting for {script_name}")
 
 def start_reprocess_thread():
     """Start the reprocess thread if needed."""
