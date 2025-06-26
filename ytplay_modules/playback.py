@@ -23,11 +23,13 @@ from ytplay_modules.state import (
     get_loop_video_id, set_loop_video_id, get_current_playback_video_id,
     set_last_played_video, get_last_played_video,
     get_cached_videos, get_cached_video_info,
-    is_scene_active, set_scene_active
+    is_scene_active, set_scene_active,
+    set_current_script_path
 )
 
 # Playback controller reference
 _playback_timer = None
+_script_path = None  # Store script path for timer context
 
 # Module state
 _waiting_for_videos_logged = False
@@ -64,7 +66,18 @@ def check_scene_active():
 
 def start_playback_controller():
     """Start the playback controller."""
-    global _playback_timer, _initial_state_checked
+    global _playback_timer, _initial_state_checked, _script_path
+    
+    # Store script path from current context
+    import threading
+    _script_path = getattr(threading.current_thread(), '_script_path', None)
+    if not _script_path:
+        # Try to get from thread local
+        try:
+            from ytplay_modules.state import _thread_local
+            _script_path = getattr(_thread_local, 'script_path', None)
+        except:
+            pass
     
     # Reset initial state check
     _initial_state_checked = False
@@ -73,8 +86,14 @@ def start_playback_controller():
     if _playback_timer:
         obs.timer_remove(_playback_timer)
     
+    # Create wrapper function that sets context
+    def playback_timer_wrapper():
+        if _script_path:
+            set_current_script_path(_script_path)
+        playback_check_timer()
+    
     # Add new timer
-    _playback_timer = playback_check_timer
+    _playback_timer = playback_timer_wrapper
     obs.timer_add(_playback_timer, PLAYBACK_CHECK_INTERVAL)
     log("Playback controller started")
 
@@ -457,6 +476,15 @@ def update_text_source(artist, song):
     obs.obs_source_release(source)
 
 
+def create_title_timer_wrapper(func, script_path):
+    """Create a timer wrapper that sets script context."""
+    def wrapper():
+        if script_path:
+            set_current_script_path(script_path)
+        func()
+    return wrapper
+
+
 def title_show_timer():
     """Timer callback to show title."""
     global _title_show_timer
@@ -491,7 +519,7 @@ def title_clear_timer():
 
 def schedule_title_show(video_info):
     """Schedule title to show after delay."""
-    global _title_show_timer
+    global _title_show_timer, _script_path
     
     # Cancel existing timer
     if _title_show_timer:
@@ -500,14 +528,14 @@ def schedule_title_show(video_info):
     # Clear text immediately
     update_text_source("", "")
     
-    # Schedule show
-    _title_show_timer = title_show_timer
+    # Schedule show with context wrapper
+    _title_show_timer = create_title_timer_wrapper(title_show_timer, _script_path)
     obs.timer_add(_title_show_timer, TITLE_SHOW_DELAY * 1000)
 
 
 def schedule_title_clear():
     """Schedule title to clear before video ends."""
-    global _title_clear_timer
+    global _title_clear_timer, _script_path
     
     # Cancel existing timer
     if _title_clear_timer:
@@ -522,7 +550,7 @@ def schedule_title_clear():
     clear_time = max(0, duration - (TITLE_CLEAR_BEFORE_END * 1000))
     
     if clear_time > 0:
-        _title_clear_timer = title_clear_timer
+        _title_clear_timer = create_title_timer_wrapper(title_clear_timer, _script_path)
         obs.timer_add(_title_clear_timer, int(clear_time))
 
 
