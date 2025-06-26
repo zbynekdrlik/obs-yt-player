@@ -20,21 +20,22 @@ MODULES_DIR = os.path.join(SCRIPT_DIR, "ytplay_modules")
 # Create shared modules directory if it doesn't exist
 Path(MODULES_DIR).mkdir(exist_ok=True)
 
-# Add to Python path
-if MODULES_DIR not in sys.path:
-    sys.path.insert(0, MODULES_DIR)
+# Add parent directory to Python path to enable package imports
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 
 # Import main entry points with error handling
 import_error = None
 try:
-    from main import (
+    from ytplay_modules.main import (
         script_description as _script_description,
         script_load as _script_load,
         script_unload as _script_unload,
         script_properties as _script_properties,
         script_defaults as _script_defaults,
         script_update as _script_update,
-        script_save as _script_save
+        script_save as _script_save,
+        sync_now_callback
     )
     
     # Pass script context to all functions
@@ -90,3 +91,6 @@ except ImportError as e:
     
     def script_save(settings):
         pass
+    
+    def sync_now_callback(props, prop):
+        return True
