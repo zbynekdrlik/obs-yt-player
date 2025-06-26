@@ -98,7 +98,7 @@ class ScriptLogger:
 
 def get_logger():
     """Get logger for current script context."""
-    from state import get_script_name, get_cache_dir
+    from .state import get_script_name, get_cache_dir
     
     script_name = get_script_name()
     if not script_name:
@@ -110,7 +110,7 @@ def get_logger():
             cache_dir = get_cache_dir()
             if not cache_dir:
                 # Use default if cache dir not set yet
-                from state import get_script_dir
+                from .state import get_script_dir
                 script_dir = get_script_dir()
                 cache_dir = os.path.join(script_dir, f"{script_name}-cache")
             
@@ -165,7 +165,7 @@ def cleanup_logging():
         with _log_lock:
             logger.cleanup()
             # Remove logger instance
-            from state import get_script_name
+            from .state import get_script_name
             script_name = get_script_name()
             if script_name in _script_loggers:
                 del _script_loggers[script_name]
