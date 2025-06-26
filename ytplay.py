@@ -42,7 +42,7 @@ from state import (
     get_current_playback_video_id, is_playing,
     is_audio_only_mode, set_audio_only_mode,
     set_script_name, set_script_dir,
-    set_thread_script_context
+    set_thread_script_context, set_current_script_path
 )
 
 # v3.6.0: Initialize script-specific state using the script path as unique identifier
@@ -78,6 +78,9 @@ def script_description():
 
 def check_configuration_warnings():
     """Check for configuration issues and return warning messages."""
+    # v3.6.7: Ensure correct script context is set before checking warnings
+    set_current_script_path(SCRIPT_PATH)
+    
     warnings = []
     
     # Check for missing scene
@@ -119,7 +122,10 @@ def update_warning_visibility(props, prop, settings):
     # v3.5.9: Safety check - don't access properties during unload
     if _is_unloading or not props:
         return False
-        
+    
+    # v3.6.7: Ensure correct script context is set
+    set_current_script_path(SCRIPT_PATH)
+    
     try:
         warnings = check_configuration_warnings()
         
@@ -142,6 +148,9 @@ def update_warning_visibility(props, prop, settings):
 
 def script_properties():
     """Define script properties shown in OBS UI."""
+    # v3.6.7: Ensure correct script context is set
+    set_current_script_path(SCRIPT_PATH)
+    
     props = obs.obs_properties_create()
     
     # Playlist URL text field
@@ -235,6 +244,9 @@ def script_properties():
 
 def script_defaults(settings):
     """Set default values for script properties."""
+    # v3.6.7: Ensure correct script context is set
+    set_current_script_path(SCRIPT_PATH)
+    
     # Default playlist URL is now empty - user must set it
     obs.obs_data_set_default_string(settings, "playlist_url", "")
     
@@ -248,6 +260,9 @@ def script_defaults(settings):
 
 def script_update(settings):
     """Called when script properties are updated."""
+    # v3.6.7: Ensure correct script context is set
+    set_current_script_path(SCRIPT_PATH)
+    
     global _global_settings
     _global_settings = settings
     
@@ -404,6 +419,9 @@ def script_unload():
 # ===== CALLBACK FUNCTIONS =====
 def sync_now_callback(props, prop):
     """Callback for Sync Now button."""
+    # v3.6.7: Ensure correct script context is set
+    set_current_script_path(SCRIPT_PATH)
+    
     log("Manual sync requested")
     
     # Check if tools are ready
