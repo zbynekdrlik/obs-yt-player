@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.2"  # Fixed playback.py SCENE_NAME import, removed ytfast_modules
+SCRIPT_VERSION = "4.0.3"  # Working on complete removal of ytfast_modules directory
 
 # Default settings
 DEFAULT_PLAYLIST_URL = ""  # Empty by default - user must configure
