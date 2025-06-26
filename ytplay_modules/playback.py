@@ -7,6 +7,7 @@ import obspython as obs
 import threading
 import time
 import os
+import random
 
 from .logger import log
 from .config import (
@@ -20,10 +21,10 @@ from .state import (
     get_script_name, set_current_file_path, set_current_playback_video_id,
     get_playback_mode, is_first_video_played, set_first_video_played,
     get_loop_video_id, set_loop_video_id, get_current_playback_video_id,
-    set_last_played_video, get_last_played_video
+    set_last_played_video, get_last_played_video,
+    get_cached_videos, get_cached_video_info,
+    is_scene_active, set_scene_active
 )
-from .cache import get_cached_videos, get_cached_video_info
-from .utils import is_scene_active
 
 # Playback controller reference
 _playback_timer = None
@@ -43,6 +44,22 @@ _opacity_timer = None
 _current_opacity = 0.0
 _target_opacity = 0.0
 _opacity_step = 0.05
+
+
+def check_scene_active():
+    """Check if the script's scene is currently active."""
+    script_name = get_script_name()
+    current_scene = obs.obs_frontend_get_current_scene()
+    
+    if not current_scene:
+        return False
+    
+    scene_name = obs.obs_source_get_name(current_scene)
+    obs.obs_source_release(current_scene)
+    
+    is_active = scene_name == script_name
+    set_scene_active(is_active)
+    return is_active
 
 
 def start_playback_controller():
@@ -95,7 +112,7 @@ def playback_check_timer():
         ensure_opacity_filter()
         
         # Check if scene is active
-        if not is_scene_active():
+        if not check_scene_active():
             if is_playing():
                 playback_mode = get_playback_mode()
                 log(f"Scene inactive in {playback_mode} mode, stopping playback")
@@ -548,7 +565,6 @@ def select_next_video():
         available_videos = list(cached_videos)
     
     # Select random video
-    import random
     return random.choice(available_videos)
 
 
