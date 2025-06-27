@@ -3,7 +3,7 @@ Configuration constants for OBS YouTube Player.
 """
 
 # Script version
-SCRIPT_VERSION = "4.0.6"
+SCRIPT_VERSION = "4.0.7"
 
 # Scene and source names
 MEDIA_SOURCE_NAME = "YouTube Player Media"
@@ -40,8 +40,15 @@ PLAYBACK_MODE_LOOP = "loop"
 DEFAULT_PLAYBACK_MODE = PLAYBACK_MODE_CONTINUOUS
 DEFAULT_AUDIO_ONLY_MODE = False
 
+# Tool settings
+TOOLS_SUBDIR = "tools"
+YTDLP_FILENAME = "yt-dlp.exe"  # Windows only for now
+FFMPEG_FILENAME = "ffmpeg.exe"  # Windows only for now
+TOOLS_CHECK_INTERVAL = 60  # Retry tools download every 60 seconds
+
 # Tool URLs
 TOOLS_BASE_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/"
+YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 
 # Error retry settings
