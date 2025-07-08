@@ -2,6 +2,10 @@
 
 A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them with multiple playback modes. Features optional AI-powered metadata extraction using Google Gemini for superior artist/song detection.
 
+## 🆕 New: Folder-Based Multi-Instance Support
+
+The latest version introduces a **folder-based architecture** for running multiple YouTube players. Each instance lives in its own folder with complete isolation - no more state conflicts or import issues! See [Multi-Instance Setup](#multi-instance-setup-new-folder-based-approach) below.
+
 ## Key Features
 
 ### 🎬 Playback Modes
@@ -19,7 +23,7 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 
 ### 🔧 Advanced Features
 - **Background Processing**: All heavy tasks run in separate threads (no OBS freezing)
-- **Multi-Instance Support**: Run multiple independent players by renaming the script
+- **Multi-Instance Support**: Run multiple independent players using folder-based isolation
 - **Nested Scene Playback**: Videos play even when scene is nested within other scenes
 - **Scene Transition Support**: Proper handling with configurable delays
 - **Comprehensive Logging**: Both OBS console and file-based logs for debugging
@@ -37,10 +41,17 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 
 ### 1. Installation
 
-1. Download the latest release (includes `ytfast.py` and `ytfast_modules/` folder)
+#### Option A: Single Instance (Legacy)
+1. Download `ytfast.py` and `ytfast_modules/` folder
 2. Copy both to your OBS scripts directory
 3. In OBS Studio: Tools → Scripts → Add Script (+)
 4. Select `ytfast.py`
+
+#### Option B: Folder-Based (Recommended for Multiple Instances)
+1. Download the release package
+2. Run `python migrate_to_folders.py` to convert to folder structure
+3. In OBS Studio: Tools → Scripts → Add Script (+)
+4. Select `yt-player-main/ytfast.py`
 
 ### 2. Configuration
 
@@ -130,29 +141,64 @@ While the script works perfectly without Gemini, using it provides significantly
 - If Gemini succeeds on retry, the file is renamed without the `_gf` marker
 - This ensures your library improves over time without manual intervention
 
-## Advanced Usage
+## Multi-Instance Setup (NEW: Folder-Based Approach)
 
-### Multi-Instance Setup
+### Why Folder-Based?
 
-Run multiple independent players:
+The new folder-based approach provides:
+- ✅ **Complete isolation** between instances (no state conflicts)
+- ✅ **Simple setup** using the helper script
+- ✅ **Easy maintenance** - update instances independently
+- ✅ **Clear organization** - one folder per player
 
-1. Copy and rename the script (e.g., `music-chill.py`, `stream-bgm.py`)
-2. Each instance automatically creates its own:
-   - Module folder (`music-chill_modules/`)
-   - Cache directory
-   - Settings and playlist
-3. Create matching scene names for each instance
+### Quick Setup with Helper Script
 
-Example structure:
+Create a new player instance in seconds:
+
+```bash
+python setup_new_instance.py main worship
+```
+
+This creates a complete `yt-player-worship/` instance with:
+- Renamed script (`ytworship.py`)
+- Renamed modules (`ytworship_modules/`)
+- Updated imports and configuration
+- Clean cache directory
+
+### Folder Structure
+
 ```
 obs-scripts/
-├── ytfast.py              → Scene: ytfast
-├── ytfast_modules/        → Modules for ytfast
-├── music-chill.py         → Scene: music-chill
-├── music-chill_modules/   → Modules for music-chill
-└── stream-bgm.py          → Scene: stream-bgm
-└── stream-bgm_modules/    → Modules for stream-bgm
+├── yt-player-main/              # Main player
+│   ├── ytfast.py
+│   ├── ytfast_modules/
+│   └── cache/
+├── yt-player-worship/           # Worship music player
+│   ├── ytworship.py
+│   ├── ytworship_modules/
+│   └── cache/
+├── yt-player-kids/              # Kids content player
+│   ├── ytkids.py
+│   ├── ytkids_modules/
+│   └── cache/
+└── setup_new_instance.py        # Helper script
 ```
+
+### Migration from Old Structure
+
+If you're using the old single-file approach:
+
+```bash
+python migrate_to_folders.py
+```
+
+This will:
+1. Create `yt-player-main/` directory
+2. Move your existing files into it
+3. Update your OBS script path
+4. Preserve all your settings
+
+See [docs/FOLDER_BASED_INSTANCES.md](docs/FOLDER_BASED_INSTANCES.md) for detailed information.
 
 ### Nested Scene Usage
 
@@ -200,6 +246,12 @@ Note: The script works perfectly without a Gemini key - it will use the built-in
 - Files marked with `_gf` will retry Gemini on next startup
 - Check logs for metadata extraction details
 
+### Multi-Instance Problems?
+- Ensure each instance is in its own folder
+- Check that imports match folder names
+- Verify scene names match script names
+- Use helper script for reliable setup
+
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
 - Source names must match exactly
@@ -214,23 +266,34 @@ Note: The script works perfectly without a Gemini key - it will use the built-in
 
 ## Project Structure
 
+### Single Instance (Legacy)
 ```
 ytfast.py                  # Main OBS interface
 ytfast_modules/
 ├── config.py             # Configuration and constants
 ├── logger.py             # Thread-safe logging system
 ├── state.py              # Global state management
-├── playback.py           # Playback mode logic
-├── scene.py              # Scene activation detection
-├── playlist.py           # YouTube playlist sync
-├── download.py           # Video downloading
-├── normalize.py          # Audio normalization
-├── metadata.py           # Metadata extraction
-├── gemini_metadata.py    # Gemini AI integration
 └── [other modules]       # Additional functionality
 ```
 
+### Folder-Based (Recommended)
+```
+yt-player-main/
+├── ytfast.py             # Main OBS interface
+├── ytfast_modules/       # All modules
+└── cache/                # Video cache
+
+setup_new_instance.py     # Helper for creating instances
+migrate_to_folders.py     # Migration from old structure
+```
+
 ## Recent Updates
+
+### v4.0.0 - Folder-Based Architecture (Coming Soon)
+- New folder-based approach for true multi-instance support
+- Helper scripts for easy setup and migration
+- Complete isolation between instances
+- Simplified maintenance and updates
 
 ### v3.4.1 - Documentation Clarity
 - Clarified that Gemini API key is optional
@@ -243,16 +306,6 @@ ytfast_modules/
 - Preserves high audio quality while saving bandwidth
 - Significantly reduces file sizes and download times
 - Perfect for audio-only streaming scenarios
-
-### v3.3.1 - Documentation Update
-- Improved README with playback modes section
-- Better feature organization and clarity
-- Enhanced troubleshooting guide
-
-### v3.3.0 - Nested Scene Playback
-- Recursive scene detection for nested sources
-- Support for multiple nesting levels
-- Enhanced logging for scene activation
 
 ## License
 
