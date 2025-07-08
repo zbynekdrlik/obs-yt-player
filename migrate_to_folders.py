@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """
-Migration Script: Single-File to Folder-Based Structure
-=======================================================
+Migration Script: Convert to Folder-Based Structure
+===================================================
 
-This script helps migrate from the old single-file YouTube player setup
-to the new folder-based structure.
+This script helps migrate an EXISTING installation from the old single-file 
+YouTube player setup to the new folder-based structure.
 
-It will:
-1. Create yt-player-main/ directory
-2. Move ytfast.py and ytfast_modules/ into it
-3. Update .gitignore if needed
-4. Provide instructions for updating OBS
+NOTE: This is only needed if you already have the player installed locally
+      with the old structure. New installations should directly use the
+      folder-based structure.
+
+What this script does:
+1. Creates yt-player-main/ directory
+2. Moves ytfast.py and ytfast_modules/ into it
+3. Updates .gitignore if needed
+4. Provides instructions for updating OBS
 
 Usage:
     python migrate_to_folders.py
@@ -24,6 +28,13 @@ from pathlib import Path
 
 def check_current_structure():
     """Check if we're in the right directory with the expected files."""
+    # First check if we already have the new structure
+    if os.path.exists('yt-player-main') and os.path.exists('yt-player-main/ytfast.py'):
+        print("✅ You already have the folder-based structure!")
+        print("   No migration needed.")
+        return False
+    
+    # Check for old structure
     required_files = ['ytfast.py', 'ytfast_modules']
     missing = []
     
@@ -35,6 +46,9 @@ def check_current_structure():
         print(f"❌ Error: Missing required files/folders: {', '.join(missing)}")
         print("   Please run this script from your obs-scripts directory")
         print("   that contains ytfast.py and ytfast_modules/")
+        print("\n   If you're setting up a new installation, you don't need")
+        print("   this migration script. Just copy the yt-player-main folder")
+        print("   directly from the repository.")
         return False
     
     return True
