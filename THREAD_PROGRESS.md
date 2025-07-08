@@ -6,14 +6,38 @@
 - [x] Created migration script for existing users
 - [x] Updated documentation with folder-based approach
 - [x] Created PR #29 for review
-- [ ] Currently working on: Waiting for user testing and feedback
-- [ ] Waiting for: User to test migration and instance creation
+- [x] Removed ytfast.py from root (now in yt-player-main/)
+- [x] Updated docs to clarify migration strategy
+- [ ] Currently working on: Waiting for user decision on full migration
+- [ ] Waiting for: User feedback on migration approach
 - [ ] Blocked by: None
 
 ## Implementation Status
 - Phase: Folder-Based Multi-Instance Support
-- Status: IMPLEMENTATION COMPLETE, PR CREATED (#29)
+- Status: PARTIAL IMPLEMENTATION, PR IN PROGRESS (#29)
 - Branch: feature/folder-based-instances
+
+## Migration Strategy Decision Point
+
+### Current Approach (Incremental)
+- Repository keeps ytfast_modules/ in root for now
+- Provides migration script for users to convert locally
+- Minimizes PR size and review complexity
+- Backward compatible for existing users
+
+### Alternative Approach (Full Migration)
+- Move all ytfast_modules/* files to yt-player-main/ytfast_modules/
+- Repository directly reflects new structure
+- New users get folder structure by default
+- Would require moving ~20 module files in PR
+
+### User Feedback Needed
+The user correctly pointed out: "Why use a migration script when the repository could already be in the correct structure?"
+
+**Options:**
+1. **Keep current approach**: Migration script for local conversion, gradual transition
+2. **Full migration now**: Move all files to folder structure in this PR
+3. **Two-phase approach**: Merge current PR, then separate PR for full file migration
 
 ## Goals Achieved ✅
 
@@ -34,8 +58,8 @@
 
 2. **migrate_to_folders.py** ✅
    - Helps existing users move to folder structure
+   - Now clarified: Only for upgrading from old versions
    - Preserves all settings and cache
-   - Updates .gitignore appropriately
    - Provides clear migration instructions
 
 ### Documentation Updated
@@ -46,10 +70,10 @@
    - Shows directory structure examples
 
 2. **README.md** ✅
-   - Added prominent section about folder-based approach
-   - Updated installation instructions
-   - Maintained all existing content
-   - Added migration path information
+   - Now shows folder structure as default
+   - Migration script presented as upgrade path
+   - Clear installation instructions for new users
+   - Multi-instance section prominently featured
 
 ## Benefits Achieved
 
@@ -75,34 +99,27 @@ User indicated these branches should be deleted as they had regression issues:
 
 ## Next Steps
 
-### Immediate Actions for User
-1. **Test the migration script**:
-   ```bash
-   python migrate_to_folders.py
-   ```
-   - Should move ytfast.py to yt-player-main/ytfast.py
-   - Should move ytfast_modules/ to yt-player-main/ytfast_modules/
-   - Update OBS script path
+### Immediate Decision Needed
+1. **Should we fully migrate the repository structure now?**
+   - Move all ytfast_modules/* to yt-player-main/ytfast_modules/
+   - Delete ytfast_modules/ from root
+   - Make folder structure the default in repository
 
-2. **Test creating new instance**:
-   ```bash
-   python setup_new_instance.py main worship
-   ```
-   - Should create yt-player-worship/ folder
-   - Should rename everything appropriately
-   - Test in OBS with scene "ytworship"
+2. **Or keep incremental approach?**
+   - Current PR provides migration tools
+   - Users convert locally
+   - Future PR could complete repository migration
 
-3. **Clean up old branches** (after testing):
-   ```bash
-   git branch -D feature/phase-14-dev
-   git branch -D feature/phase-14-doc-improvements
-   git branch -D obsolete/common-modules-redesign
-   ```
+### If Full Migration Chosen
+1. Move all module files (~20 files)
+2. Update all imports
+3. Remove old structure from root
+4. Update documentation accordingly
 
-### If Testing Successful
-1. Merge PR #29
-2. Tag new version (v4.0.0 - major architecture change)
-3. Update any deployment documentation
+### If Incremental Approach
+1. Test current implementation
+2. Merge PR #29 as-is
+3. Plan future PR for complete migration
 
 ## Architecture Decision Record
 
@@ -138,8 +155,10 @@ User indicated these branches should be deleted as they had regression issues:
 
 ## Final Notes
 
-This approach is intentionally simple. After multiple failed attempts with increasing complexity, the folder-based approach provides a robust solution that "just works" by leveraging the file system for isolation rather than trying to manage it in code.
+The folder-based approach is proven to work. The remaining decision is whether to:
+1. Fully implement it in the repository now (user's suggestion)
+2. Provide migration tools for gradual transition (current approach)
 
-The helper scripts make it even easier than the original setup while providing complete isolation between instances.
+Both approaches achieve the same end goal - the question is timing and PR complexity.
 
 **Version**: Will be v4.0.0 when merged (major architecture change)
