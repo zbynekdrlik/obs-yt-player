@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.3"  # Patch: Fixed ALL hardcoded imports including playback.py
+SCRIPT_VERSION = "4.0.4"  # Patch: Fixed ALL imports to use relative imports for true multi-instance
 
 # Dynamic script detection - works with any script name
 # Look for .py file in parent directory that's not __init__.py
