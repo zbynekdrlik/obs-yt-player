@@ -2,84 +2,57 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] All 21 module files ARE present in yt-player-main/ytfast_modules/
-- [x] Fixed __init__.py with proper imports for package functionality
-- [x] Removed all duplicate files from root ytfast_modules/
-- [x] Removed migration script (not needed for v4.0.0)
-- [x] Repository structure is clean
-- [ ] **NEW GOAL**: Rename ytfast → ytplay throughout codebase
+- [x] Created ytplay.py (copy of ytfast.py) 
+- [x] Created rename_to_ytplay.py migration script
+- [ ] **WAITING FOR USER**: Run the migration script locally to complete rename
+- [ ] After migration: Delete ytfast.py from GitHub
+- [ ] After migration: Test everything works
 
-## NEW GOAL FOR NEXT THREAD: Rename to ytplay
+## Migration Script Ready
+I've created `rename_to_ytplay.py` that will:
+1. Rename `ytfast.py` → `ytplay.py` (or remove old one)
+2. Rename `ytfast_modules/` → `ytplay_modules/`
+3. Update all imports throughout codebase
+4. Update documentation references
+5. Update setup_new_instance.py
 
-### What Needs to Be Done
-1. **Rename main script**: `ytfast.py` → `ytplay.py`
-2. **Rename modules folder**: `ytfast_modules/` → `ytplay_modules/`
-3. **Update all imports** throughout the codebase to use `ytplay_modules`
-4. **Update all references** in:
-   - Documentation (README.md, docs/)
-   - Helper scripts (setup_new_instance.py)
-   - Configuration files
-   - Any hardcoded strings referencing "ytfast"
+## How to Complete the Rename
+```bash
+# 1. Pull the latest changes
+git pull origin feature/folder-based-instances
 
-### Current Structure (to be renamed)
-```
-obs-yt-player/
-├── yt-player-main/
-│   ├── ytfast.py           # → ytplay.py
-│   └── ytfast_modules/     # → ytplay_modules/
-├── docs/
-├── phases/
-├── setup_new_instance.py
-└── README.md
-```
+# 2. Run the migration script
+python rename_to_ytplay.py
 
-### Target Structure
-```
-obs-yt-player/
-├── yt-player-main/
-│   ├── ytplay.py           # Renamed from ytfast.py
-│   └── ytplay_modules/     # Renamed from ytfast_modules/
-├── docs/
-├── phases/
-├── setup_new_instance.py
-└── README.md
+# 3. Test in OBS that everything works
+
+# 4. Commit the changes
+git add -A
+git commit -m "Complete ytfast to ytplay rename"
+git push origin feature/folder-based-instances
 ```
 
-## Work Completed This Thread
-1. ✅ Cleaned up duplicate files from migration
-2. ✅ Fixed critical __init__.py with proper imports
-3. ✅ Removed migration script
-4. ✅ Repository structure is clean and ready
-
-## Next Thread Tasks
-1. **Rename files**:
-   - `ytfast.py` → `ytplay.py`
-   - `ytfast_modules/` → `ytplay_modules/`
-
-2. **Update imports in all Python files**:
-   - Change `from ytfast_modules` → `from ytplay_modules`
-   - Change `import ytfast_modules` → `import ytplay_modules`
-
-3. **Update documentation**:
-   - README.md
-   - All docs/ files
-   - setup_new_instance.py
-   - Any other references
-
-4. **Update configuration**:
-   - SCRIPT_NAME in config.py
-   - Any logging references
-   - Any hardcoded "ytfast" strings
-
-5. **Test thoroughly** after rename
+## What the Script Will Do
+- ✅ Handle all 21 module files automatically
+- ✅ Update all imports and references
+- ✅ Update documentation
+- ✅ Preserve all functionality
+- ✅ Clean up old files
 
 ## Version for Release
 **v4.0.0** - Major changes:
-- Folder-based multi-instance architecture
+- Folder-based multi-instance architecture  
 - Renamed from ytfast to ytplay
+- Complete isolation between instances
+
+## Testing After Migration
+- [ ] Script loads in OBS without errors
+- [ ] Video playback works
+- [ ] Playlist sync works
+- [ ] All playback modes work
+- [ ] Multi-instance setup works
 
 ## Critical Information
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Current state: Clean structure, ready for rename
-- Next goal: Complete rename to ytplay
+- Status: Migration script ready, waiting for local execution
