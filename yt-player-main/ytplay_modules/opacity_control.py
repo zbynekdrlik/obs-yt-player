@@ -4,8 +4,8 @@ Manages smooth fade in/out transitions for title display.
 """
 
 import obspython as obs
-from config import TITLE_FADE_DURATION, TITLE_FADE_STEPS, TITLE_FADE_INTERVAL, OPACITY_FILTER_NAME, TEXT_SOURCE_NAME
-from logger import log
+from .config import TITLE_FADE_DURATION, TITLE_FADE_STEPS, TITLE_FADE_INTERVAL, OPACITY_FILTER_NAME, TEXT_SOURCE_NAME
+from .logger import log
 
 # Module-level variables
 _opacity_timer = None
@@ -123,7 +123,7 @@ def opacity_transition_callback():
         # If fading out and reached 0, update the text
         if _fade_direction == 'out' and _current_opacity == 0 and _pending_text is not None:
             # Import here to avoid circular dependency
-            from ytplay_modules.media_control import update_text_source_content
+            from .media_control import update_text_source_content
             update_text_source_content(_pending_text['song'], _pending_text['artist'], _pending_text.get('gemini_failed', False))
             _pending_text = None
             # Now fade in
