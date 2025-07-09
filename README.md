@@ -2,18 +2,16 @@
 
 A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them with multiple playback modes. Features optional AI-powered metadata extraction using Google Gemini for superior artist/song detection.
 
-## 🆕 Folder-Based Architecture (v4.0.0+)
+## 🆕 Multi-Instance Support (v4.0.7+)
 
-**NEW**: The player now uses a **folder-based architecture** where each instance lives in its own folder. This provides complete isolation between multiple players - no more state conflicts or import issues!
+The player now supports **multiple independent instances** through a clean folder-based architecture. Each instance runs completely isolated with its own playlist, cache, and settings.
 
-### Default Structure
+### Quick Setup
+```cmd
+create_new_ytplayer.bat worship
 ```
-obs-scripts/
-└── yt-player-main/              # Main player template
-    ├── ytplay.py                # Script to load in OBS
-    ├── ytplay_modules/          # All modules
-    └── cache/                   # Video cache
-```
+
+This creates a new instance in seconds! See [Multi-Instance Setup](#multi-instance-setup) for details.
 
 ## Key Features
 
@@ -26,7 +24,7 @@ obs-scripts/
 - **Loudness normalization** to -14 LUFS (YouTube standard)
 - **Professional audio processing** via FFmpeg
 - **Audio-only mode** for minimal bandwidth usage
-- **Gemini AI metadata** for accurate artist/song detection
+- **Gemini AI metadata** for accurate artist/song detection (optional)
 
 ### 📺 OBS Integration
 - Seamless **Media Source** integration
@@ -36,7 +34,7 @@ obs-scripts/
 
 ### 🔧 Advanced Features
 - **Background Processing**: All heavy tasks run in separate threads (no OBS freezing)
-- **Multi-Instance Support**: Run multiple independent players using folder-based isolation
+- **Multi-Instance Support**: Run multiple independent players
 - **Nested Scene Playback**: Videos play even when scene is nested within other scenes
 - **Scene Transition Support**: Proper handling with configurable delays
 - **Comprehensive Logging**: Both OBS console and file-based logs for debugging
@@ -53,7 +51,7 @@ obs-scripts/
 
 ### 1. Download and Setup
 
-1. Download the latest release
+1. Download the latest release or clone the repository
 2. Copy the `yt-player-main/` folder to your OBS scripts directory
 3. In OBS Studio: Tools → Scripts → Add Script (+)
 4. Navigate to and select `yt-player-main/ytplay.py`
@@ -70,9 +68,9 @@ In script properties, configure:
 
 ### 3. Scene Setup
 
-The script name determines the scene name. For example:
+The script name determines the scene name:
 - Script: `ytplay.py` → Scene: `ytplay`
-- Script: `ytworship.py` → Scene: `ytworship`
+- Script: `worship.py` → Scene: `worship`
 
 Create required OBS sources in your scene:
 
@@ -110,7 +108,7 @@ Check the OBS Script Log for:
 
 ### Creating Additional Instances
 
-Use the Windows batch file to create new instances in seconds:
+Use the included batch file to create new instances in seconds:
 
 ```cmd
 create_new_ytplayer.bat worship
@@ -118,26 +116,43 @@ create_new_ytplayer.bat worship
 
 This creates:
 ```
-obs-scripts/
-├── yt-player-main/              # Original template
-│   └── ytplay.py                # Scene: ytplay
-└── yt-player-worship/           # New instance
-    └── ytworship.py             # Scene: ytworship
+obs-yt-player/
+├── yt-player-main/        # Original template
+│   ├── ytplay.py          # Scene: ytplay
+│   └── ytplay_modules/
+└── yt-player-worship/     # New instance
+    ├── worship.py         # Scene: worship
+    └── worship_modules/
 ```
 
-### What the Script Does:
-1. Copies `yt-player-main/` to `yt-player-worship/`
-2. Renames `ytplay.py` to `ytworship.py`
-3. Renames `ytplay_modules/` to `ytworship_modules/`
-4. Updates all imports automatically
-5. Cleans the cache directory
-6. Displays setup instructions
+### What Happens:
+1. Copies the template folder
+2. Renames script and modules to match instance name
+3. Cleans the cache directory
+4. Shows setup instructions
 
 ### Benefits
 - ✅ **Complete isolation** between instances
 - ✅ **Simple setup** - one command creates everything
-- ✅ **Easy maintenance** - update instances independently
+- ✅ **No manual configuration** - works immediately
 - ✅ **Clear organization** - one folder per player
+
+### Example Use Cases
+
+**Different Content Types:**
+```cmd
+create_new_ytplayer.bat music      # General music
+create_new_ytplayer.bat worship    # Worship songs
+create_new_ytplayer.bat kids       # Kids content
+create_new_ytplayer.bat ambient    # Background music
+```
+
+**Stream Scheduling:**
+```cmd
+create_new_ytplayer.bat morning    # Morning show
+create_new_ytplayer.bat afternoon  # Afternoon content
+create_new_ytplayer.bat evening    # Evening playlist
+```
 
 See [docs/FOLDER_BASED_INSTANCES.md](docs/FOLDER_BASED_INSTANCES.md) for detailed information.
 
@@ -180,7 +195,7 @@ Note: The script works perfectly without a Gemini key - it will use the built-in
 - If Gemini succeeds on retry, the file is renamed without the `_gf` marker
 - This ensures your library improves over time without manual intervention
 
-### Nested Scene Usage
+## Nested Scene Usage
 
 Include YouTube player scenes within other scenes:
 
@@ -188,7 +203,7 @@ Include YouTube player scenes within other scenes:
 Main Stream Scene
 ├── Game Capture
 ├── Webcam
-└── Nested Scene: ytworship (YouTube player)
+└── Nested Scene: worship (YouTube player)
 ```
 
 The player detects nested scenes automatically and continues playback seamlessly.
@@ -214,9 +229,9 @@ The player detects nested scenes automatically and continues playback seamlessly
 
 ### Multi-Instance Problems?
 - Ensure each instance is in its own folder
-- Check that imports match folder names
-- Verify scene names match script names
+- Scene names must match script names
 - Use batch file for reliable setup
+- Check logs for import errors
 
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
@@ -231,34 +246,36 @@ The player detects nested scenes automatically and continues playback seamlessly
 
 ## Project Structure
 
-### Folder-Based Architecture (v4.0.0+)
 ```
-yt-player-main/
-├── ytplay.py               # Main OBS interface
-├── ytplay_modules/         # All modules
-│   ├── config.py          # Configuration
-│   ├── download.py        # Video downloading
-│   ├── playback.py        # Playback control
-│   └── ...                # Other modules
-└── cache/                  # Video cache
-
-create_new_ytplayer.bat     # Windows batch file for instances
-cleanup_old_modules.bat     # Cleanup tool for old modules
+obs-yt-player/
+├── yt-player-main/          # Template instance
+│   ├── ytplay.py            # Main script
+│   ├── ytplay_modules/      # All modules
+│   │   ├── __init__.py      # Package marker
+│   │   ├── config.py        # Dynamic configuration
+│   │   ├── download.py      # Video downloading
+│   │   ├── playback.py      # Playback control
+│   │   └── ...              # Other modules
+│   └── cache/               # Video cache
+│
+├── create_new_ytplayer.bat  # Instance creator
+└── docs/                    # Documentation
+    └── FOLDER_BASED_INSTANCES.md
 ```
 
 ## Recent Updates
 
-### v4.0.1 - Dynamic Script Detection
-- Fixed config.py to dynamically detect script name
-- Improved multi-instance support
-- Added batch file for easy Windows setup
-- Removed old ytfast_modules directory
+### v4.0.7 - Multi-Instance Ready
+- Improved batch file (no manual import updates needed)
+- Fixed validation and naming issues
+- All modules verified against main branch
+- Ready for production use
 
 ### v4.0.0 - Folder-Based Architecture
 - **BREAKING**: Renamed from ytfast to ytplay
 - New folder-based approach for true multi-instance support
 - Complete isolation between instances
-- Simplified maintenance and updates
+- Dynamic module loading system
 
 ### v3.4.1 - Documentation Clarity
 - Clarified that Gemini API key is optional
@@ -274,3 +291,30 @@ cleanup_old_modules.bat     # Cleanup tool for old modules
 ## License
 
 MIT License - see LICENSE file for details.
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+For major changes, please open an issue first to discuss what you would like to change.
+
+## Support
+
+If you encounter any issues:
+1. Check the [Troubleshooting](#troubleshooting) section
+2. Review the OBS Script Log for errors
+3. Open an issue on GitHub with:
+   - Your OBS version
+   - Error messages from the log
+   - Steps to reproduce the problem
+
+## Acknowledgments
+
+- **yt-dlp** - For reliable YouTube downloading
+- **FFmpeg** - For audio processing and normalization
+- **Google Gemini** - For AI-powered metadata extraction
+- **OBS Studio** - For the amazing streaming platform
