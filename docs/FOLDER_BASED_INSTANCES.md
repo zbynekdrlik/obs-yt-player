@@ -22,6 +22,7 @@ This document describes the **folder-based approach** for running multiple YouTu
 - ✅ **Clear organization** - One folder = one player
 - ✅ **Flexible naming** - Any script name works
 - ✅ **Automatic configuration** - No manual import updates needed
+- ✅ **Unique source names** - No OBS conflicts (v4.1.0+)
 
 ## Directory Structure
 
@@ -112,7 +113,14 @@ The multi-instance system uses intelligent module loading:
    - All modules use relative imports: `from .logger import log`
    - These work regardless of the module directory name
 
-This means each instance automatically finds its own modules without any manual configuration!
+4. **Unique Source Names (v4.1.0+)**
+   ```python
+   # In config.py
+   MEDIA_SOURCE_NAME = f"{SCENE_NAME}_video"
+   TEXT_SOURCE_NAME = f"{SCENE_NAME}_title"
+   ```
+
+This means each instance automatically finds its own modules and creates unique source names without any manual configuration!
 
 ## OBS Setup
 
@@ -125,34 +133,39 @@ For each player instance:
    - Scene name = script name (without .py)
    - Example: `worship.py` → Scene: `worship`
 
-3. **Add required sources**
-   - **Media Source** named `video`
+3. **Add required sources (v4.1.0+ naming)**
+   - **Media Source** named `[instance]_video`
+     - For `worship.py`: name it `worship_video`
      - Uncheck "Local File"
      - Leave other settings default
-   - **Text Source** named `title` (optional)
+   - **Text Source** named `[instance]_title` (optional)
+     - For `worship.py`: name it `worship_title`
      - For displaying song metadata
 
 4. **Configure the script**
    - Set the YouTube playlist URL
    - Configure other settings as needed
 
-## Naming Conventions
+## Source Naming Convention (v4.1.0+)
 
-The script name (without .py) becomes the scene name:
+Due to OBS requiring globally unique source names, each instance uses prefixed names:
 
-| Script Name | Scene Name | Example Use |
-|-------------|------------|-------------|
-| `ytplay.py` | `ytplay` | General music |
-| `worship.py` | `worship` | Worship music |
-| `kids.py` | `kids` | Kids content |
-| `ambient.py` | `ambient` | Background music |
-| `remixes.py` | `remixes` | Remix playlist |
+| Script Name | Scene Name | Media Source | Text Source |
+|-------------|------------|--------------|--------------|
+| `ytplay.py` | `ytplay` | `ytplay_video` | `ytplay_title` |
+| `worship.py` | `worship` | `worship_video` | `worship_title` |
+| `kids.py` | `kids` | `kids_video` | `kids_title` |
+| `ambient.py` | `ambient` | `ambient_video` | `ambient_title` |
+| `remixes.py` | `remixes` | `remixes_video` | `remixes_title` |
+
+This prevents conflicts when running multiple instances simultaneously.
 
 ## Key Features
 
 1. **Dynamic Configuration**
    - `config.py` automatically detects the script name
    - Scene name is derived from script filename
+   - Source names are prefixed with scene name (v4.1.0+)
    - No hardcoded paths or names
 
 2. **Module Isolation**
@@ -165,6 +178,11 @@ The script name (without .py) becomes the scene name:
    - No conflicts between different playlists
    - Independent download and processing
 
+4. **Source Name Uniqueness** (v4.1.0+)
+   - Each instance uses unique source names
+   - No conflicts in OBS
+   - Automatic naming based on instance name
+
 ## Best Practices
 
 1. **Keep a template instance**
@@ -174,8 +192,8 @@ The script name (without .py) becomes the scene name:
 
 2. **Version control**
    - Track the template folder in git
-   - Consider `.gitignore` for instance folders
-   - Or commit them for full version control
+   - Instance folders are protected by `.gitignore`
+   - Pull updates won't delete your instances
 
 3. **Consistent updates**
    - When updating shared functionality, update template first
@@ -230,14 +248,34 @@ ModuleNotFoundError: No module named 'worship_modules'
 - `worship.py` → Scene must be named `worship`
 - Check OBS scene name matches exactly
 
-### Videos not playing
-- Media Source must be named `video`
+### Videos not playing (v4.1.0+)
+- Media Source must be named `[instance]_video`
+- Example: `worship_video` for worship instance
 - Scene must be active or nested
 - Check cache folder permissions
 
+### Source name conflicts
+- Update to v4.1.0 or later
+- Each instance now uses unique source names
+- Old naming: `video` and `title`
+- New naming: `[instance]_video` and `[instance]_title`
+
 ## Migration from Old Setup
 
-If upgrading from the single-file setup:
+### From v4.0.x to v4.1.0
+
+The main change is source naming to avoid OBS conflicts:
+
+1. **Update your scripts** to v4.1.0
+2. **Update OBS source names** in each scene:
+   - `video` → `ytplay_video` (for main instance)
+   - `title` → `ytplay_title` (for main instance)
+   - For other instances: `[instance]_video` and `[instance]_title`
+3. **Test each instance** to ensure playback works
+
+### From Single-File Setup
+
+If upgrading from the old single-file setup:
 
 1. **Backup your current setup**
    ```bash
@@ -255,7 +293,10 @@ If upgrading from the single-file setup:
    - Remove old script references
    - Add new scripts from folders
 
-5. **Verify functionality**
+5. **Update source names** (v4.1.0+)
+   - Rename sources to include instance prefix
+
+6. **Verify functionality**
    - Test each instance
    - Check logs for errors
 
@@ -268,12 +309,21 @@ If upgrading from the single-file setup:
 3. Uses `importlib` to dynamically load modules
 4. All internal imports use relative paths
 
+### Source Name Generation (v4.1.0+)
+
+1. Script name is detected: `worship.py` → `worship`
+2. Scene name matches script name: `worship`
+3. Source names are prefixed:
+   - Media: `worship_video`
+   - Text: `worship_title`
+
 ### Why This Works
 
 - **No hardcoded module names** in the codebase
 - **Relative imports** (`.module`) work in any directory
 - **Dynamic detection** adapts to any script name
 - **Package structure** (`__init__.py`) enables clean imports
+- **Unique source names** prevent OBS conflicts
 
 ## Example Use Cases
 
@@ -318,5 +368,6 @@ Key advantages:
 - **Independent updates** and testing
 - **Flexible naming** for any use case
 - **Automatic module detection** at runtime
+- **Unique source names** prevent OBS conflicts (v4.1.0+)
 
 This is the recommended approach for running multiple YouTube players in OBS Studio, providing both simplicity and power for any streaming setup.
