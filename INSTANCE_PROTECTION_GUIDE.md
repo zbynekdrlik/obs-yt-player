@@ -35,9 +35,9 @@ C:\OBS-Scripts\
    cd yt-player-instances
    ```
 
-2. **Use the safe instance creator:**
+2. **Use the instance creator with location choice:**
    ```cmd
-   ..\obs-yt-player\create_new_ytplayer_safe.bat worship
+   ..\obs-yt-player\create_new_ytplayer.bat worship
    ```
    Choose option 2 or 3 to create outside repository.
 
@@ -72,10 +72,9 @@ mklink /D yt-player-worship C:\yt-instances\yt-player-worship
 
 ## 📝 Safe Workflow
 
-1. **Always create instances outside the repository**
-2. **Use `create_new_ytplayer_safe.bat` instead of the original**
-3. **Use `update_all_instances_safe.bat` which searches multiple locations**
-4. **Never run `git clean -fd` without checking what will be deleted**
+1. **Always create instances outside the repository** (choose option 2 or 3 in the creator)
+2. **Use `update_all_instances.bat` which searches multiple locations**
+3. **Never run `git clean -fd` without checking what will be deleted**
 
 ## 🚀 Quick Recovery
 
@@ -83,10 +82,9 @@ If you just lost instances:
 
 1. **Recreate them quickly:**
    ```cmd
-   create_new_ytplayer_safe.bat worship
-   create_new_ytplayer_safe.bat kids
-   create_new_ytplayer_safe.bat music
+   create_new_ytplayer.bat worship
    ```
+   Choose option 2 to create in parent directory.
 
 2. **Reconfigure in OBS:**
    - Add the scripts from their new locations
@@ -113,7 +111,7 @@ yt-player-*/
 ## 📋 Checklist for Safety
 
 - [ ] Instances stored outside repository
-- [ ] Using `_safe.bat` versions of scripts
+- [ ] Using location choice when creating instances
 - [ ] `.gitignore` includes `yt-player-*/`
 - [ ] Never use `git clean -fd` without checking
 - [ ] Regular backups of instance folders
