@@ -170,6 +170,21 @@ Each instance automatically uses unique source names:
 - ✅ **Clear organization** - one folder per player
 - ✅ **No source conflicts** - unique names per instance (v4.1.0+)
 
+### Updating All Instances
+
+When you update the main repository, use the included batch file to update all instances:
+
+```cmd
+update_all_instances.bat
+```
+
+This will:
+1. Pull the latest changes from GitHub (`git pull origin main`)
+2. Find all `yt-player-*` instance directories
+3. Update each instance from the template (`yt-player-main`)
+4. Preserve each instance's cache and configuration
+5. Show a summary of updated instances
+
 ### Example Use Cases
 
 **Different Content Types:**
@@ -288,18 +303,19 @@ The player detects nested scenes automatically and continues playback seamlessly
 
 ```
 obs-yt-player/
-├── yt-player-main/          # Template instance
-│   ├── ytplay.py            # Main script
-│   ├── ytplay_modules/      # All modules
-│   │   ├── __init__.py      # Package marker
-│   │   ├── config.py        # Dynamic configuration
-│   │   ├── download.py      # Video downloading
-│   │   ├── playback.py      # Playback control
-│   │   └── ...              # Other modules
-│   └── cache/               # Video cache
+├── yt-player-main/             # Template instance
+│   ├── ytplay.py               # Main script
+│   ├── ytplay_modules/         # All modules
+│   │   ├── __init__.py         # Package marker
+│   │   ├── config.py           # Dynamic configuration
+│   │   ├── download.py         # Video downloading
+│   │   ├── playback.py         # Playback control
+│   │   └── ...                 # Other modules
+│   └── cache/                  # Video cache
 │
-├── create_new_ytplayer.bat  # Instance creator
-└── docs/                    # Documentation
+├── create_new_ytplayer.bat     # Instance creator
+├── update_all_instances.bat    # Bulk updater
+└── docs/                       # Documentation
     └── FOLDER_BASED_INSTANCES.md
 ```
 
