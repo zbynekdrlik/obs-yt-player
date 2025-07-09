@@ -1,188 +1,297 @@
-"""Scene and source management for OBS YouTube Player."""
+"""
+Scene management for OBS YouTube Player.
+Handles scene verification and frontend events with transition awareness.
+Supports nested scene detection for scenes used as sources.
+"""
 
 import obspython as obs
+import time
+from .config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME, PLAYBACK_MODE_SINGLE
 from .logger import log
-from .config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME, SCRIPT_NAME
 from .state import (
-    is_scene_active, set_scene_active, is_playing,
-    get_cached_videos, get_loop_video_id, get_playback_mode
+    set_scene_active, is_scene_active, is_playing, 
+    set_stop_threads, get_playback_mode, is_first_video_played,
+    set_first_video_played
 )
 
-# Default settings
-DEFAULT_TEXT_SETTINGS = {
-    "font": {
-        "face": "Arial",
-        "size": 48,
-        "style": "Regular",
-        "flags": 0
-    },
-    "color": 0xFFFFFFFF,  # White
-    "opacity": 100,
-    "outline": True,
-    "outline_color": 0xFF000000,  # Black
-    "outline_size": 2,
-    "outline_opacity": 100,
-    "align": "center",
-    "valign": "center"
-}
+# Module-level variables for transition tracking
+_last_scene_change_time = 0
+_pending_deactivation = False
+_deactivation_timer = None
 
-def create_scene_if_needed():
-    """Create scene and sources if they don't exist."""
-    # Check if scene exists
+def verify_scene_setup():
+    """Verify that required scene and sources exist."""
     scene_source = obs.obs_get_source_by_name(SCENE_NAME)
-    if scene_source:
-        obs.obs_source_release(scene_source)
-        log(f"Scene '{SCENE_NAME}' already exists")
-        return
-    
-    # Create new scene
-    scene_source = obs.obs_source_create("scene", SCENE_NAME, None, None)
     if not scene_source:
-        log(f"ERROR: Failed to create scene '{SCENE_NAME}'")
+        log(f"ERROR: Required scene '{SCENE_NAME}' not found! Please create it.")
         return
     
-    # Get the scene object
     scene = obs.obs_scene_from_source(scene_source)
-    
-    # Create Media Source
-    media_settings = obs.obs_data_create()
-    obs.obs_data_set_bool(media_settings, "hw_decode", True)
-    obs.obs_data_set_bool(media_settings, "is_local_file", True)
-    obs.obs_data_set_bool(media_settings, "restart_on_activate", False)
-    obs.obs_data_set_bool(media_settings, "close_when_inactive", False)
-    obs.obs_data_set_bool(media_settings, "looping", False)  # We manage looping
-    
-    media_source = obs.obs_source_create("ffmpeg_source", MEDIA_SOURCE_NAME, media_settings, None)
-    if media_source:
-        # Add to scene
-        scene_item = obs.obs_scene_add(scene, media_source)
+    if scene:
+        # Check for required sources
+        media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
+        text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
         
-        # Scale to fit (you might want to adjust this)
-        obs.obs_sceneitem_set_scale_filter(scene_item, obs.OBS_SCALE_FILTER_LANCZOS)
-        
-        # Release source reference
-        obs.obs_source_release(media_source)
-        log(f"Created Media Source: {MEDIA_SOURCE_NAME}")
-    else:
-        log(f"ERROR: Failed to create Media Source: {MEDIA_SOURCE_NAME}")
+        if not media_source:
+            log(f"WARNING: Media Source '{MEDIA_SOURCE_NAME}' not found in scene")
+        else:
+            obs.obs_source_release(media_source)
+            
+        if not text_source:
+            log(f"WARNING: Text Source '{TEXT_SOURCE_NAME}' not found in scene")
+        else:
+            obs.obs_source_release(text_source)
     
-    obs.obs_data_release(media_settings)
-    
-    # Create Text Source
-    text_settings = obs.obs_data_create()
-    
-    # Apply default text settings
-    font_obj = obs.obs_data_create()
-    obs.obs_data_set_string(font_obj, "face", DEFAULT_TEXT_SETTINGS["font"]["face"])
-    obs.obs_data_set_int(font_obj, "size", DEFAULT_TEXT_SETTINGS["font"]["size"])
-    obs.obs_data_set_string(font_obj, "style", DEFAULT_TEXT_SETTINGS["font"]["style"])
-    obs.obs_data_set_int(font_obj, "flags", DEFAULT_TEXT_SETTINGS["font"]["flags"])
-    
-    obs.obs_data_set_obj(text_settings, "font", font_obj)
-    obs.obs_data_set_int(text_settings, "color", DEFAULT_TEXT_SETTINGS["color"])
-    obs.obs_data_set_int(text_settings, "opacity", DEFAULT_TEXT_SETTINGS["opacity"])
-    obs.obs_data_set_bool(text_settings, "outline", DEFAULT_TEXT_SETTINGS["outline"])
-    obs.obs_data_set_int(text_settings, "outline_color", DEFAULT_TEXT_SETTINGS["outline_color"])
-    obs.obs_data_set_int(text_settings, "outline_size", DEFAULT_TEXT_SETTINGS["outline_size"])
-    obs.obs_data_set_int(text_settings, "outline_opacity", DEFAULT_TEXT_SETTINGS["outline_opacity"])
-    obs.obs_data_set_string(text_settings, "align", DEFAULT_TEXT_SETTINGS["align"])
-    obs.obs_data_set_string(text_settings, "valign", DEFAULT_TEXT_SETTINGS["valign"])
-    
-    obs.obs_data_release(font_obj)
-    
-    text_source = obs.obs_source_create("text_gdiplus", TEXT_SOURCE_NAME, text_settings, None)
-    if text_source:
-        # Add to scene
-        scene_item = obs.obs_scene_add(scene, text_source)
-        
-        # Position at bottom of screen (you might want to adjust this)
-        pos = obs.vec2()
-        pos.x = 960  # Center X for 1920x1080
-        pos.y = 900  # Near bottom
-        obs.obs_sceneitem_set_pos(scene_item, pos)
-        obs.obs_sceneitem_set_alignment(scene_item, 5)  # Center alignment
-        
-        # Release source reference
-        obs.obs_source_release(text_source)
-        log(f"Created Text Source: {TEXT_SOURCE_NAME}")
-    else:
-        log(f"ERROR: Failed to create Text Source: {TEXT_SOURCE_NAME}")
-    
-    obs.obs_data_release(text_settings)
-    
-    # Release scene source
     obs.obs_source_release(scene_source)
     
-    log(f"Scene '{SCENE_NAME}' created with media and text sources")
+    # Remove this timer - only run once
+    obs.timer_remove(verify_scene_setup)
 
-def check_scene_active():
-    """Check if our scene is currently active."""
+def is_scene_visible_nested(scene_name, check_scene_source=None):
+    """
+    Check if a scene is visible as a nested source in the current program scene.
+    
+    Args:
+        scene_name: The name of the scene to check for
+        check_scene_source: Optional scene source to check within (defaults to current program scene)
+    
+    Returns:
+        bool: True if the scene is visible as a nested source
+    """
+    # Get the scene to check within (default to current program scene)
+    if check_scene_source is None:
+        check_scene_source = obs.obs_frontend_get_current_scene()
+        if not check_scene_source:
+            return False
+        need_release = True
+    else:
+        need_release = False
+    
+    try:
+        # Get the scene object
+        scene = obs.obs_scene_from_source(check_scene_source)
+        if not scene:
+            return False
+        
+        # Enumerate all scene items
+        scene_items = obs.obs_scene_enum_items(scene)
+        if not scene_items:
+            return False
+        
+        found = False
+        for scene_item in scene_items:
+            # Check if item is visible
+            if not obs.obs_sceneitem_visible(scene_item):
+                continue
+            
+            # Get the source for this scene item
+            source = obs.obs_sceneitem_get_source(scene_item)
+            if not source:
+                continue
+            
+            source_name = obs.obs_source_get_name(source)
+            source_id = obs.obs_source_get_id(source)
+            
+            # Check if this is a scene source
+            if source_id == "scene":
+                if source_name == scene_name:
+                    # Found our scene as a nested source
+                    found = True
+                    break
+                else:
+                    # This is another scene, check recursively for nested scenes
+                    # But avoid infinite recursion by not checking the same scene
+                    if source_name != obs.obs_source_get_name(check_scene_source):
+                        if is_scene_visible_nested(scene_name, source):
+                            found = True
+                            break
+        
+        # Release the scene items
+        obs.sceneitem_list_release(scene_items)
+        
+        return found
+        
+    finally:
+        if need_release:
+            obs.obs_source_release(check_scene_source)
+
+def is_scene_active_or_nested():
+    """
+    Check if our scene is active either directly in program or as a nested source.
+    
+    Returns:
+        bool: True if scene is active in any way
+    """
+    # First check if we're the direct program scene
     current_scene = obs.obs_frontend_get_current_scene()
-    if not current_scene:
-        return False
+    if current_scene:
+        scene_name = obs.obs_source_get_name(current_scene)
+        obs.obs_source_release(current_scene)
+        if scene_name == SCENE_NAME:
+            return True
     
-    scene_name = obs.obs_source_get_name(current_scene)
-    obs.obs_source_release(current_scene)
+    # Then check if we're nested in the current program scene
+    return is_scene_visible_nested(SCENE_NAME)
+
+def verify_initial_state():
+    """Verify initial state when OBS finishes loading."""
+    is_active = is_scene_active_or_nested()
+    set_scene_active(is_active)
+    log(f"Initial scene check: {SCENE_NAME} (active or nested: {is_active})")
+
+def get_preview_scene_name():
+    """Get the name of the scene in preview (for Studio Mode)."""
+    preview_scene = obs.obs_frontend_get_current_preview_scene()
+    if preview_scene:
+        name = obs.obs_source_get_name(preview_scene)
+        obs.obs_source_release(preview_scene)
+        return name
+    return None
+
+def is_studio_mode_active():
+    """Check if Studio Mode (preview/program) is active."""
+    return obs.obs_frontend_preview_program_mode_active()
+
+def delayed_deactivation():
+    """Handle delayed deactivation after transition."""
+    global _deactivation_timer, _pending_deactivation
     
-    return scene_name == SCENE_NAME
+    # Clear the timer reference
+    obs.timer_remove(delayed_deactivation)
+    _deactivation_timer = None
+    
+    # Now actually deactivate, but only if scene is not nested
+    if _pending_deactivation and not is_scene_active_or_nested():
+        log("Deactivating scene after transition delay")
+        set_scene_active(False)
+        # Playback controller will handle stopping when scene is inactive
+        _pending_deactivation = False
 
 def on_frontend_event(event):
     """Handle OBS frontend events."""
-    if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
-        # Check if our scene is now active
-        was_active = is_scene_active()
-        is_active = check_scene_active()
-        
-        if is_active != was_active:
-            set_scene_active(is_active)
-            if is_active:
-                log(f"Scene '{SCENE_NAME}' activated")
-            else:
-                log(f"Scene '{SCENE_NAME}' deactivated")
-                
-                # Check if we're in loop mode
-                from .config import PLAYBACK_MODE_LOOP
-                if get_playback_mode() == PLAYBACK_MODE_LOOP:
-                    # Clear the loop video when scene becomes inactive
-                    from .state import set_loop_video_id
-                    set_loop_video_id(None)
-                    log("Loop mode: Cleared loop video due to scene change")
+    try:
+        if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
+            handle_scene_change()
+        elif event == obs.OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED:
+            handle_preview_change()
+        elif event == obs.OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED:
+            handle_transition_duration_changed()
+        elif event == obs.OBS_FRONTEND_EVENT_EXIT:
+            handle_obs_exit()
+        elif event == obs.OBS_FRONTEND_EVENT_FINISHED_LOADING:
+            log("OBS finished loading")
+            verify_initial_state()
+    except Exception as e:
+        log(f"ERROR in frontend event handler: {e}")
 
-def on_scene_change(calldata):
-    """Legacy callback for scene changes."""
-    # This is now handled by frontend events
-    pass
-
-def setup_scene_callback():
-    """Set up scene change callbacks."""
-    # Note: Frontend events are registered in script_load
-    # This function kept for compatibility
-    pass
-
-def verify_scene_setup():
-    """Verify scene exists and is properly configured."""
-    log("Verifying scene setup...")
+def handle_preview_change():
+    """
+    Handle preview scene change in Studio Mode.
+    This lets us prepare for upcoming transitions.
+    """
+    if not is_studio_mode_active():
+        return
     
-    # Create scene if needed
-    create_scene_if_needed()
+    preview_scene_name = get_preview_scene_name()
+    if preview_scene_name:
+        current_scene = obs.obs_frontend_get_current_scene()
+        if current_scene:
+            current_scene_name = obs.obs_source_get_name(current_scene)
+            obs.obs_source_release(current_scene)
+            
+            # If our scene is now in preview and not in program, it might go live soon
+            if preview_scene_name == SCENE_NAME and current_scene_name != SCENE_NAME:
+                log(f"Scene '{SCENE_NAME}' loaded in preview, ready to transition")
+
+def handle_transition_duration_changed():
+    """Handle transition duration change event."""
+    # Get the new transition duration when user changes it
+    duration = obs.obs_frontend_get_transition_duration()
+    log(f"Transition duration changed to: {duration}ms")
+
+def handle_scene_change():
+    """
+    Handle scene change events with transition awareness.
+    Now supports nested scene detection.
+    """
+    global _last_scene_change_time, _pending_deactivation, _deactivation_timer
     
-    # Check initial scene state
-    is_active = check_scene_active()
-    set_scene_active(is_active)
+    current_time = time.time() * 1000  # Convert to milliseconds
+    time_since_last_change = current_time - _last_scene_change_time
+    _last_scene_change_time = current_time
+    
+    was_active = is_scene_active()
+    is_active = is_scene_active_or_nested()
+    
+    # Only act on actual changes
+    if is_active == was_active:
+        return
+    
+    # Cancel any pending deactivation if scene is becoming active
+    if is_active and _deactivation_timer:
+        obs.timer_remove(delayed_deactivation)
+        _deactivation_timer = None
+        _pending_deactivation = False
+    
+    # Get transition duration
+    transition_duration = obs.obs_frontend_get_transition_duration()
+    
+    # Check if this is likely a transition (rapid scene changes or Studio Mode)
+    is_likely_transition = (time_since_last_change < 100) or is_studio_mode_active()
+    
+    current_scene = obs.obs_frontend_get_current_scene()
+    current_scene_name = "Unknown"
+    if current_scene:
+        current_scene_name = obs.obs_source_get_name(current_scene)
+        obs.obs_source_release(current_scene)
     
     if is_active:
-        log(f"Scene '{SCENE_NAME}' is currently active")
+        # Scene becoming active - start immediately
+        if current_scene_name == SCENE_NAME:
+            log(f"Scene activated directly: {SCENE_NAME}")
+        else:
+            log(f"Scene activated as nested source in: {current_scene_name}")
+        set_scene_active(True)
+        
+        # If in single mode and first video was already played, reset it
+        # This allows playing one video each time the scene is activated
+        if get_playback_mode() == PLAYBACK_MODE_SINGLE and is_first_video_played():
+            log("Single mode: Resetting first video played flag for new scene activation")
+            set_first_video_played(False)
+        
+        # Playback controller will handle starting
+        
     else:
-        log(f"Scene '{SCENE_NAME}' is not active")
+        # Scene becoming inactive
+        if is_likely_transition and transition_duration > 300:
+            # This is likely a transition - delay the deactivation
+            log(f"Scene transitioning out, delaying stop for {transition_duration}ms")
+            _pending_deactivation = True
+            
+            # Set timer for deactivation after transition completes
+            if _deactivation_timer:
+                obs.timer_remove(delayed_deactivation)
+            _deactivation_timer = delayed_deactivation
+            obs.timer_add(_deactivation_timer, int(transition_duration))
+        else:
+            # Instant scene change or very short transition
+            log(f"Scene deactivated (no longer visible in: {current_scene_name})")
+            set_scene_active(False)
+            # Playback controller will handle stopping
+
+def handle_obs_exit():
+    """Handle OBS exit event."""
+    global _deactivation_timer
     
-    # Note about loop checkbox
-    media_source = obs.obs_get_source_by_name(MEDIA_SOURCE_NAME)
-    if media_source:
-        log(f"IMPORTANT: Disable 'Loop' checkbox in {MEDIA_SOURCE_NAME} source properties!")
-        log("The script manages looping behavior based on Playback Mode setting.")
-        obs.obs_source_release(media_source)
+    log("OBS exiting - initiating cleanup")
     
-    log("Scene verification complete")
+    # Cancel any pending timers
+    if _deactivation_timer:
+        obs.timer_remove(delayed_deactivation)
+        _deactivation_timer = None
     
-    # Remove the timer so it only runs once
-    obs.timer_remove(verify_scene_setup)
+    # Signal all threads to stop
+    set_stop_threads(True)
+    
+    # Allow brief time for cleanup
+    time.sleep(0.1)
