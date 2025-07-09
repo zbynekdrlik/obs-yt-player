@@ -6,7 +6,8 @@
 - [x] All modules match main branch functionality
 - [x] Deep analysis completed - all modules verified
 - [x] Fixed create_new_ytplayer.bat validation issue
-- [ ] Currently working on: Testing batch file fix
+- [x] Fixed batch file naming and removed unnecessary import updates
+- [ ] Currently working on: Testing improved batch file
 - [ ] Waiting for: User to test the fixed batch file
 - [ ] Blocked by: None
 
@@ -20,11 +21,18 @@ Performed comprehensive comparison between main and feature branches:
 - Dynamic script detection implemented correctly
 - Multi-instance support confirmed working
 
-## 🔧 Fixed: Batch File Validation
-Fixed validation issue in create_new_ytplayer.bat:
-- Problem: `echo %INSTANCE_NAME% |` was adding trailing space
-- Solution: Removed space before pipe character: `echo %INSTANCE_NAME%|`
-- Now accepts valid instance names like "ytfast"
+## 🔧 Fixed: Batch File Issues
+1. **Validation issue fixed:**
+   - Problem: `echo %INSTANCE_NAME% |` was adding trailing space
+   - Solution: Removed space before pipe character: `echo %INSTANCE_NAME%|`
+
+2. **Naming issue fixed:**
+   - Problem: Was prefixing "yt" to names (ytytfast.py instead of ytfast.py)
+   - Solution: Use instance name directly without prefix
+   
+3. **Removed unnecessary import updates:**
+   - The dynamic import system makes manual updates unnecessary
+   - All imports are relative and work automatically
 
 ## ✅ All Modules Verified and Working
 All 20 modules have been compared with main branch and are now identical except for imports:
@@ -58,8 +66,8 @@ All 20 modules have been compared with main branch and are now identical except 
 ## Current Status
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- State: **WORKING - Ready for Testing**
-- Next Step: Test create_new_ytplayer.bat with various instance names
+- State: **WORKING - Batch file improved**
+- Next Step: Test create_new_ytplayer.bat with correct naming
 
 ## Key Achievement
 Successfully implemented folder-based multi-instance support with minimal changes:
@@ -67,6 +75,6 @@ Successfully implemented folder-based multi-instance support with minimal change
 2. Dynamic script name detection
 3. Module directory naming
 4. Default cache location
-5. Instance creation script
+5. Instance creation script (now simplified and corrected)
 
 **Everything else remains UNCHANGED from main branch - and it's WORKING!**
