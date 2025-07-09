@@ -2,87 +2,76 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Version 4.0.7 CONFIRMED WORKING by user! 🎉
-- [x] All modules match main branch functionality
-- [x] Deep analysis completed - all modules verified
-- [x] Fixed create_new_ytplayer.bat validation issue
-- [x] Fixed batch file naming and removed unnecessary import updates
-- [x] Updated all documentation for merge
-- [x] Removed unnecessary MERGE_SUMMARY.md
-- [ ] Currently working on: Ready for merge
-- [ ] Waiting for: User approval to merge
+- [x] Currently working on: COMPLETE - Ready for merge!
+- [ ] Waiting for: User approval to merge PR #30
 - [ ] Blocked by: None
 
-## 🎉 READY FOR MERGE
-All implementation, testing, and documentation complete!
+## 🎉 READY FOR MERGE - v4.1.0
 
-## 📋 Merge Preparation Checklist
-- ✅ Code implementation complete and tested
-- ✅ Batch file tested and working correctly
-- ✅ All documentation updated:
-  - ✅ README.md - Has concise multi-instance section
-  - ✅ DOCUMENTATION_STRUCTURE.md - Updated for v4.0.7
-  - ✅ docs/FOLDER_BASED_INSTANCES.md - Detailed technical guide for developers
-  - ✅ docs/04-guidelines.md - Updated for multi-instance
-- ✅ Version set to 4.0.7 in config.py
-- ✅ PR #29 description up to date
-- ✅ All tests passing
+### Implementation Complete ✅
+- Unique source naming implemented and tested
+- User confirmed: "new source naming is working"
+- All documentation updated
+- PR #30 ready for merge
 
-## 🎉 SUCCESS: v4.0.7 WORKING
-User confirmed that v4.0.7 is working correctly!
-
-## ✅ Deep Analysis Complete
-Performed comprehensive comparison between main and feature branches:
-- All 20 modules have identical functionality
-- Only changes are import pattern (absolute → relative)
-- Dynamic script detection implemented correctly
-- Multi-instance support confirmed working
-
-## 🔧 Fixed: Batch File Issues
-1. **Validation issue fixed:**
-   - Problem: `echo %INSTANCE_NAME% |` was adding trailing space
-   - Solution: Removed space before pipe character: `echo %INSTANCE_NAME%|`
-
-2. **Naming issue fixed:**
-   - Problem: Was prefixing "yt" to names (ytytfast.py instead of ytfast.py)
-   - Solution: Use instance name directly without prefix
-   
-3. **Removed unnecessary import updates:**
-   - The dynamic import system makes manual updates unnecessary
-   - All imports are relative and work automatically
-
-## ✅ All Modules Verified and Working
-All 20 modules have been compared with main branch and are now identical except for imports:
-- ✅ All modules use relative imports
-- ✅ config.py has dynamic script detection
-- ✅ Main script uses dynamic module loading
-- ✅ Everything else unchanged from main branch
+## Implementation Status
+- Phase: Source Name Redesign
+- Step: COMPLETE
+- Status: TESTED AND WORKING
 
 ## Version History
-- **v4.0.1-4.0.4**: Multiple attempts with various issues
-- **v4.0.5**: Fixed import errors and syntax issues
-- **v4.0.6**: Restored scene.py to match main branch
-- **v4.0.7**: Restored video_selector.py, playlist.py, and tools.py - **CONFIRMED WORKING**
+- v4.0.7 → v4.1.0: Implemented unique source names for multi-instance support
 
-## Current Status
-- Branch: `feature/folder-based-instances`
-- PR: #29
-- State: **READY FOR MERGE**
-- Next Step: Merge to main branch
+## Testing Status Matrix
+| Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
+|-----------|------------|-------------|--------------------|-----------------------|
+| config.py | ✅ v4.1.0  | ✅          | ✅                 | ✅                    |
+| All modules | ✅        | ✅          | ✅                 | ✅                    |
+| Documentation | ✅      | N/A         | N/A                | N/A                   |
 
-## Key Achievement
-Successfully implemented folder-based multi-instance support with minimal changes:
-1. Import system changes (absolute → relative)
-2. Dynamic script name detection
-3. Module directory naming
-4. Default cache location
-5. Instance creation script (now simplified and corrected)
+## Changes Made
+1. **config.py**: 
+   - Updated version to 4.1.0
+   - Changed source naming to use dynamic prefixes:
+     - MEDIA_SOURCE_NAME = f"{SCENE_NAME}_video"
+     - TEXT_SOURCE_NAME = f"{SCENE_NAME}_title"
+   - This ensures unique names like ytplay_video, ytfast_video, etc.
 
-**Everything else remains UNCHANGED from main branch - and it's WORKING!**
+2. **.gitignore**:
+   - Added `yt-player-*/` to protect instance folders from git operations
 
-## What Happens After Merge
-1. Users can create multiple instances with `create_new_ytplayer.bat`
-2. Each instance is completely isolated
-3. Breaking change: Script renamed from ytfast to ytplay
-4. Users need to update their OBS script references
-5. Existing caches can be moved to new structure
+3. **README.md**:
+   - Added migration guide for v4.0.x → v4.1.0
+   - Updated installation instructions with new source names
+   - Added breaking change warning
+
+4. **DOCUMENTATION_STRUCTURE.md**:
+   - Updated to reflect v4.1.0 changes
+   - Added unique source names section
+
+5. **docs/FOLDER_BASED_INSTANCES.md**:
+   - Added comprehensive documentation for source naming
+   - Included troubleshooting for source conflicts
+   - Updated migration guide
+
+## Last User Action
+- Date/Time: Recent
+- Action: Confirmed "new source naming is working"
+- Result: Feature working correctly
+- Next Required: Merge PR #30
+
+## PR #30 Summary
+- Title: Implement unique source names for multi-instance support
+- Changes: 5 files changed (+122, -86)
+- Breaking change: Users must update OBS source names
+- Migration guide included
+- Testing complete
+
+## Important Notes
+- This is a BREAKING CHANGE - users need to update their OBS source references
+- Old source names (video, title) won't work anymore
+- New source names follow pattern: [instance]_video and [instance]_title
+- Instance folders are now protected by .gitignore
+
+## Ready for Production
+All testing complete, documentation updated, and user confirmed working. Ready to merge to main branch!

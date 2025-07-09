@@ -40,6 +40,13 @@ The script uses a **folder-based architecture** with dynamic imports:
 - Complete isolation between instances
 - Use `create_new_ytplayer.bat` for easy instance creation
 
+### Unique Source Names (v4.1.0+)
+To support multiple instances without OBS conflicts:
+- Source names are prefixed with instance name
+- `ytplay` instance: `ytplay_video` and `ytplay_title`
+- `worship` instance: `worship_video` and `worship_title`
+- Automatic detection based on script name
+
 ## Documentation Hierarchy
 
 ### Core Documentation (`/docs/`)
@@ -107,7 +114,7 @@ The script uses a simplified metadata extraction system:
 
 ### Version Management
 - Version constant in `config.py`
-- Current version: 4.0.7 (Multi-instance support)
+- Current version: 4.1.0 (Unique source names for multi-instance)
 - Each code change increments the version
 - **MAJOR**: Significant changes (e.g., v4.0 for folder-based architecture)
 - **MINOR**: New features, phase implementations
@@ -130,8 +137,9 @@ The script uses a simplified metadata extraction system:
 8. Use thread-aware logging
 9. All module imports are relative
 10. Each instance is completely isolated
+11. Source names must be unique (v4.1.0+)
 
-## Current Implementation Status (v4.0.7)
+## Current Implementation Status (v4.1.0)
 The implementation includes:
 - ✅ All phases 1-12 complete
 - ✅ Folder-based multi-instance architecture
@@ -146,5 +154,6 @@ The implementation includes:
 - ✅ Audio-only mode option
 - ✅ Nested scene support
 - ✅ Comprehensive logging system
+- ✅ Unique source names for multi-instance support
 
 All videos are processed through: download → Gemini/parser → universal cleaning → normalization → playback.
