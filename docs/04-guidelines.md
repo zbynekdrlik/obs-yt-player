@@ -1,19 +1,27 @@
 # 04‑Guidelines (Output & Coding Style)
 
 ## Output Rules
-1. Claude outputs modular code: minimal `ytfast.py` plus modules in `<scriptname>_modules/` directory
+1. Claude outputs modular code: minimal main script (e.g., `ytplay.py`) plus modules in `{scriptname}_modules/` directory
 2. Main script contains only OBS interface functions; all logic goes in modules
 3. Include an OBS script description docstring ≤ 400 characters in main script
 4. No external dependencies besides Python std lib and OBS‑bundled libs
 
 ## Module Structure
-- **Main script** (`ytfast.py`): Minimal OBS interface only
-- **Modules folder** (`<scriptname>_modules/`):
-  - `config.py` - Configuration constants
-  - `logger.py` - Logging system
+- **Main script** (e.g., `ytplay.py`): Minimal OBS interface only
+- **Modules folder** (`{scriptname}_modules/`):
+  - `__init__.py` - Package marker for imports
+  - `config.py` - Configuration constants with dynamic script detection
+  - `logger.py` - Thread-aware logging system
   - `state.py` - Thread-safe state management
   - `utils.py` - Utility functions
   - Individual feature modules for each component
+
+## Multi-Instance Architecture (v4.0+)
+- Each instance lives in its own folder (e.g., `yt-player-worship/`)
+- Script name determines module folder: `worship.py` → `worship_modules/`
+- All imports within modules are relative (e.g., `from .logger import log`)
+- Complete isolation between instances
+- Use `create_new_ytplayer.bat` for easy instance creation
 
 ## Coding Style
 - Follow PEP‑8 (≤ 120 chars per line where practical)
@@ -21,6 +29,7 @@
 - Each module has single responsibility
 - Protect shared state through `state.py` accessors
 - Wrap worker loops in `try/except`
+- All module imports must be relative within the package
 
 ## Logging Guidelines
 - Use thread-aware logging to handle OBS's behavior with background threads
@@ -50,6 +59,7 @@ Examples:
 - Another iteration in Phase 2: `1.1.1` → `1.1.2` (PATCH for iteration)
 - Phase 3 implementation: `1.1.2` → `1.2.0` (MINOR for new phase)
 - Modular refactoring: `1.9.0` → `2.0.0` (MAJOR for architecture change)
+- Multi-instance support: `3.x.x` → `4.0.0` (MAJOR for new architecture)
 
 ## Development Workflow & Feature Branch Updates
 
@@ -77,9 +87,9 @@ While working on a feature branch:
 ### Log Requirements
 Users should provide logs showing:
 ```
-[ytfast.py] [timestamp] Script version X.Y.Z loaded
-[ytfast.py] [timestamp] [Feature-specific success messages]
-[ytfast.py] [timestamp] [No critical errors]
+[scriptname.py] [timestamp] Script version X.Y.Z loaded
+[scriptname.py] [timestamp] [Feature-specific success messages]
+[scriptname.py] [timestamp] [No critical errors]
 ```
 
 ### Final PR Requirements
@@ -89,6 +99,8 @@ Before merging feature branch to main:
 - [ ] No regressions
 - [ ] Clean commit history
 - [ ] PR description includes test results
+- [ ] Documentation updated if needed
+- [ ] README reflects any new features
 
 ## Module Development Guidelines
 - Avoid circular imports by importing at function level when necessary
@@ -97,11 +109,13 @@ Before merging feature branch to main:
 - Heavy processing happens in background threads
 - OBS API calls only on main thread
 - Each module should have clear docstring explaining its purpose
+- All imports within modules must be relative (e.g., `from .state import get_cache_dir`)
+- Main script uses dynamic imports via `importlib`
 
 ## Testing Version
 Users should always check the OBS logs to verify the correct version is loaded:
 ```
-[ytfast.py] [timestamp] Script version X.Y.Z loaded
+[scriptname.py] [timestamp] Script version X.Y.Z loaded
 ```
 
 ## Development Workflow - Branches and Pull Requests
@@ -111,7 +125,7 @@ All changes to the codebase **MUST** be made through feature branches and pull r
 
 1. **Create Feature Branch**: 
    - Branch from `main` for each new feature or fix
-   - Use descriptive branch names: `feature/phase-10-playback`, `fix/metadata-parsing`, `refactor/windows-only`
+   - Use descriptive branch names: `feature/multi-instance`, `fix/metadata-parsing`, `refactor/windows-only`
 
 2. **Develop and Test**:
    - Make changes in the feature branch
@@ -140,7 +154,7 @@ All changes to the codebase **MUST** be made through feature branches and pull r
 ### Example Workflow
 ```bash
 # Working on feature branch
-git checkout feature/phase-11-scene-management
+git checkout feature/folder-based-instances
 
 # Claude makes changes, they are immediately committed
 # User pulls and tests
