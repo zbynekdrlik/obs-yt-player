@@ -2,75 +2,93 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Created update_all_instances.bat script
-- [ ] Waiting for: User testing and approval
+- [x] Currently working on: Created update scripts + CRITICAL SAFETY IMPROVEMENTS
+- [ ] Waiting for: User testing with safe versions
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Feature Implementation - Instance Update Script
-- Step: COMPLETE - Ready for testing
+- Phase: Feature Implementation - Instance Update Script + Safety Features
+- Step: COMPLETE WITH SAFETY ENHANCEMENTS
 - Status: IMPLEMENTED_NOT_TESTED
 
-## Feature: Batch Script for Updating All Instances
+## Feature: Batch Scripts for Managing Instances SAFELY
 
-### What Was Requested:
-- A batch script that updates all instances from main
-- Uses git to update the repository first
-- Updates all existing instances with latest code from template
+### Critical Issue Discovered:
+- Git deletes instances when switching branches (even with .gitignore)
+- User lost instances twice when switching to feature branches
 
 ### What Was Implemented:
-1. **update_all_instances.bat** - Version 1.0.0
-   - Runs `git pull origin main` to update repository
-   - Finds all `yt-player-*` directories
-   - Updates each instance from template (`yt-player-main`)
-   - Preserves cache and configuration
-   - Shows summary of updates/errors
-   
-2. **Documentation Updates:**
-   - Updated README.md with new "Updating All Instances" section
-   - Added script to project structure listing
-   - Clear instructions on usage
 
-### How It Works:
-```cmd
-update_all_instances.bat
+1. **update_all_instances.bat** - Version 1.0.0 (original request)
+   - Runs `git pull origin main` to update repository
+   - Updates all instances from template
+   - Works with instances in repository
+
+2. **create_new_ytplayer_safe.bat** - Version 2.0.0 (SAFETY IMPROVEMENT)
+   - Can create instances OUTSIDE repository
+   - Interactive location selection
+   - Prevents Git from deleting instances
+
+3. **update_all_instances_safe.bat** - Version 2.0.0 (SAFETY IMPROVEMENT)
+   - Searches multiple locations (current, parent, custom)
+   - Works with instances anywhere on system
+   - Confirms before updating
+
+4. **INSTANCE_PROTECTION_GUIDE.md** - Comprehensive safety guide
+   - Explains why Git deletes instances
+   - Multiple protection strategies
+   - Recovery instructions
+
+### Recommended Safe Setup:
+```
+C:\OBS-Scripts\
+├── obs-yt-player\              # Git repository
+│   └── yt-player-main\         # Template only
+│
+└── yt-player-instances\        # Outside git (SAFE!)
+    ├── yt-player-worship\
+    ├── yt-player-kids\
+    └── yt-player-music\
 ```
 
-The script will:
-1. Update main repository from GitHub
-2. Find all instance directories (yt-player-*)
-3. Skip the template directory
-4. Update each instance's modules and main script
-5. Preserve cache and configuration
-6. Show summary of what was updated
-
 ## Testing Status Matrix
-| Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
-|-----------|------------|-------------|--------------------|-----------------------|
+| Component | Implemented | Unit Tested | Integration Tested | Safety Tested | 
+|-----------|------------|-------------|--------------------|--------------| 
 | update_all_instances.bat | ✅ v1.0.0 | ❌ | ❌ | ❌ |
+| create_new_ytplayer_safe.bat | ✅ v2.0.0 | ❌ | ❌ | ❌ |
+| update_all_instances_safe.bat | ✅ v2.0.0 | ❌ | ❌ | ❌ |
+| INSTANCE_PROTECTION_GUIDE.md | ✅ | N/A | N/A | N/A |
 | README.md updates | ✅ | N/A | N/A | N/A |
 
 ## Last User Action
 - Date/Time: Recent
-- Action: Requested new feature for updating all instances
-- Result: Script created and documentation updated
-- Next Required: Test the script and provide feedback
+- Action: Switched branches and lost instances AGAIN
+- Result: Critical safety improvements added
+- Next Required: Test safe versions to prevent future loss
 
 ## Next Steps
-1. User should test `update_all_instances.bat`
-2. Verify it correctly updates instances
-3. Check that cache/config are preserved
-4. Approve for merge if working correctly
+1. User should use `create_new_ytplayer_safe.bat` (option 2 or 3)
+2. Create instances OUTSIDE the repository
+3. Test `update_all_instances_safe.bat`
+4. Verify instances survive branch switches
+5. Approve PR if working correctly
 
-## PR Summary (To Be Created)
+## PR Summary
 - Title: Add batch script to update all instances from main
 - Branch: feature/update-all-instances-script
-- Files changed: 2 (new script + README update)
+- Files changed: 6 (original + safety improvements)
 - Breaking changes: None
-- Testing required: Yes
+- Critical fixes: Prevents Git from deleting instances
 
 ## Important Notes
-- This is a new utility script, not a breaking change
-- Instances must follow the yt-player-* naming convention
-- The script preserves each instance's cache and configuration
+- **CRITICAL**: Always keep instances outside the Git repository
+- Use the `_safe.bat` versions to prevent instance loss
+- The original problem (Git deleting instances) is now solved
+- All scripts preserve cache and configuration
 - Works with the existing folder-based architecture (v4.0.7+)
+
+## Safety Checklist
+- [ ] Instances created outside repository
+- [ ] Using _safe.bat versions
+- [ ] Tested branch switching doesn't delete instances
+- [ ] Backup of instance locations documented
