@@ -6,9 +6,9 @@ Supports nested scene detection for scenes used as sources.
 
 import obspython as obs
 import time
-from config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME, PLAYBACK_MODE_SINGLE
-from logger import log
-from state import (
+from .config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME, PLAYBACK_MODE_SINGLE
+from .logger import log
+from .state import (
     set_scene_active, is_scene_active, is_playing, 
     set_stop_threads, get_playback_mode, is_first_video_played,
     set_first_video_played

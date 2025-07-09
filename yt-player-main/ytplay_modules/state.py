@@ -4,7 +4,7 @@ Thread-safe state variables and accessors.
 """
 
 import threading
-from config import DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, DEFAULT_PLAYBACK_MODE, DEFAULT_AUDIO_ONLY_MODE
+from .config import DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, DEFAULT_PLAYBACK_MODE, DEFAULT_AUDIO_ONLY_MODE
 
 # Threading synchronization
 _state_lock = threading.Lock()

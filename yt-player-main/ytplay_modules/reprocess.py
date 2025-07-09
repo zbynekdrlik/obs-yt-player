@@ -8,14 +8,14 @@ import threading
 import time
 from pathlib import Path
 
-from logger import log
-from state import (
+from .logger import log
+from .state import (
     get_cache_dir, get_cached_videos, get_cached_video_info,
     should_stop_threads, is_tools_ready,
     add_cached_video, get_gemini_api_key, get_playlist_url
 )
-from metadata import get_video_metadata
-from utils import sanitize_filename
+from .metadata import get_video_metadata
+from .utils import sanitize_filename
 import subprocess
 import json
 
@@ -24,7 +24,7 @@ _reprocess_thread = None
 def get_video_title_from_youtube(video_id):
     """Fetch video title from YouTube for a specific video ID."""
     try:
-        from utils import get_ytdlp_path
+        from .utils import get_ytdlp_path
         
         ytdlp_path = get_ytdlp_path()
         

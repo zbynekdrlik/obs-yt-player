@@ -1,265 +1,320 @@
-# OBS YouTube Player (Windows)
+# OBS YouTube Player 🎬
 
 A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them with multiple playback modes. Features optional AI-powered metadata extraction using Google Gemini for superior artist/song detection.
+
+## 🆕 Multi-Instance Support (v4.0.7+)
+
+The player now supports **multiple independent instances** through a clean folder-based architecture. Each instance runs completely isolated with its own playlist, cache, and settings.
+
+### Quick Setup
+```cmd
+create_new_ytplayer.bat worship
+```
+
+This creates a new instance in seconds! See [Multi-Instance Setup](#multi-instance-setup) for details.
 
 ## Key Features
 
 ### 🎬 Playback Modes
-- **Continuous Mode** (default): Plays all videos randomly forever
-- **Single Mode**: Plays one video then stops
-- **Loop Mode**: Repeats the same video continuously
+- **Continuous**: Plays through all cached videos randomly
+- **Single**: Plays one video and stops (perfect for intros/outros)
+- **Loop**: Repeats the current video indefinitely
 
-### 🎯 Core Functionality
-- **Automatic Playlist Sync**: Fetches and syncs YouTube playlists (on startup and manual trigger)
-- **Local Caching**: Downloads and stores videos locally for reliable offline playback
-- **Audio Normalization**: Normalizes all audio to -14 LUFS using FFmpeg for consistent volume
-- **AI-Powered Metadata** (Optional): Google Gemini AI extracts accurate artist/song information
-- **Smart Title Parser**: Fallback parser ensures videos always play, even without Gemini
-- **Audio-Only Mode**: Option to download minimal video quality (144p) while preserving high audio quality
+### 🎵 Audio Excellence
+- **Loudness normalization** to -14 LUFS (YouTube standard)
+- **Professional audio processing** via FFmpeg
+- **Audio-only mode** for minimal bandwidth usage
+- **Gemini AI metadata** for accurate artist/song detection (optional)
+
+### 📺 OBS Integration
+- Seamless **Media Source** integration
+- **Scene-aware playback** (only plays when scene is active)
+- **Multi-instance support** via folder isolation
+- **Metadata display** through Text Sources
 
 ### 🔧 Advanced Features
 - **Background Processing**: All heavy tasks run in separate threads (no OBS freezing)
-- **Multi-Instance Support**: Run multiple independent players by renaming the script
+- **Multi-Instance Support**: Run multiple independent players
 - **Nested Scene Playback**: Videos play even when scene is nested within other scenes
 - **Scene Transition Support**: Proper handling with configurable delays
 - **Comprehensive Logging**: Both OBS console and file-based logs for debugging
-- **Automatic Retry**: Failed metadata extractions retry on next startup
 
-## Requirements
+## Prerequisites
 
-- **Windows 10/11** (Windows-only script)
 - **OBS Studio** with Python scripting support
-- **Internet connection** for initial video downloads
-- **Disk space** for video cache (varies by playlist size)
-- **Google Gemini API key** (Optional but recommended - free tier available)
+- **Python 3.6+** (comes with OBS)
+- **Windows** (yt-dlp and FFmpeg requirements)
+- **FFmpeg** (automatically downloaded by the script)
+- **Google Gemini API Key** (optional, for enhanced metadata)
 
-## Quick Start
+## Installation
 
-### 1. Installation
+### 1. Download and Setup
 
-1. Download the latest release (includes `ytfast.py` and `ytfast_modules/` folder)
-2. Copy both to your OBS scripts directory
+1. Download the latest release or clone the repository
+2. Copy the `yt-player-main/` folder to your OBS scripts directory
 3. In OBS Studio: Tools → Scripts → Add Script (+)
-4. Select `ytfast.py`
+4. Navigate to and select `yt-player-main/ytplay.py`
 
 ### 2. Configuration
 
 In script properties, configure:
-- **YouTube Playlist URL**: Your playlist URL
-- **Cache Directory**: Where to store videos (auto-created)
-- **Gemini API Key** (Optional): For enhanced metadata extraction (see below)
-- **Playback Mode**: Choose between Continuous, Single, or Loop
-- **Audio Only Mode**: Enable for minimal video quality with high audio quality
+
+- **YouTube Playlist URL**: Your playlist (must be public or unlisted)
+- **Cache Directory**: Where to store videos (default: `cache`)
+- **Playback Mode**: Continuous, Single, or Loop
+- **Audio Only Mode**: Check for minimal video quality
+- **Gemini API Key**: Optional, for better metadata
 
 ### 3. Scene Setup
 
-1. Create a scene named `ytfast` (matching script name without .py)
-2. Add these sources to the scene:
-   - **Media Source** named `video`
-   - **Text Source** named `title` (for song info display)
-3. Videos start playing when you switch to this scene!
+The script name determines the scene name:
+- Script: `ytplay.py` → Scene: `ytplay`
+- Script: `worship.py` → Scene: `worship`
 
-## Playback Modes Explained
+Create required OBS sources in your scene:
 
-### 🔄 Continuous Mode (Default)
-Perfect for background music streams:
-- Plays videos randomly from your playlist
-- Never repeats until all videos have played
-- Continues forever while scene is active
-- Stops when switching to another scene
+1. **Media Source** named `video`
+   - Uncheck "Local File"
+   - Leave other settings default
 
-### ▶️ Single Mode
-Ideal for intro/outro videos:
-- Plays one random video and stops
-- Media source becomes blank after playback
-- Switching scenes and back plays a new video
-- Great for scheduled content breaks
+2. **Text Source** named `title` (optional)
+   - Displays current song info
 
-### 🔁 Loop Mode
-Best for ambient content or hold music:
-- Randomly selects one video and repeats it
-- Same video loops until scene becomes inactive
-- New random video selected when scene reactivates
-- Perfect for consistent background content
+## Usage
+
+### Basic Operation
+
+1. **Load Script**: OBS automatically loads the script on startup
+2. **Automatic Sync**: Playlist syncs every 15 minutes (when scene active)
+3. **Manual Sync**: Click "Sync Playlist Now" button anytime
+4. **Scene Activation**: Videos only download/play when scene is active
+
+### Playback Modes Explained
+
+- **Continuous** (default): Random playback through all videos
+- **Single**: Plays one video then stops (resets on scene change)
+- **Loop**: Repeats current video (switches videos on scene change)
+
+### Progress Monitoring
+
+Check the OBS Script Log for:
+- Download progress with speed/ETA
+- Sync status and video counts
+- Metadata extraction results
+- Any errors or warnings
+
+## Multi-Instance Setup
+
+### Creating Additional Instances
+
+Use the included batch file to create new instances in seconds:
+
+```cmd
+create_new_ytplayer.bat worship
+```
+
+This creates:
+```
+obs-yt-player/
+├── yt-player-main/        # Original template
+│   ├── ytplay.py          # Scene: ytplay
+│   └── ytplay_modules/
+└── yt-player-worship/     # New instance
+    ├── worship.py         # Scene: worship
+    └── worship_modules/
+```
+
+### What Happens:
+1. Copies the template folder
+2. Renames script and modules to match instance name
+3. Cleans the cache directory
+4. Shows setup instructions
+
+### Benefits
+- ✅ **Complete isolation** between instances
+- ✅ **Simple setup** - one command creates everything
+- ✅ **No manual configuration** - works immediately
+- ✅ **Clear organization** - one folder per player
+
+### Example Use Cases
+
+**Different Content Types:**
+```cmd
+create_new_ytplayer.bat music      # General music
+create_new_ytplayer.bat worship    # Worship songs
+create_new_ytplayer.bat kids       # Kids content
+create_new_ytplayer.bat ambient    # Background music
+```
+
+**Stream Scheduling:**
+```cmd
+create_new_ytplayer.bat morning    # Morning show
+create_new_ytplayer.bat afternoon  # Afternoon content
+create_new_ytplayer.bat evening    # Evening playlist
+```
+
+See [docs/FOLDER_BASED_INSTANCES.md](docs/FOLDER_BASED_INSTANCES.md) for detailed information.
 
 ## Audio-Only Mode
 
-Enable this option when you only need audio output from OBS:
-- Downloads videos at minimal quality (144p) to save bandwidth
-- Preserves the highest available audio quality
-- Significantly reduces download time and storage usage
-- Perfect for radio streams or audio-only broadcasts
+Enable "Audio Only Mode" for:
+- Minimal bandwidth usage (144p video)
+- Maximum audio quality (192k)
+- ~90% smaller file sizes
+- Perfect for music-only streams
 
-Benefits:
-- **80-90% smaller file sizes** compared to normal quality
-- **Faster downloads** on limited bandwidth connections
-- **Same high-quality audio** as normal mode
-- **Lower CPU usage** during playback
+## Gemini AI Integration (Optional)
 
-## Metadata System
+The script includes two metadata extraction methods:
 
-### Why Use Google Gemini? (Recommended)
+1. **Built-in Parser**: Uses regex patterns (good for most titles)
+2. **Gemini AI**: Advanced parsing for complex titles (recommended)
 
-While the script works perfectly without Gemini, using it provides significantly better metadata extraction:
+### Why Use Gemini?
 
-- **Superior Accuracy**: Gemini uses AI with Google Search to understand complex video titles that simple parsers miss
-- **International Support**: Works with videos in any language, including non-Latin scripts
-- **Context Understanding**: Recognizes artists and songs even when titles use unusual formatting
-- **Handles Edge Cases**: Correctly extracts metadata from titles like:
-  - "HOLYGHOST | Sons Of Sunday" (reversed format)
-  - "'COME RIGHT NOW' | Official Video" (quotes and annotations)
-  - "Forever | Live At Chapel" (live performances)
-  - Videos with multiple artists, remixes, or features
+While the built-in parser works well for standard formats like "Artist - Song", Gemini excels at:
+- Complex formats: "Song by Artist (feat. Guest) [Live]"
+- Non-standard separators: "Artist • Song | Album"
+- Multiple artists and featured guests
+- Removing channel names and extra info
 
-### 🤖 Google Gemini AI (Optional but Recommended)
-- Uses Gemini 2.5 Flash with Google Search grounding for intelligent extraction
-- Provides the most accurate artist/song detection available
-- Free tier offers 2 requests/minute, 50 requests/day (plenty for most users)
-- When not configured, script automatically uses title parser
+### Getting a Gemini API Key
 
-### 📝 Smart Title Parser (Always Available)
-- Built-in fallback that ensures the script always works
-- Handles common patterns: "Artist - Song", "Song | Artist"
-- While functional, it's less accurate than Gemini for complex titles
-- Perfect for simple playlists or when Gemini isn't needed
+1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a free API key
+3. Paste it in the script settings
+4. Enjoy superior metadata extraction!
 
-### 🔄 File Naming & Automatic Retry
-- Videos processed without Gemini (or when Gemini fails) are marked with `_gf` suffix
-- Example: `song_artist_videoID_normalized_gf.mp4`
-- On each startup, the script automatically retries Gemini extraction for `_gf` files
+Note: The script works perfectly without a Gemini key - it will use the built-in parser which handles most common title formats well.
+
+### Automatic Retry System
+
+- Files that fail Gemini processing are marked with `_gf` suffix
+- Script retries these files automatically on next startup
 - If Gemini succeeds on retry, the file is renamed without the `_gf` marker
 - This ensures your library improves over time without manual intervention
 
-## Advanced Usage
-
-### Multi-Instance Setup
-
-Run multiple independent players:
-
-1. Copy and rename the script (e.g., `music-chill.py`, `stream-bgm.py`)
-2. Each instance automatically creates its own:
-   - Module folder (`music-chill_modules/`)
-   - Cache directory
-   - Settings and playlist
-3. Create matching scene names for each instance
-
-Example structure:
-```
-obs-scripts/
-├── ytfast.py              → Scene: ytfast
-├── ytfast_modules/        → Modules for ytfast
-├── music-chill.py         → Scene: music-chill
-├── music-chill_modules/   → Modules for music-chill
-└── stream-bgm.py          → Scene: stream-bgm
-└── stream-bgm_modules/    → Modules for stream-bgm
-```
-
-### Nested Scene Usage
+## Nested Scene Usage
 
 Include YouTube player scenes within other scenes:
 
-1. Set up your YouTube player scene as normal
-2. In another scene, add a "Scene" source
-3. Select your YouTube player scene
-4. Videos play when the parent scene is active!
+```
+Main Stream Scene
+├── Game Capture
+├── Webcam
+└── Nested Scene: worship (YouTube player)
+```
 
-Perfect for:
-- Picture-in-picture layouts
-- Multi-camera setups with background music
-- Complex scene compositions
-- Dynamic streaming layouts
-
-## Getting a Gemini API Key (Optional)
-
-While not required, a Gemini API key significantly improves metadata accuracy:
-
-1. Visit https://aistudio.google.com/app/apikey
-2. Sign in with Google account
-3. Click "Create API Key"
-4. Copy key to OBS script settings
-5. Free tier = 2 requests/minute, 50 requests/day (plenty for most users)
-
-Note: The script works perfectly without a Gemini key - it will use the built-in title parser instead.
+The player detects nested scenes automatically and continues playback seamlessly.
 
 ## Troubleshooting
 
 ### Videos Not Playing?
-1. **Check scene name** matches script name (without .py)
-2. **Verify source names** are exactly `video` and `title`
-3. **Confirm playlist URL** is valid and public
-4. **Check logs** in `{cache_dir}/logs/` for errors
+- Check Media Source is named exactly `video`
+- Ensure scene containing sources is active
+- Verify playlist URL is accessible
+- Check Script Log for errors
 
-### Playback Mode Issues?
-- Mode changes take effect immediately
-- Current video continues in new mode
-- Scene must be reactivated for some mode changes
+### High CPU Usage?
+- Normal during initial sync/download
+- Enable Audio-Only mode for lower resource usage
+- Processing runs in background threads
 
-### Metadata Problems?
-- If using Gemini: Verify API key is correct
-- Without Gemini: Videos will play with basic title parsing
+### Metadata Not Showing?
+- Text source must be named exactly `title`
+- Gemini API key improves accuracy significantly
 - Files marked with `_gf` will retry Gemini on next startup
 - Check logs for metadata extraction details
+
+### Multi-Instance Problems?
+- Ensure each instance is in its own folder
+- Scene names must match script names
+- Use batch file for reliable setup
+- Check logs for import errors
 
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
 - Source names must match exactly
-- Check parent scene is active
-- Look for "nested source" in logs
+- Check logs for scene detection info
 
-### Audio-Only Mode Questions?
-- Check logs for "Audio-only mode" messages
-- Verify videos show 144p resolution in logs
-- File sizes should be significantly smaller
-- Audio quality remains unchanged
+### Download Errors?
+- Usually temporary YouTube rate limits
+- Failed downloads retry automatically
+- Check your internet connection
+- Verify FFmpeg is accessible
 
 ## Project Structure
 
 ```
-ytfast.py                  # Main OBS interface
-ytfast_modules/
-├── config.py             # Configuration and constants
-├── logger.py             # Thread-safe logging system
-├── state.py              # Global state management
-├── playback.py           # Playback mode logic
-├── scene.py              # Scene activation detection
-├── playlist.py           # YouTube playlist sync
-├── download.py           # Video downloading
-├── normalize.py          # Audio normalization
-├── metadata.py           # Metadata extraction
-├── gemini_metadata.py    # Gemini AI integration
-└── [other modules]       # Additional functionality
+obs-yt-player/
+├── yt-player-main/          # Template instance
+│   ├── ytplay.py            # Main script
+│   ├── ytplay_modules/      # All modules
+│   │   ├── __init__.py      # Package marker
+│   │   ├── config.py        # Dynamic configuration
+│   │   ├── download.py      # Video downloading
+│   │   ├── playback.py      # Playback control
+│   │   └── ...              # Other modules
+│   └── cache/               # Video cache
+│
+├── create_new_ytplayer.bat  # Instance creator
+└── docs/                    # Documentation
+    └── FOLDER_BASED_INSTANCES.md
 ```
 
 ## Recent Updates
 
+### v4.0.7 - Multi-Instance Ready
+- Improved batch file (no manual import updates needed)
+- Fixed validation and naming issues
+- All modules verified against main branch
+- Ready for production use
+
+### v4.0.0 - Folder-Based Architecture
+- **BREAKING**: Renamed from ytfast to ytplay
+- New folder-based approach for true multi-instance support
+- Complete isolation between instances
+- Dynamic module loading system
+
 ### v3.4.1 - Documentation Clarity
 - Clarified that Gemini API key is optional
 - Added detailed explanation of why Gemini provides better results
-- Documented _gf file naming behavior
-- Improved metadata system documentation
+- Improved metadata extraction documentation
 
 ### v3.4.0 - Audio-Only Mode
-- Added option for minimal video quality downloads
-- Preserves high audio quality while saving bandwidth
+- New audio-only mode for bandwidth-conscious users
+- Downloads minimal 144p video with high-quality 192k audio
 - Significantly reduces file sizes and download times
 - Perfect for audio-only streaming scenarios
-
-### v3.3.1 - Documentation Update
-- Improved README with playback modes section
-- Better feature organization and clarity
-- Enhanced troubleshooting guide
-
-### v3.3.0 - Nested Scene Playback
-- Recursive scene detection for nested sources
-- Support for multiple nesting levels
-- Enhanced logging for scene activation
 
 ## License
 
 MIT License - see LICENSE file for details.
 
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+For major changes, please open an issue first to discuss what you would like to change.
+
 ## Support
 
-- **Issues**: GitHub Issues for bug reports
-- **Documentation**: Check `/docs` folder for detailed guides
-- **Logs**: Enable debug logging for troubleshooting
+If you encounter any issues:
+1. Check the [Troubleshooting](#troubleshooting) section
+2. Review the OBS Script Log for errors
+3. Open an issue on GitHub with:
+   - Your OBS version
+   - Error messages from the log
+   - Steps to reproduce the problem
+
+## Acknowledgments
+
+- **yt-dlp** - For reliable YouTube downloading
+- **FFmpeg** - For audio processing and normalization
+- **Google Gemini** - For AI-powered metadata extraction
+- **OBS Studio** - For the amazing streaming platform

@@ -9,16 +9,16 @@ import time
 import threading
 import os
 
-from config import SCRIPT_VERSION
-from logger import log
-from state import (
+from .config import SCRIPT_VERSION
+from .logger import log
+from .state import (
     sync_event, video_queue, playlist_sync_thread,
     is_tools_ready, should_stop_threads, get_playlist_url,
     is_sync_on_startup_done, set_sync_on_startup_done,
     set_playlist_video_ids, is_video_cached
 )
-from utils import get_ytdlp_path
-from cache import scan_existing_cache, cleanup_removed_videos
+from .utils import get_ytdlp_path
+from .cache import scan_existing_cache, cleanup_removed_videos
 
 def fetch_playlist_with_ytdlp(playlist_url):
     """Fetch playlist information using yt-dlp."""
@@ -153,6 +153,6 @@ def trigger_manual_sync():
 def start_playlist_sync_thread():
     """Start the playlist sync thread."""
     global playlist_sync_thread
-    import state
+    from . import state
     state.playlist_sync_thread = threading.Thread(target=playlist_sync_worker, daemon=True)
     state.playlist_sync_thread.start()

@@ -10,9 +10,9 @@ import urllib.parse
 import re
 from typing import Optional, Tuple
 
-import state
-from logger import log
-from config import SCRIPT_NAME
+from . import state
+from .logger import log
+from .config import SCRIPT_NAME
 
 # Gemini API configuration
 GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
@@ -193,3 +193,22 @@ def clean_gemini_song_title(song: str) -> str:
     """
     # This will be handled by the universal cleaner
     return song
+
+# Track failed attempts to avoid repeated failures (compatibility)
+_gemini_failures = set()  # Set of video IDs that failed
+
+def clear_gemini_failures():
+    """Clear the set of failed video IDs (called on script restart)."""
+    global _gemini_failures
+    _gemini_failures.clear()
+    log("Cleared Gemini failure cache")
+
+def remove_gemini_failure(video_id):
+    """Remove a video ID from the failure set (for retry)."""
+    if video_id in _gemini_failures:
+        _gemini_failures.remove(video_id)
+        log(f"Removed {video_id} from Gemini failure cache")
+
+def is_gemini_failed(video_id):
+    """Check if a video ID has failed Gemini extraction."""
+    return video_id in _gemini_failures

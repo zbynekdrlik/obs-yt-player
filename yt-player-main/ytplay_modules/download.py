@@ -9,16 +9,16 @@ import subprocess
 import threading
 import queue
 
-from config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT, SCRIPT_VERSION
-from logger import log
-from state import (
+from .config import MAX_RESOLUTION, MIN_VIDEO_HEIGHT, DOWNLOAD_TIMEOUT, SCRIPT_VERSION
+from .logger import log
+from .state import (
     video_queue, process_videos_thread, should_stop_threads,
     get_cache_dir, is_video_cached, add_cached_video,
     download_progress_milestones, is_audio_only_mode
 )
-from utils import get_ytdlp_path, get_ffmpeg_path
-from metadata import get_video_metadata
-from normalize import normalize_audio
+from .utils import get_ytdlp_path, get_ffmpeg_path
+from .metadata import get_video_metadata
+from .normalize import normalize_audio
 
 def download_video(video_id, title):
     """Download video to temporary file."""
@@ -242,6 +242,6 @@ def process_videos_worker():
 def start_video_processing_thread():
     """Start the video processing thread."""
     global process_videos_thread
-    import state
+    from . import state
     state.process_videos_thread = threading.Thread(target=process_videos_worker, daemon=True)
     state.process_videos_thread.start()

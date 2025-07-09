@@ -10,17 +10,17 @@ import urllib.request
 import threading
 from pathlib import Path
 
-from config import (
+from .config import (
     YTDLP_FILENAME, FFMPEG_FILENAME,
     YTDLP_URL, FFMPEG_URL,
     TOOLS_CHECK_INTERVAL
 )
-from logger import log
-from state import (
+from .logger import log
+from .state import (
     tools_thread, set_tools_ready, is_tools_logged_waiting, 
     set_tools_logged_waiting, should_stop_threads
 )
-from utils import get_ytdlp_path, get_ffmpeg_path, get_tools_path, ensure_cache_directory
+from .utils import get_ytdlp_path, get_ffmpeg_path, get_tools_path, ensure_cache_directory
 
 def download_file(url, destination, description="file"):
     """Download a file from URL to destination with progress logging."""
@@ -194,7 +194,7 @@ def tools_setup_worker():
                 # Tools are ready, trigger startup sync
                 log("Tools setup complete")
                 # Import here to avoid circular import
-                from playlist import trigger_startup_sync
+                from .playlist import trigger_startup_sync
                 trigger_startup_sync()
                 break
             
@@ -216,6 +216,6 @@ def tools_setup_worker():
 def start_tools_thread():
     """Start the tools setup thread."""
     global tools_thread
-    import state
+    from . import state
     state.tools_thread = threading.Thread(target=tools_setup_worker, daemon=True)
     state.tools_thread.start()

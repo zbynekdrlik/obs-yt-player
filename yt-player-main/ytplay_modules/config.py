@@ -7,16 +7,29 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "3.4.4"  # Clarified Gemini is optional in documentation
+SCRIPT_VERSION = "4.0.7"  # Restored video_selector.py, playlist.py, and tools.py to match main branch
 
-# Get script information from environment or defaults
-SCRIPT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ytfast.py'))
-SCRIPT_DIR = os.path.dirname(SCRIPT_PATH)
-SCRIPT_NAME = os.path.splitext(os.path.basename(SCRIPT_PATH))[0]
+# Dynamic script detection - works with any script name
+# Look for .py file in parent directory that's not __init__.py
+SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_PATH = None
+SCRIPT_NAME = None
+
+# Find the main script file dynamically
+for file in os.listdir(SCRIPT_DIR):
+    if file.endswith('.py') and not file.startswith('_'):
+        SCRIPT_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, file))
+        SCRIPT_NAME = os.path.splitext(file)[0]
+        break
+
+# Fallback if no script found (shouldn't happen)
+if not SCRIPT_PATH:
+    SCRIPT_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, 'ytplay.py'))
+    SCRIPT_NAME = 'ytplay'
 
 # Default settings
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
-DEFAULT_CACHE_DIR = os.path.join(SCRIPT_DIR, f"{SCRIPT_NAME}-cache")
+DEFAULT_CACHE_DIR = os.path.join(SCRIPT_DIR, "cache")
 
 # Playback behavior modes
 PLAYBACK_MODE_CONTINUOUS = "continuous"  # Play videos forever (default)

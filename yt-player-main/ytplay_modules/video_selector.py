@@ -1,12 +1,11 @@
-"""
-Video selection logic.
+"""Video selection logic.
 Handles random selection, loop mode, and played video tracking.
 """
 
 import random
-from logger import log
-from config import PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP
-from state import (
+from .logger import log
+from .config import PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP
+from .state import (
     get_cached_videos, get_played_videos, add_played_video, 
     clear_played_videos, get_playback_mode, get_loop_video_id,
     set_loop_video_id
@@ -85,7 +84,7 @@ def validate_video_file(video_id):
     Validate that a video file exists and is accessible.
     Returns True if valid, False otherwise.
     """
-    from state import get_cached_video_info
+    from .state import get_cached_video_info
     import os
     
     video_info = get_cached_video_info(video_id)
@@ -106,7 +105,7 @@ def get_video_display_info(video_id):
     Get display information for a video (song, artist, etc).
     Returns dict with song, artist, and gemini_failed status.
     """
-    from state import get_cached_video_info
+    from .state import get_cached_video_info
     
     video_info = get_cached_video_info(video_id)
     if not video_info:

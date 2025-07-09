@@ -1,10 +1,9 @@
-"""
-Title display management.
+"""Title display management.
 Handles scheduling and timing of title show/hide operations.
 """
 
 import obspython as obs
-from logger import log
+from .logger import log
 
 # Title timing constants (in seconds)
 TITLE_CLEAR_BEFORE_END = 3.5  # Clear title 3.5 seconds before song ends
@@ -30,7 +29,7 @@ def clear_title_before_end_callback():
     log("Fading out title before song end")
     
     # Import here to avoid circular dependency
-    from ytfast_modules.opacity_control import fade_out_text
+    from .opacity_control import fade_out_text
     fade_out_text()
 
 
@@ -49,8 +48,8 @@ def show_title_after_start_callback():
         log(f"Showing title after delay: {song} - {artist}")
         
         # Import here to avoid circular dependency
-        from ytfast_modules.media_control import update_text_source_content
-        from ytfast_modules.opacity_control import fade_in_text
+        from .media_control import update_text_source_content
+        from .opacity_control import fade_in_text
         
         update_text_source_content(song, artist, gemini_failed)
         fade_in_text()
@@ -109,8 +108,8 @@ def schedule_title_show(video_info):
     _pending_title_info = video_info
     
     # Import here to avoid circular dependency
-    from ytfast_modules.opacity_control import set_current_opacity, update_text_opacity
-    from ytfast_modules.media_control import update_text_source_content
+    from .opacity_control import set_current_opacity, update_text_opacity
+    from .media_control import update_text_source_content
     
     # Set opacity to 0 immediately (no fade needed as it's a new video)
     set_current_opacity(0.0)
@@ -144,7 +143,7 @@ def schedule_title_clear_from_current(remaining_ms):
         log(f"Scheduled title fade out in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
     else:
         # Import here to avoid circular dependency
-        from ytfast_modules.opacity_control import get_current_opacity, fade_out_text
+        from .opacity_control import get_current_opacity, fade_out_text
         
         if get_current_opacity() > 0:
             # Should fade out immediately
@@ -163,8 +162,8 @@ def delayed_duration_check_callback():
         _duration_check_timer = None
     
     # Import here to avoid circular dependency
-    from ytfast_modules.media_control import get_media_duration
-    from config import MEDIA_SOURCE_NAME
+    from .media_control import get_media_duration
+    from .config import MEDIA_SOURCE_NAME
     
     duration = get_media_duration(MEDIA_SOURCE_NAME)
     if duration > 0:
@@ -212,8 +211,8 @@ def update_text_source(song, artist, gemini_failed=False):
     This is called when we want to change the text with a transition.
     """
     # Import here to avoid circular dependency
-    from ytfast_modules.opacity_control import get_current_opacity, set_pending_text, fade_out_text, fade_in_text
-    from ytfast_modules.media_control import update_text_source_content
+    from .opacity_control import get_current_opacity, set_pending_text, fade_out_text, fade_in_text
+    from .media_control import update_text_source_content
     
     # If opacity is not 0, fade out first then update
     if get_current_opacity() > 0:

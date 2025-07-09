@@ -8,10 +8,10 @@ import re
 import json
 import subprocess
 
-from config import NORMALIZE_TIMEOUT
-from logger import log
-from state import get_cache_dir
-from utils import get_ffmpeg_path, sanitize_filename
+from .config import NORMALIZE_TIMEOUT
+from .logger import log
+from .state import get_cache_dir
+from .utils import get_ffmpeg_path, sanitize_filename
 
 def extract_loudnorm_stats(ffmpeg_output):
     """Extract loudnorm statistics from FFmpeg output."""

@@ -6,8 +6,8 @@ import os
 import re
 import unicodedata
 from pathlib import Path
-from config import TOOLS_SUBDIR
-from state import get_cache_dir
+from .config import TOOLS_SUBDIR
+from .state import get_cache_dir
 
 # YouTube ID validation pattern
 YOUTUBE_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{11}$')
@@ -18,12 +18,12 @@ def get_tools_path():
 
 def get_ytdlp_path():
     """Get path to yt-dlp executable."""
-    from config import YTDLP_FILENAME
+    from .config import YTDLP_FILENAME
     return os.path.join(get_tools_path(), YTDLP_FILENAME)
 
 def get_ffmpeg_path():
     """Get path to ffmpeg executable."""
-    from config import FFMPEG_FILENAME
+    from .config import FFMPEG_FILENAME
     return os.path.join(get_tools_path(), FFMPEG_FILENAME)
 
 def sanitize_filename(text):
@@ -55,7 +55,7 @@ def sanitize_filename(text):
 
 def ensure_cache_directory():
     """Ensure cache directory exists."""
-    from logger import log
+    from .logger import log
     
     try:
         cache_dir = get_cache_dir()

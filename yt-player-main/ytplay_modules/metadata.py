@@ -8,11 +8,11 @@ import re
 import json
 from pathlib import Path
 
-from config import SCRIPT_VERSION
-from logger import log
-from utils import format_duration, validate_youtube_id
-import gemini_metadata
-import state
+from .config import SCRIPT_VERSION
+from .logger import log
+from .utils import format_duration, validate_youtube_id
+from . import gemini_metadata
+from . import state
 
 def get_video_metadata(filepath, title, video_id=None):
     """
