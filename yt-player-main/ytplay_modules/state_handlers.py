@@ -14,10 +14,10 @@ from state import (
     get_loop_video_id, set_loop_video_id, get_cached_videos,
     is_scene_active
 )
-from ytplay_modules.media_control import (
+from media_control import (
     get_media_duration, get_media_time, get_current_video_from_media_source
 )
-from ytplay_modules.title_manager import (
+from title_manager import (
     SEEK_THRESHOLD, schedule_title_clear_from_current,
     is_title_clear_scheduled, get_title_clear_timer,
     cancel_title_timers
@@ -93,7 +93,7 @@ def handle_playing_state():
             # No valid media loaded, start fresh
             log("No valid media loaded, starting playback")
             # Import here to avoid circular dependency
-            from ytplay_modules.playback_controller import start_next_video
+            from playback_controller import start_next_video
             start_next_video()
             return
         # Valid media is playing, sync the state
@@ -137,7 +137,7 @@ def handle_playing_state():
         remaining_ms = duration - current_time
         
         # Import here to avoid circular dependency
-        from ytplay_modules.title_manager import TITLE_CLEAR_BEFORE_END
+        from title_manager import TITLE_CLEAR_BEFORE_END
         
         # Schedule fade out when we're close to the end
         # We check for (TITLE_CLEAR_BEFORE_END + 5) seconds to give enough time for scheduling
@@ -203,7 +203,7 @@ def handle_ended_state():
                 # Mark that first video has been played
                 set_first_video_played(True)
                 # Import here to avoid circular dependency
-                from ytplay_modules.playback_controller import stop_current_playback
+                from playback_controller import stop_current_playback
                 stop_current_playback()
                 return
             else:
@@ -214,7 +214,7 @@ def handle_ended_state():
             if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
                 log("Single mode: First video ended, stopping playback")
                 # Import here to avoid circular dependency
-                from ytplay_modules.playback_controller import stop_current_playback
+                from playback_controller import stop_current_playback
                 stop_current_playback()
                 return
             else:
@@ -222,7 +222,7 @@ def handle_ended_state():
                 log("Playback ended, starting next video")
         
         # Import here to avoid circular dependency
-        from ytplay_modules.playback_controller import start_next_video
+        from playback_controller import start_next_video
         start_next_video()
     elif is_scene_active() and get_cached_videos():
         # Check if we're in single mode and already played first video
@@ -232,7 +232,7 @@ def handle_ended_state():
         # Not playing but scene is active and we have videos - start playback
         log("Scene active and videos available, starting playback")
         # Import here to avoid circular dependency
-        from ytplay_modules.playback_controller import start_next_video
+        from playback_controller import start_next_video
         start_next_video()
 
 
@@ -257,7 +257,7 @@ def schedule_loop_restart(video_id):
             _loop_restart_timer = None
         # Don't clear _loop_restart_pending here - wait until video is actually playing
         # Import here to avoid circular dependency
-        from ytplay_modules.playback_controller import start_specific_video
+        from playback_controller import start_specific_video
         start_specific_video(video_id)
     
     # Schedule the restart with a longer delay to ensure media source is ready
@@ -282,7 +282,7 @@ def handle_stopped_state():
             
             # Stop playback cleanly
             # Import here to avoid circular dependency
-            from ytplay_modules.playback_controller import stop_current_playback
+            from playback_controller import stop_current_playback
             stop_current_playback()
             return
         
@@ -292,12 +292,12 @@ def handle_stopped_state():
             _playback_retry_count += 1
             log(f"Retry attempt {_playback_retry_count}")
             # Import here to avoid circular dependency
-            from ytplay_modules.playback_controller import start_next_video
+            from playback_controller import start_next_video
             start_next_video()
         else:
             log("Max retries reached, stopping playback")
             # Import here to avoid circular dependency
-            from ytplay_modules.playback_controller import stop_current_playback
+            from playback_controller import stop_current_playback
             stop_current_playback()
 
 
@@ -321,7 +321,7 @@ def handle_none_state():
                 
             log("Scene active and videos available, starting playback")
             # Import here to avoid circular dependency
-            from ytplay_modules.playback_controller import start_next_video
+            from playback_controller import start_next_video
             start_next_video()
     elif is_scene_active() and is_playing():
         # This shouldn't happen - playing but no media?
