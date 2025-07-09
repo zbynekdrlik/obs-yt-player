@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.7"  # Restored video_selector.py, playlist.py, and tools.py to match main branch
+SCRIPT_VERSION = "4.1.0"  # Implemented unique source names for multi-instance support
 
 # Dynamic script detection - works with any script name
 # Look for .py file in parent directory that's not __init__.py
@@ -42,8 +42,10 @@ DEFAULT_AUDIO_ONLY_MODE = False
 
 # OBS Scene and Source names
 SCENE_NAME = SCRIPT_NAME  # Scene name matches script filename without extension
-MEDIA_SOURCE_NAME = "video"
-TEXT_SOURCE_NAME = "title"
+
+# Dynamic source names - prefixed with scene name to ensure uniqueness
+MEDIA_SOURCE_NAME = f"{SCENE_NAME}_video"
+TEXT_SOURCE_NAME = f"{SCENE_NAME}_title"
 OPACITY_FILTER_NAME = "Title Opacity"
 
 # Tool settings
