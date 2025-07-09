@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 :: Script to update all yt-player instances from main
-:: Version: 2.0.0 - Now with multi-location search
+:: Version: 2.0.1 - Fixed nested if statement error
 
 echo ==========================================
-echo YouTube Player Instance Updater v2.0.0
+echo YouTube Player Instance Updater v2.0.1
 echo ==========================================
 echo.
 
@@ -104,11 +104,14 @@ for /L %%i in (1,1,%instance_count%) do (
     echo Updating: !instance_path!
     echo ------------------------
     
-    :: Find the main script name
+    :: Find the main script name by looking for .py files
     set "script_name="
     for %%F in ("!instance_path!\*.py") do (
         set "filename=%%~nF"
-        if not "!filename:~0,2!"=="__" (
+        :: Skip files starting with __ or test_
+        set "first_chars=!filename:~0,2!"
+        set "test_prefix=!filename:~0,5!"
+        if not "!first_chars!"=="__" if not "!test_prefix!"=="test_" (
             set "script_name=!filename!"
         )
     )
@@ -169,7 +172,7 @@ for /L %%i in (1,1,%instance_count%) do (
         echo ✓ Instance updated successfully
         set /a updated_count+=1
     ) else (
-        echo ERROR: No Python script found!
+        echo ERROR: No Python script found in !instance_path!
         set /a error_count+=1
     )
 )
