@@ -7,7 +7,6 @@ from .state import (
     is_scene_active, set_scene_active, is_playing,
     get_cached_videos, get_loop_video_id, get_playback_mode
 )
-from .metadata import update_window_title
 
 # Default settings
 DEFAULT_TEXT_SETTINGS = {
@@ -138,7 +137,6 @@ def on_frontend_event(event):
             set_scene_active(is_active)
             if is_active:
                 log(f"Scene '{SCENE_NAME}' activated")
-                update_window_title()
             else:
                 log(f"Scene '{SCENE_NAME}' deactivated")
                 
@@ -174,7 +172,6 @@ def verify_scene_setup():
     
     if is_active:
         log(f"Scene '{SCENE_NAME}' is currently active")
-        update_window_title()
     else:
         log(f"Scene '{SCENE_NAME}' is not active")
     
