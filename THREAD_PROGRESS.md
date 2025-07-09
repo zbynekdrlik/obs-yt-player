@@ -2,42 +2,47 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Created ytplay.py (copy of ytfast.py) 
-- [x] Created rename_to_ytplay.py migration script
-- [ ] **WAITING FOR USER**: Run the migration script locally to complete rename
-- [ ] After migration: Delete ytfast.py from GitHub
-- [ ] After migration: Test everything works
+- [x] Deleted rename script as requested
+- [x] Deleted old ytfast.py 
+- [x] ytplay.py already exists
+- [ ] **IN PROGRESS**: Need to rename ytfast_modules → ytplay_modules
+- [ ] Need to update all imports in 21 module files
+- [ ] Need to update documentation
 
-## Migration Script Ready
-I've created `rename_to_ytplay.py` that will:
-1. Rename `ytfast.py` → `ytplay.py` (or remove old one)
-2. Rename `ytfast_modules/` → `ytplay_modules/`
-3. Update all imports throughout codebase
-4. Update documentation references
-5. Update setup_new_instance.py
+## Step-by-Step Rename Progress
 
-## How to Complete the Rename
-```bash
-# 1. Pull the latest changes
-git pull origin feature/folder-based-instances
+### Completed:
+1. ✅ Removed rename_to_ytplay.py script
+2. ✅ Removed ytfast.py (ytplay.py already exists)
 
-# 2. Run the migration script
-python rename_to_ytplay.py
+### Next Steps:
+3. 🔄 Rename modules directory and update imports
+4. ⏳ Update documentation references
+5. ⏳ Update setup_new_instance.py
+6. ⏳ Test everything works
 
-# 3. Test in OBS that everything works
-
-# 4. Commit the changes
-git add -A
-git commit -m "Complete ytfast to ytplay rename"
-git push origin feature/folder-based-instances
-```
-
-## What the Script Will Do
-- ✅ Handle all 21 module files automatically
-- ✅ Update all imports and references
-- ✅ Update documentation
-- ✅ Preserve all functionality
-- ✅ Clean up old files
+## Module Files to Process (21 files):
+- [ ] __init__.py
+- [ ] cache.py
+- [ ] config.py
+- [ ] download.py
+- [ ] gemini_metadata.py
+- [ ] logger.py
+- [ ] media_control.py
+- [ ] metadata.py
+- [ ] normalize.py
+- [ ] opacity_control.py
+- [ ] playback.py
+- [ ] playback_controller.py
+- [ ] playlist.py
+- [ ] reprocess.py
+- [ ] scene.py
+- [ ] state.py
+- [ ] state_handlers.py
+- [ ] title_manager.py
+- [ ] tools.py
+- [ ] utils.py
+- [ ] video_selector.py
 
 ## Version for Release
 **v4.0.0** - Major changes:
@@ -45,14 +50,7 @@ git push origin feature/folder-based-instances
 - Renamed from ytfast to ytplay
 - Complete isolation between instances
 
-## Testing After Migration
-- [ ] Script loads in OBS without errors
-- [ ] Video playback works
-- [ ] Playlist sync works
-- [ ] All playback modes work
-- [ ] Multi-instance setup works
-
 ## Critical Information
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: Migration script ready, waiting for local execution
+- Status: Renaming in progress (step 2/6)
