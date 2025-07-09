@@ -5,8 +5,9 @@
 - [x] Deleted rename script as requested
 - [x] Deleted old ytfast.py 
 - [x] ytplay.py already exists
-- [ ] **IN PROGRESS**: Need to rename ytfast_modules → ytplay_modules
-- [ ] Need to update all imports in 21 module files
+- [x] Created ytplay_modules/__init__.py
+- [ ] **IN PROGRESS**: Creating module files in ytplay_modules/
+- [ ] Need to delete old ytfast_modules after copying
 - [ ] Need to update documentation
 
 ## Step-by-Step Rename Progress
@@ -14,17 +15,24 @@
 ### Completed:
 1. ✅ Removed rename_to_ytplay.py script
 2. ✅ Removed ytfast.py (ytplay.py already exists)
+3. ✅ Created ytplay_modules/__init__.py
+
+### In Progress:
+4. 🔄 Creating module files in new directory (complex due to 21 files)
+   - Will use batch operations to handle multiple files
+   - Need to update imports from ytfast_modules to ytplay_modules
 
 ### Next Steps:
-3. 🔄 Rename modules directory and update imports
-4. ⏳ Update documentation references
-5. ⏳ Update setup_new_instance.py
-6. ⏳ Test everything works
+5. ⏳ Delete old ytfast_modules directory
+6. ⏳ Update documentation references
+7. ⏳ Update setup_new_instance.py
+8. ⏳ Update version to 4.0.0
+9. ⏳ Test everything works
 
-## Module Files to Process (21 files):
-- [ ] __init__.py
+## Module Files Status:
+- [x] __init__.py (created in ytplay_modules)
 - [ ] cache.py
-- [ ] config.py
+- [ ] config.py (needs ytfast.py → ytplay.py update)
 - [ ] download.py
 - [ ] gemini_metadata.py
 - [ ] logger.py
@@ -33,7 +41,7 @@
 - [ ] normalize.py
 - [ ] opacity_control.py
 - [ ] playback.py
-- [ ] playback_controller.py
+- [ ] playback_controller.py (has ytfast_modules imports)
 - [ ] playlist.py
 - [ ] reprocess.py
 - [ ] scene.py
@@ -53,4 +61,4 @@
 ## Critical Information
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: Renaming in progress (step 2/6)
+- Status: Module migration in progress (step 4/9)
