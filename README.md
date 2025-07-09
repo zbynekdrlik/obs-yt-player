@@ -9,9 +9,9 @@ A Windows-only OBS Studio Python script that syncs YouTube playlists, caches vid
 ### Default Structure
 ```
 obs-scripts/
-└── yt-player-main/              # Main player instance
-    ├── ytfast.py                # Script to load in OBS
-    ├── ytfast_modules/          # All modules
+└── yt-player-main/              # Main player template
+    ├── ytplay.py                # Script to load in OBS
+    ├── ytplay_modules/          # All modules
     └── cache/                   # Video cache
 ```
 
@@ -46,7 +46,7 @@ obs-scripts/
 - **OBS Studio** with Python scripting support
 - **Python 3.6+** (comes with OBS)
 - **Windows** (yt-dlp and FFmpeg requirements)
-- **FFmpeg** (bundled with OBS or standalone)
+- **FFmpeg** (automatically downloaded by the script)
 - **Google Gemini API Key** (optional, for enhanced metadata)
 
 ## Installation
@@ -57,7 +57,7 @@ obs-scripts/
 1. Download the latest release
 2. Copy the `yt-player-main/` folder to your OBS scripts directory
 3. In OBS Studio: Tools → Scripts → Add Script (+)
-4. Navigate to and select `yt-player-main/ytfast.py`
+4. Navigate to and select `yt-player-main/ytplay.py`
 
 #### For Existing Users (Upgrading from v3.x)
 If you have the old single-file setup (ytfast.py in root):
@@ -81,16 +81,18 @@ In script properties, configure:
 
 ### 3. Scene Setup
 
+The script name determines the scene name. For example:
+- Script: `ytplay.py` → Scene: `ytplay`
+- Script: `ytworship.py` → Scene: `ytworship`
+
 Create required OBS sources in your scene:
 
-1. **Media Source** named `ytplayer`
+1. **Media Source** named `video`
    - Uncheck "Local File"
    - Leave other settings default
 
-2. **Text Sources** (optional):
-   - `ytplayer Song` - Displays current song
-   - `ytplayer Artist` - Displays current artist  
-   - `ytplayer Title` - Displays full title
+2. **Text Source** named `title` (optional)
+   - Displays current song info
 
 ## Usage
 
@@ -119,24 +121,28 @@ Check the OBS Script Log for:
 
 ### Creating Additional Instances
 
-Use the helper script to create new instances in seconds:
+#### Method 1: Using the Batch File (Windows - Recommended)
+```cmd
+create_new_ytplayer.bat worship
+```
 
+#### Method 2: Using Python Script
 ```bash
-python setup_new_instance.py main worship
+python setup_new_instance.py worship
 ```
 
 This creates:
 ```
 obs-scripts/
-├── yt-player-main/              # Original instance
-│   └── ytfast.py                # Scene: ytfast
+├── yt-player-main/              # Original template
+│   └── ytplay.py                # Scene: ytplay
 └── yt-player-worship/           # New instance
     └── ytworship.py             # Scene: ytworship
 ```
 
 ### Benefits
 - ✅ **Complete isolation** between instances
-- ✅ **Simple setup** using the helper script
+- ✅ **Simple setup** using helper scripts
 - ✅ **Easy maintenance** - update instances independently
 - ✅ **Clear organization** - one folder per player
 
@@ -189,7 +195,7 @@ Include YouTube player scenes within other scenes:
 Main Stream Scene
 ├── Game Capture
 ├── Webcam
-└── Nested Scene: ytfast (YouTube player)
+└── Nested Scene: ytworship (YouTube player)
 ```
 
 The player detects nested scenes automatically and continues playback seamlessly.
@@ -197,7 +203,7 @@ The player detects nested scenes automatically and continues playback seamlessly
 ## Troubleshooting
 
 ### Videos Not Playing?
-- Check Media Source is named exactly `ytplayer`
+- Check Media Source is named exactly `video`
 - Ensure scene containing sources is active
 - Verify playlist URL is accessible
 - Check Script Log for errors
@@ -208,7 +214,7 @@ The player detects nested scenes automatically and continues playback seamlessly
 - Processing runs in background threads
 
 ### Metadata Not Showing?
-- Text sources must be named exactly as specified
+- Text source must be named exactly `title`
 - Gemini API key improves accuracy significantly
 - Files marked with `_gf` will retry Gemini on next startup
 - Check logs for metadata extraction details
@@ -217,7 +223,7 @@ The player detects nested scenes automatically and continues playback seamlessly
 - Ensure each instance is in its own folder
 - Check that imports match folder names
 - Verify scene names match script names
-- Use helper script for reliable setup
+- Use helper scripts for reliable setup
 
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
@@ -235,21 +241,27 @@ The player detects nested scenes automatically and continues playback seamlessly
 ### Folder-Based Architecture (v4.0.0+)
 ```
 yt-player-main/
-├── ytfast.py             # Main OBS interface
-├── ytfast_modules/       # All modules
+├── ytplay.py             # Main OBS interface
+├── ytplay_modules/       # All modules
 │   ├── config.py        # Configuration
 │   ├── download.py      # Video downloading
 │   ├── playback.py      # Playback control
 │   └── ...              # Other modules
 └── cache/                # Video cache
 
-setup_new_instance.py     # Helper for creating instances
-migrate_to_folders.py     # Migration from old structure
+create_new_ytplayer.bat   # Windows batch file for instances
+setup_new_instance.py     # Python script for instances
 ```
 
 ## Recent Updates
 
+### v4.0.1 - Dynamic Script Detection
+- Fixed config.py to dynamically detect script name
+- Improved multi-instance support
+- Added batch file for easy Windows setup
+
 ### v4.0.0 - Folder-Based Architecture
+- **BREAKING**: Renamed from ytfast to ytplay
 - New folder-based approach for true multi-instance support
 - Helper scripts for easy setup and migration
 - Complete isolation between instances
