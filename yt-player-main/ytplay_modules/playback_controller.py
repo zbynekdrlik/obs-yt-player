@@ -17,22 +17,22 @@ from state import (
     get_playback_mode, is_first_video_played, set_first_video_played,
     get_loop_video_id, set_loop_video_id
 )
-from ytplay_modules.media_control import (
+from media_control import (
     force_disable_media_loop, get_media_state, get_media_duration,
     get_current_video_from_media_source, update_media_source,
     stop_media_source, update_text_source_content
 )
-from ytplay_modules.opacity_control import (
+from opacity_control import (
     ensure_opacity_filter, cancel_opacity_timer,
     get_current_opacity, fade_out_text, set_current_opacity
 )
-from ytplay_modules.title_manager import (
+from title_manager import (
     cancel_title_timers, schedule_title_show, schedule_title_clear_with_delay
 )
-from ytplay_modules.video_selector import (
+from video_selector import (
     select_next_video, validate_video_file, get_video_display_info
 )
-from ytplay_modules.state_handlers import (
+from state_handlers import (
     handle_playing_state, handle_ended_state, handle_stopped_state,
     handle_none_state, cancel_loop_restart_timer, reset_playback_tracking,
     set_preloaded_video_state, set_manual_stop_detected, clear_loop_restart_state
@@ -192,8 +192,8 @@ def playback_controller():
                         log(f"Loop mode - Set pre-loaded video as loop video: {current_video_id}")
                 
                 # Check if we need to fade out the title for pre-loaded video
-                from ytplay_modules.media_control import get_media_time
-                from ytplay_modules.title_manager import TITLE_CLEAR_BEFORE_END, schedule_title_clear_from_current
+                from media_control import get_media_time
+                from title_manager import TITLE_CLEAR_BEFORE_END, schedule_title_clear_from_current
                 current_time = get_media_time(MEDIA_SOURCE_NAME)
                 if duration > 0 and current_time > 0:
                     remaining_ms = duration - current_time
@@ -356,7 +356,7 @@ def start_next_video():
     else:
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
-        from ytplay_modules.state_handlers import _playback_retry_count, _max_retry_attempts
+        from state_handlers import _playback_retry_count, _max_retry_attempts
         if _playback_retry_count < _max_retry_attempts:
             _playback_retry_count += 1
             start_next_video()
@@ -440,7 +440,7 @@ def stop_playback_controller():
         # Cancel other timers
         cancel_opacity_timer()
         cancel_loop_restart_timer()
-        from ytplay_modules.media_control import cancel_media_reload_timer
+        from media_control import cancel_media_reload_timer
         cancel_media_reload_timer()
         
         if _playback_timer:
