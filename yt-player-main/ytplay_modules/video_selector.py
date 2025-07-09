@@ -1,114 +1,68 @@
-"""
-Video selection logic.
-Handles random selection, loop mode, and played video tracking.
+"""Video selection logic for OBS YouTube Player.
+Handles choosing next video based on playback mode.
 """
 
 import random
-from logger import log
-from config import PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP
-from state import (
-    get_cached_videos, get_played_videos, add_played_video, 
-    clear_played_videos, get_playback_mode, get_loop_video_id,
-    set_loop_video_id
-)
+import os
 
+from .logger import log
+from .state import (
+    get_cached_videos, get_played_videos, add_played_video,
+    clear_played_videos, get_playback_mode, get_loop_video_id
+)
+from .cache import validate_video_file
+from .config import PLAYBACK_MODE_LOOP
 
 def select_next_video():
-    """
-    Select next video for playback using random no-repeat logic.
-    Returns video_id or None if no videos available.
-    """
+    """Select next video to play based on current mode."""
     cached_videos = get_cached_videos()
-    playback_mode = get_playback_mode()
-    
     if not cached_videos:
-        log("No videos available for playback")
+        log("No videos available to play")
         return None
     
-    # In loop mode, return the loop video if set
+    playback_mode = get_playback_mode()
+    
+    # In loop mode, check if we have a loop video set
     if playback_mode == PLAYBACK_MODE_LOOP:
         loop_video_id = get_loop_video_id()
         if loop_video_id and loop_video_id in cached_videos:
-            video_info = cached_videos[loop_video_id]
-            log(f"Loop mode - Selected: {video_info['song']} - {video_info['artist']}")
+            log(f"Loop mode: Selecting loop video {loop_video_id}")
             return loop_video_id
-        # If no loop video set, continue to select one and set it
+        else:
+            log("Loop mode: No loop video set, selecting random video")
     
-    available_videos = list(cached_videos.keys())
+    # For continuous mode or when no loop video is set
     played_videos = get_played_videos()
     
-    # If we only have one video, always play it
-    if len(available_videos) == 1:
-        selected = available_videos[0]
-        # Don't add to played list if it's the only video
-        video_info = cached_videos[selected]
-        log(f"Selected (only video): {video_info['song']} - {video_info['artist']}")
+    # Find unplayed videos
+    unplayed = [vid for vid in cached_videos if vid not in played_videos]
+    
+    if not unplayed:
+        # All videos played, reset history
+        log("All videos played, resetting play history")
+        clear_played_videos()
+        unplayed = list(cached_videos.keys())
+    
+    # Select random video from unplayed
+    if unplayed:
+        selected = random.choice(unplayed)
+        add_played_video(selected)
         
-        # Set as loop video if in loop mode
+        # If in loop mode and no loop video set, set this as the loop video
         if playback_mode == PLAYBACK_MODE_LOOP and not get_loop_video_id():
+            from .state import set_loop_video_id
             set_loop_video_id(selected)
-            log(f"Loop mode - Set loop video: {selected}")
+            log(f"Loop mode: Set {selected} as loop video")
         
         return selected
     
-    # If all videos have been played, reset the played list
-    if len(played_videos) >= len(available_videos):
-        clear_played_videos()
-        played_videos = []
-        log("Reset played videos list")
-    
-    # Find unplayed videos
-    unplayed = [vid for vid in available_videos if vid not in played_videos]
-    
-    if not unplayed:
-        # This shouldn't happen due to reset above, but just in case
-        clear_played_videos()
-        unplayed = available_videos
-    
-    # Select random video from unplayed
-    selected = random.choice(unplayed)
-    add_played_video(selected)
-    
-    video_info = cached_videos[selected]
-    log(f"Selected: {video_info['song']} - {video_info['artist']}")
-    
-    # Set as loop video if in loop mode and not set
-    if playback_mode == PLAYBACK_MODE_LOOP and not get_loop_video_id():
-        set_loop_video_id(selected)
-        log(f"Loop mode - Set loop video: {selected}")
-    
-    return selected
-
-
-def validate_video_file(video_id):
-    """
-    Validate that a video file exists and is accessible.
-    Returns True if valid, False otherwise.
-    """
-    from state import get_cached_video_info
-    import os
-    
-    video_info = get_cached_video_info(video_id)
-    if not video_info:
-        log(f"ERROR: No info for video {video_id}")
-        return False
-    
-    # Validate video file exists
-    if not os.path.exists(video_info['path']):
-        log(f"ERROR: Video file missing: {video_info['path']}")
-        return False
-    
-    return True
-
+    return None
 
 def get_video_display_info(video_id):
-    """
-    Get display information for a video (song, artist, etc).
-    Returns dict with song, artist, and gemini_failed status.
-    """
-    from state import get_cached_video_info
-    
+    """Get display information for a video."""
+    from .state import get_cached_video_info
     video_info = get_cached_video_info(video_id)
+    
     if not video_info:
         return {
             'song': 'Unknown Song',
@@ -116,17 +70,30 @@ def get_video_display_info(video_id):
             'gemini_failed': False
         }
     
-    # Extract metadata with fallbacks
-    song = video_info.get('song', 'Unknown Song')
-    artist = video_info.get('artist', 'Unknown Artist')
-    gemini_failed = video_info.get('gemini_failed', False)
-    
-    # Log if metadata is missing
-    if song == 'Unknown Song' or artist == 'Unknown Artist':
-        log(f"WARNING: Missing metadata for video {video_id} - Song: '{song}', Artist: '{artist}'")
-    
     return {
-        'song': song,
-        'artist': artist,
-        'gemini_failed': gemini_failed
+        'song': video_info.get('song', 'Unknown Song'),
+        'artist': video_info.get('artist', 'Unknown Artist'),
+        'gemini_failed': video_info.get('gemini_failed', False)
     }
+
+def validate_video_file(video_id):
+    """Validate that video file exists and is playable."""
+    from .state import get_cached_video_info, remove_cached_video
+    
+    video_info = get_cached_video_info(video_id)
+    if not video_info:
+        return False
+    
+    video_path = video_info.get('path')
+    if not video_path:
+        return False
+    
+    # Check if file exists and is valid
+    from .cache import validate_video_file as validate_file
+    if not validate_file(video_path):
+        log(f"Video file missing or invalid: {video_path}")
+        # Remove from cache
+        remove_cached_video(video_id)
+        return False
+    
+    return True
