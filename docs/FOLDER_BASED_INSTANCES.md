@@ -21,11 +21,12 @@ This document describes the **folder-based approach** for running multiple YouTu
 - ✅ **No shared state** - Impossible to have conflicts
 - ✅ **Clear organization** - One folder = one player
 - ✅ **Flexible naming** - Any script name works
+- ✅ **Automatic configuration** - No manual import updates needed
 
 ## Directory Structure
 
 ```
-obs-scripts/
+obs-yt-player/
 ├── yt-player-main/              # Template player instance
 │   ├── ytplay.py                # Main script
 │   ├── ytplay_modules/          # Module directory
@@ -37,14 +38,14 @@ obs-scripts/
 │   └── cache/                   # Cache directory
 │
 ├── yt-player-worship/           # Worship player instance
-│   ├── ytworship.py             # Instance script
-│   ├── ytworship_modules/       # Instance modules
-│   │   └── ...                  # All modules with updated imports
+│   ├── worship.py               # Instance script
+│   ├── worship_modules/         # Instance modules (auto-configured)
+│   │   └── ...                  # All modules work automatically
 │   └── cache/
 │
 ├── yt-player-kids/              # Kids player instance
-│   ├── ytkids.py
-│   ├── ytkids_modules/
+│   ├── kids.py
+│   ├── kids_modules/
 │   └── cache/
 │
 └── create_new_ytplayer.bat      # Windows batch file for instances
@@ -52,7 +53,7 @@ obs-scripts/
 
 ## Creating a New Instance
 
-### Using the Windows Batch File
+### Using the Windows Batch File (Recommended)
 
 ```cmd
 create_new_ytplayer.bat worship
@@ -60,11 +61,12 @@ create_new_ytplayer.bat worship
 
 This will:
 1. Copy `yt-player-main/` to `yt-player-worship/`
-2. Rename `ytplay.py` to `ytworship.py`
-3. Rename `ytplay_modules/` to `ytworship_modules/`
-4. Update all imports automatically
-5. Clean the cache directory
-6. Display setup instructions
+2. Rename `ytplay.py` to `worship.py`
+3. Rename `ytplay_modules/` to `worship_modules/`
+4. Clean the cache directory
+5. Display setup instructions
+
+**Note:** The batch file no longer updates imports because the dynamic import system handles this automatically!
 
 ### Manual Setup (Advanced Users)
 
@@ -76,40 +78,52 @@ This will:
 2. **Rename the main script**
    ```bash
    cd yt-player-worship
-   mv ytplay.py ytworship.py
+   mv ytplay.py worship.py
    ```
 
 3. **Rename the modules folder**
    ```bash
-   mv ytplay_modules/ ytworship_modules/
+   mv ytplay_modules/ worship_modules/
    ```
 
-4. **Update imports using PowerShell**
-   ```powershell
-   # Update main script
-   (Get-Content ytworship.py) -replace 'from ytplay_modules', 'from ytworship_modules' | Set-Content ytworship.py
-   
-   # Update all module files
-   Get-ChildItem -Path ytworship_modules -Filter *.py -Recurse | ForEach-Object {
-       (Get-Content $_.FullName) -replace 'from ytplay_modules', 'from ytworship_modules' | Set-Content $_.FullName
-   }
-   ```
-
-5. **Clean cache directory**
+4. **Clean cache directory**
    ```bash
    rm -rf cache/*
    ```
+
+That's it! No import updates needed - the script automatically detects its module directory.
+
+## How the Dynamic Import System Works
+
+The multi-instance system uses intelligent module loading:
+
+1. **Script Detection**
+   ```python
+   SCRIPT_NAME = os.path.splitext(os.path.basename(SCRIPT_PATH))[0]
+   MODULES_DIR_NAME = f"{SCRIPT_NAME}_modules"
+   ```
+
+2. **Dynamic Import**
+   ```python
+   modules = importlib.import_module(MODULES_DIR_NAME)
+   ```
+
+3. **Relative Imports**
+   - All modules use relative imports: `from .logger import log`
+   - These work regardless of the module directory name
+
+This means each instance automatically finds its own modules without any manual configuration!
 
 ## OBS Setup
 
 For each player instance:
 
 1. **Add the script to OBS**
-   - Scripts → + → Add `yt-player-worship/ytworship.py`
+   - Scripts → + → Add `yt-player-worship/worship.py`
 
 2. **Create the scene**
    - Scene name = script name (without .py)
-   - Example: `ytworship.py` → Scene: `ytworship`
+   - Example: `worship.py` → Scene: `worship`
 
 3. **Add required sources**
    - **Media Source** named `video`
@@ -129,12 +143,12 @@ The script name (without .py) becomes the scene name:
 | Script Name | Scene Name | Example Use |
 |-------------|------------|-------------|
 | `ytplay.py` | `ytplay` | General music |
-| `ytworship.py` | `ytworship` | Worship music |
-| `ytkids.py` | `ytkids` | Kids content |
-| `ytambient.py` | `ytambient` | Background music |
+| `worship.py` | `worship` | Worship music |
+| `kids.py` | `kids` | Kids content |
+| `ambient.py` | `ambient` | Background music |
 | `remixes.py` | `remixes` | Remix playlist |
 
-## How It Works
+## Key Features
 
 1. **Dynamic Configuration**
    - `config.py` automatically detects the script name
@@ -143,7 +157,7 @@ The script name (without .py) becomes the scene name:
 
 2. **Module Isolation**
    - Each instance has its own modules folder
-   - Import statements reference instance-specific modules
+   - Modules are loaded dynamically at runtime
    - Complete separation of code execution
 
 3. **Cache Separation**
@@ -201,19 +215,19 @@ yt-player-audio/     → Audio-only mode
 ### Script not loading in OBS
 - Check that Python file exists and is readable
 - Ensure modules folder was renamed correctly
-- Verify no syntax errors in imports
+- Verify `__init__.py` exists in modules folder
 
 ### Import errors
 ```
-ModuleNotFoundError: No module named 'ytworship_modules'
+ModuleNotFoundError: No module named 'worship_modules'
 ```
-- Module folder name must match imports exactly
-- Check for typos in import statements
-- Ensure `__init__.py` exists in modules folder
+- Module folder name must match script name + "_modules"
+- Example: `worship.py` needs `worship_modules/`
+- Check for typos in folder names
 
 ### Wrong scene detected
 - Scene name comes from script filename
-- `ytworship.py` → Scene must be named `ytworship`
+- `worship.py` → Scene must be named `worship`
 - Check OBS scene name matches exactly
 
 ### Videos not playing
@@ -230,21 +244,36 @@ If upgrading from the single-file setup:
    cp -r obs-scripts obs-scripts-backup
    ```
 
-2. **Manual migration steps**
-   - Create `yt-player-main/` directory
-   - Move `ytfast.py` to `yt-player-main/ytplay.py`
-   - Move `ytfast_modules/` to `yt-player-main/ytplay_modules/`
-   - Move cache directory to `yt-player-main/cache/`
-   - Update imports in all Python files
-   - Update OBS to load from new location
+2. **Download the new version**
+   - Get the latest release with folder structure
 
-3. **Update OBS script paths**
+3. **Move your cache** (optional)
+   - Copy your existing cache to preserve downloads
+   - Place in `yt-player-main/cache/`
+
+4. **Update OBS script paths**
    - Remove old script references
    - Add new scripts from folders
 
-4. **Verify functionality**
+5. **Verify functionality**
    - Test each instance
    - Check logs for errors
+
+## Technical Details
+
+### Module Loading Process
+
+1. Main script determines its own name
+2. Calculates module directory name
+3. Uses `importlib` to dynamically load modules
+4. All internal imports use relative paths
+
+### Why This Works
+
+- **No hardcoded module names** in the codebase
+- **Relative imports** (`.module`) work in any directory
+- **Dynamic detection** adapts to any script name
+- **Package structure** (`__init__.py`) enables clean imports
 
 ## Example Use Cases
 
@@ -270,15 +299,24 @@ yt-player-spanish/    → Spanish content
 yt-player-french/     → French content
 ```
 
+### Quality Variants
+```
+yt-player-hd/         → 1080p downloads
+yt-player-sd/         → 480p downloads
+yt-player-audio/      → Audio-only mode enabled
+```
+
 ## Summary
 
-The folder-based architecture provides true isolation between instances while maintaining flexibility and ease of use. Each instance is self-contained, making it impossible to have conflicts between different players.
+The folder-based architecture with dynamic imports provides true isolation between instances while maintaining flexibility and ease of use. Each instance is self-contained and self-configuring, making it impossible to have conflicts between different players.
 
 Key advantages:
 - **Zero shared state** between instances
 - **Simple setup** with batch file
+- **No manual configuration** needed
 - **Clear organization** of files
 - **Independent updates** and testing
 - **Flexible naming** for any use case
+- **Automatic module detection** at runtime
 
-This is the recommended approach for running multiple YouTube players in OBS Studio.
+This is the recommended approach for running multiple YouTube players in OBS Studio, providing both simplicity and power for any streaming setup.
