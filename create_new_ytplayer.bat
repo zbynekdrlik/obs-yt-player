@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 :: YouTube Player Instance Creator with Safety Features
-:: Version: 2.0.0
+:: Version: 2.0.1
 
 echo ==========================================
-echo YouTube Player Instance Creator v2.0.0
+echo YouTube Player Instance Creator v2.0.1
 echo ==========================================
 echo.
 
@@ -28,7 +28,7 @@ set "INSTANCE_NAME=%~1"
 set "INSTANCE_NAME=%INSTANCE_NAME:"=%"
 
 :: Basic validation - only allow alphanumeric and basic characters
-echo %INSTANCE_NAME% | findstr /R "^[a-zA-Z0-9_-]*$" >nul
+echo %INSTANCE_NAME%| findstr /R "^[a-zA-Z0-9_-]*$" >nul
 if errorlevel 1 (
     echo ERROR: Invalid instance name!
     echo Instance names can only contain letters, numbers, underscore and hyphen.
