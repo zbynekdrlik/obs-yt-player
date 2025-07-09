@@ -32,7 +32,7 @@ set SOURCE_MODULES=ytplay_modules
 set TARGET_MODULES=yt%INSTANCE_NAME%_modules
 
 :: Validate instance name (alphanumeric and underscore only)
-echo %INSTANCE_NAME% | findstr /r "^[a-zA-Z0-9_]*$" >nul
+echo %INSTANCE_NAME%| findstr /r "^[a-zA-Z0-9_]*$" >nul
 if errorlevel 1 (
     echo.
     echo ERROR: Instance name can only contain letters, numbers, and underscores
