@@ -67,3 +67,6 @@ music*.py
 bgm*.py
 stream*.py
 test*.py
+
+# Multi-instance folders
+yt-player-*/
