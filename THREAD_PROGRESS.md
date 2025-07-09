@@ -2,9 +2,9 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Fixed ALL imports to use relative imports (v4.0.4)
-- [x] All modules now use relative imports (e.g., `from .logger import log`)
-- [ ] **READY FOR TESTING** - All import fixes complete, multi-instance support should now work properly
+- [x] Fixed import error "attempted relative import with no known parent package" (v4.0.5)
+- [x] Changed main script to use dynamic package imports with importlib
+- [ ] **READY FOR TESTING** - Import system completely redesigned for proper multi-instance support
 
 ## Summary of Changes:
 
@@ -12,7 +12,7 @@
 1. **Dynamic Script Detection**: config.py now automatically detects script name
 2. **Flexible Naming**: Any script name works (ytplay.py, ytworship.py, remixes.py)
 3. **Scene = Script Name**: Automatic scene naming from script filename
-4. **FIXED**: ALL imports now use relative paths for true multi-instance support (v4.0.4)
+4. **FIXED**: Import system redesigned - uses importlib for dynamic package imports (v4.0.5)
 
 ### 🔧 Helper Scripts (Simplified)
 1. **create_new_ytplayer.bat**: Windows batch file for easy instance creation
@@ -28,37 +28,24 @@
 - **No State Conflicts**: Impossible to have cross-contamination
 - **Easy Setup**: `create_new_ytplayer.bat worship` creates everything
 - **Flexible Naming**: No restrictions on script names
-- **True Multi-Instance**: Fixed ALL imports to use relative imports (v4.0.4)
+- **True Multi-Instance**: Fixed import system to use dynamic package loading (v4.0.5)
 
 ## Bug Fixes:
 - **v4.0.2**: Claims to fix hardcoded imports (but didn't actually fix them)
 - **v4.0.3**: Claims to fix critical missed import in playback.py (but didn't actually fix them)
 - **v4.0.4**: ACTUALLY fixed ALL imports to use relative imports in all modules
+- **v4.0.5**: Fixed "attempted relative import with no known parent package" error by redesigning import system
 
-## Import Fixes Applied (v4.0.4):
-Fixed imports in all modules:
-- config.py (version updated to 4.0.4)
-- state.py
-- logger.py
-- utils.py
-- cache.py
-- title_manager.py
-- tools.py
-- scene.py
-- playlist.py
-- video_selector.py
-- gemini_metadata.py
-- metadata.py
-- normalize.py
-- download.py
-- reprocess.py
-- media_control.py
-- opacity_control.py
-- state_handlers.py
-- playback_controller.py
+## Import System Redesign (v4.0.5):
+The main script now:
+1. Uses `importlib.import_module()` to dynamically import the module package
+2. Imports modules as `modules.config`, `modules.logger`, etc.
+3. Each instance has its own module namespace
+4. Properly supports relative imports within modules
+5. No more direct imports that break the package structure
 
 ## Testing Checklist:
-- [ ] Test main template (ytplay.py) works
+- [ ] Test main template (ytplay.py) loads without import errors
 - [ ] Test create_new_ytplayer.bat creates instance correctly
 - [ ] Test that instance works independently
 - [ ] Verify scene detection works
@@ -67,7 +54,7 @@ Fixed imports in all modules:
 - [ ] Verify imports are truly isolated between instances
 
 ## Version for Release
-**v4.0.4** - Major architectural changes:
+**v4.0.5** - Major architectural changes:
 - Folder-based multi-instance support
 - Renamed ytfast → ytplay
 - Dynamic configuration
@@ -75,12 +62,13 @@ Fixed imports in all modules:
 - Windows batch file support
 - Simplified setup process
 - Fixed ALL imports to use relative imports for true multi-instance isolation
+- Redesigned import system using importlib for proper package loading
 
 ## PR Status:
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: **Code complete, ALL imports fixed, ready for testing**
-- Changes: Simplified to Windows batch file only, fixed ALL imports to use relative imports
+- Status: **Import system redesigned, ready for testing**
+- Changes: Fixed critical import error that prevented script from loading in OBS
 
 ## Critical Note:
-Previous versions (4.0.2 and 4.0.3) claimed to fix imports but did NOT actually fix them. Version 4.0.4 has actually converted ALL module imports to use relative imports (e.g., `from .module import function` instead of `from module import function`), which is essential for true multi-instance support.
+Version 4.0.5 redesigns the import system to properly support multi-instance operation. The main script now uses `importlib` to dynamically import the modules as a proper Python package, which allows the relative imports within modules to work correctly.
