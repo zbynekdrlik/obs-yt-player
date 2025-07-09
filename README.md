@@ -53,21 +53,10 @@ obs-scripts/
 
 ### 1. Download and Setup
 
-#### For New Installations (Recommended)
 1. Download the latest release
 2. Copy the `yt-player-main/` folder to your OBS scripts directory
 3. In OBS Studio: Tools → Scripts → Add Script (+)
 4. Navigate to and select `yt-player-main/ytplay.py`
-
-#### For Existing Users (Upgrading from v3.x)
-If you have the old single-file setup (ytfast.py in root):
-```bash
-python migrate_to_folders.py
-```
-This will:
-- Move your files to the new folder structure
-- Preserve all your settings and cache
-- Update your OBS script path
 
 ### 2. Configuration
 
@@ -121,14 +110,10 @@ Check the OBS Script Log for:
 
 ### Creating Additional Instances
 
-#### Method 1: Using the Batch File (Windows - Recommended)
+Use the Windows batch file to create new instances in seconds:
+
 ```cmd
 create_new_ytplayer.bat worship
-```
-
-#### Method 2: Using Python Script
-```bash
-python setup_new_instance.py worship
 ```
 
 This creates:
@@ -140,9 +125,17 @@ obs-scripts/
     └── ytworship.py             # Scene: ytworship
 ```
 
+### What the Script Does:
+1. Copies `yt-player-main/` to `yt-player-worship/`
+2. Renames `ytplay.py` to `ytworship.py`
+3. Renames `ytplay_modules/` to `ytworship_modules/`
+4. Updates all imports automatically
+5. Cleans the cache directory
+6. Displays setup instructions
+
 ### Benefits
 - ✅ **Complete isolation** between instances
-- ✅ **Simple setup** using helper scripts
+- ✅ **Simple setup** - one command creates everything
 - ✅ **Easy maintenance** - update instances independently
 - ✅ **Clear organization** - one folder per player
 
@@ -223,7 +216,7 @@ The player detects nested scenes automatically and continues playback seamlessly
 - Ensure each instance is in its own folder
 - Check that imports match folder names
 - Verify scene names match script names
-- Use helper scripts for reliable setup
+- Use batch file for reliable setup
 
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
@@ -241,16 +234,16 @@ The player detects nested scenes automatically and continues playback seamlessly
 ### Folder-Based Architecture (v4.0.0+)
 ```
 yt-player-main/
-├── ytplay.py             # Main OBS interface
-├── ytplay_modules/       # All modules
-│   ├── config.py        # Configuration
-│   ├── download.py      # Video downloading
-│   ├── playback.py      # Playback control
-│   └── ...              # Other modules
-└── cache/                # Video cache
+├── ytplay.py               # Main OBS interface
+├── ytplay_modules/         # All modules
+│   ├── config.py          # Configuration
+│   ├── download.py        # Video downloading
+│   ├── playback.py        # Playback control
+│   └── ...                # Other modules
+└── cache/                  # Video cache
 
-create_new_ytplayer.bat   # Windows batch file for instances
-setup_new_instance.py     # Python script for instances
+create_new_ytplayer.bat     # Windows batch file for instances
+cleanup_old_modules.bat     # Cleanup tool for old modules
 ```
 
 ## Recent Updates
@@ -259,11 +252,11 @@ setup_new_instance.py     # Python script for instances
 - Fixed config.py to dynamically detect script name
 - Improved multi-instance support
 - Added batch file for easy Windows setup
+- Removed old ytfast_modules directory
 
 ### v4.0.0 - Folder-Based Architecture
 - **BREAKING**: Renamed from ytfast to ytplay
 - New folder-based approach for true multi-instance support
-- Helper scripts for easy setup and migration
 - Complete isolation between instances
 - Simplified maintenance and updates
 
