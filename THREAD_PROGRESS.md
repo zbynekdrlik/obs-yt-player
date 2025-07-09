@@ -6,10 +6,15 @@
 - [x] Created batch file: create_new_ytplayer.bat
 - [x] Updated README.md (fixed media source name to "video")
 - [x] Updated docs/FOLDER_BASED_INSTANCES.md
-- [x] Created cleanup_old_modules.bat for cleanup
+- [x] Removed cleanup_old_modules.bat (no longer needed)
 - [x] Removed setup_new_instance.py and migrate_to_folders.py (simplified)
 - [x] Updated all documentation
-- [ ] **READY FOR TESTING** - All code changes complete
+- [x] **FIXED CRITICAL BUG** - Removed hardcoded imports in:
+  - title_manager.py
+  - state_handlers.py
+  - playback_controller.py
+- [x] Incremented version to 4.0.2
+- [ ] **READY FOR TESTING** - All code changes complete, critical bugs fixed
 
 ## Summary of Changes:
 
@@ -17,10 +22,11 @@
 1. **Dynamic Script Detection**: config.py now automatically detects script name
 2. **Flexible Naming**: Any script name works (ytplay.py, ytworship.py, remixes.py)
 3. **Scene = Script Name**: Automatic scene naming from script filename
+4. **FIXED**: All imports now use relative paths for true multi-instance support
 
 ### 🔧 Helper Scripts (Simplified)
 1. **create_new_ytplayer.bat**: Windows batch file for easy instance creation
-2. **cleanup_old_modules.bat**: Cleanup tool for old modules
+2. Removed Python scripts and cleanup batch file (no longer needed)
 
 ### 📚 Documentation Updates
 1. **README.md**: Fixed media source name, removed Python script references
@@ -32,6 +38,12 @@
 - **No State Conflicts**: Impossible to have cross-contamination
 - **Easy Setup**: `create_new_ytplayer.bat worship` creates everything
 - **Flexible Naming**: No restrictions on script names
+- **True Multi-Instance**: Fixed hardcoded imports that would have broken it
+
+## Bug Fixes in v4.0.2:
+- Fixed hardcoded "ytplay_modules" imports in three modules
+- All imports now use relative paths
+- Multi-instance architecture will now work correctly
 
 ## Testing Checklist:
 - [ ] Test main template (ytplay.py) works
@@ -39,23 +51,20 @@
 - [ ] Test that instance works independently
 - [ ] Verify scene detection works
 - [ ] Confirm media source "video" plays correctly
-- [ ] Test cleanup_old_modules.bat removes old directory
+- [ ] Test multiple instances run simultaneously without conflicts
 
 ## Version for Release
-**v4.0.1** - Major architectural changes:
+**v4.0.2** - Major architectural changes:
 - Folder-based multi-instance support
 - Renamed ytfast → ytplay
 - Dynamic configuration
 - Complete isolation between instances
 - Windows batch file support
 - Simplified setup process
-
-## Files Ready for Deletion:
-- yt-player-main/ytfast_modules/* (old modules directory)
-- Use cleanup_old_modules.bat to remove
+- Fixed critical import bugs
 
 ## PR Status:
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: **Code complete, ready for testing**
-- Changes: Simplified to Windows batch file only
+- Status: **Code complete, critical bugs fixed, ready for testing**
+- Changes: Simplified to Windows batch file only, fixed import bugs
