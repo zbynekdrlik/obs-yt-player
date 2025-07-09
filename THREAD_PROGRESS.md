@@ -3,6 +3,7 @@
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
 - [x] Fixed import error "attempted relative import with no known parent package" (v4.0.5)
+- [x] Fixed syntax error in utils.py - restored double backslash for proper string literal
 - [x] Changed main script to use dynamic package imports with importlib
 - [ ] **READY FOR TESTING** - Import system completely redesigned for proper multi-instance support
 
@@ -35,6 +36,7 @@
 - **v4.0.3**: Claims to fix critical missed import in playback.py (but didn't actually fix them)
 - **v4.0.4**: ACTUALLY fixed ALL imports to use relative imports in all modules
 - **v4.0.5**: Fixed "attempted relative import with no known parent package" error by redesigning import system
+- **Syntax Fix**: Fixed string literal syntax error in utils.py (corrupted during conversion)
 
 ## Import System Redesign (v4.0.5):
 The main script now:
@@ -43,6 +45,11 @@ The main script now:
 3. Each instance has its own module namespace
 4. Properly supports relative imports within modules
 5. No more direct imports that break the package structure
+
+## Additional Fixes:
+- **utils.py syntax error**: Fixed corrupted string literal on line 33
+  - Was: `invalid_chars = '<>:"|?*\'` (unclosed string)
+  - Fixed to: `invalid_chars = '<>:"|?*\\'` (proper double backslash)
 
 ## Testing Checklist:
 - [ ] Test main template (ytplay.py) loads without import errors
@@ -63,12 +70,13 @@ The main script now:
 - Simplified setup process
 - Fixed ALL imports to use relative imports for true multi-instance isolation
 - Redesigned import system using importlib for proper package loading
+- Fixed syntax error introduced during conversion
 
 ## PR Status:
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: **Import system redesigned, ready for testing**
-- Changes: Fixed critical import error that prevented script from loading in OBS
+- Status: **Import system redesigned and syntax errors fixed, ready for testing**
+- Changes: Fixed critical import error and syntax error that prevented script from loading in OBS
 
 ## Critical Note:
-Version 4.0.5 redesigns the import system to properly support multi-instance operation. The main script now uses `importlib` to dynamically import the modules as a proper Python package, which allows the relative imports within modules to work correctly.
+Version 4.0.5 redesigns the import system to properly support multi-instance operation. The main script now uses `importlib` to dynamically import the modules as a proper Python package, which allows the relative imports within modules to work correctly. Also fixed a syntax error in utils.py that was introduced during the conversion process.
