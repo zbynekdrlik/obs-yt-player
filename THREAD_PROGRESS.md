@@ -6,42 +6,36 @@
 - [x] Deleted old ytfast.py 
 - [x] ytplay.py already exists
 - [x] Created ytplay_modules/__init__.py
-- [ ] **IN PROGRESS**: Creating module files in ytplay_modules/
+- [x] Created ytplay_modules/config.py (v4.0.0, ytplay.py reference)
+- [x] Created ytplay_modules/logger.py
+- [ ] **CHALLENGE**: Need to copy 19 more module files
+- [ ] Need to update imports in files that use "ytfast_modules"
 - [ ] Need to delete old ytfast_modules after copying
 - [ ] Need to update documentation
 
-## Step-by-Step Rename Progress
+## Module Copy Strategy
+Most module files use relative imports (e.g., `from config import ...`).
+Only some files like playback_controller.py use full module paths (`from ytfast_modules.xxx import ...`).
 
-### Completed:
-1. ✅ Removed rename_to_ytplay.py script
-2. ✅ Removed ytfast.py (ytplay.py already exists)
-3. ✅ Created ytplay_modules/__init__.py
+### Files that need import updates:
+- playback_controller.py (has many `from ytfast_modules.xxx import`)
+- Possibly others (need to check)
 
-### In Progress:
-4. 🔄 Creating module files in new directory (complex due to 21 files)
-   - Will use batch operations to handle multiple files
-   - Need to update imports from ytfast_modules to ytplay_modules
+### Completed Module Files:
+- [x] __init__.py
+- [x] config.py (with ytfast.py → ytplay.py update)
+- [x] logger.py
 
-### Next Steps:
-5. ⏳ Delete old ytfast_modules directory
-6. ⏳ Update documentation references
-7. ⏳ Update setup_new_instance.py
-8. ⏳ Update version to 4.0.0
-9. ⏳ Test everything works
-
-## Module Files Status:
-- [x] __init__.py (created in ytplay_modules)
+### Remaining Module Files (19):
 - [ ] cache.py
-- [ ] config.py (needs ytfast.py → ytplay.py update)
 - [ ] download.py
 - [ ] gemini_metadata.py
-- [ ] logger.py
 - [ ] media_control.py
 - [ ] metadata.py
 - [ ] normalize.py
 - [ ] opacity_control.py
 - [ ] playback.py
-- [ ] playback_controller.py (has ytfast_modules imports)
+- [ ] playback_controller.py (NEEDS IMPORT UPDATES)
 - [ ] playlist.py
 - [ ] reprocess.py
 - [ ] scene.py
@@ -52,6 +46,10 @@
 - [ ] utils.py
 - [ ] video_selector.py
 
+## Current Approach
+Due to GitHub API limitations, copying 19 files individually is challenging.
+Focusing on critical files first, then will need efficient batch approach.
+
 ## Version for Release
 **v4.0.0** - Major changes:
 - Folder-based multi-instance architecture  
@@ -61,4 +59,4 @@
 ## Critical Information
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: Module migration in progress (step 4/9)
+- Status: Module migration in progress (3/21 files done)
