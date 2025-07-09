@@ -32,7 +32,7 @@ def sanitize_filename(text):
     text = text.replace('/', '-')
     
     # Remove/replace other invalid filename characters
-    invalid_chars = '<>:"|?*\'  # Note: forward slash already handled
+    invalid_chars = '<>:"|?*\''  # Note: forward slash already handled
     for char in invalid_chars:
         text = text.replace(char, '_')
     
