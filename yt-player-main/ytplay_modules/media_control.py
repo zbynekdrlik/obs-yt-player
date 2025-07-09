@@ -5,8 +5,8 @@ Handles OBS media source operations and text source updates.
 
 import obspython as obs
 import os
-from config import MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
-from logger import log
+from .config import MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
+from .logger import log
 
 # Timer for delayed media reload
 _media_reload_timer = None
@@ -38,7 +38,7 @@ def get_current_video_from_media_source():
             if len(parts) >= 2:
                 video_id = parts[-1]
                 # Verify this video is in our cache
-                from state import get_cached_video_info
+                from .state import get_cached_video_info
                 if get_cached_video_info(video_id):
                     return video_id
         
