@@ -7,10 +7,10 @@ This script automates the process of creating new YouTube player instances
 for OBS Studio by copying and configuring player folders.
 
 Usage:
-    python setup_new_instance.py <source> <target>
+    python setup_new_instance.py <target_name>
     
 Example:
-    python setup_new_instance.py main worship
+    python setup_new_instance.py worship
     
 This will create yt-player-worship/ from yt-player-main/
 """
@@ -39,10 +39,28 @@ def update_file_content(filepath, replacements):
         return False
 
 
-def setup_instance(source_name, target_name):
-    """Set up a new YouTube player instance from an existing one."""
+def find_template_script_info(source_dir):
+    """Find the main script and modules folder in the source directory."""
+    script_path = None
+    script_name = None
+    modules_name = None
     
-    # Validate names
+    # Look for .py file (not starting with _)
+    for file in os.listdir(source_dir):
+        if file.endswith('.py') and not file.startswith('_'):
+            script_path = file
+            script_name = os.path.splitext(file)[0]
+            # Assume modules folder has same base name + _modules
+            modules_name = f"{script_name}_modules"
+            break
+    
+    return script_path, script_name, modules_name
+
+
+def setup_instance(target_name, source_name="main"):
+    """Set up a new YouTube player instance from the template."""
+    
+    # Validate target name
     if not re.match(r'^[a-zA-Z0-9_-]+$', target_name):
         print(f"❌ Error: Target name '{target_name}' contains invalid characters.")
         print("   Use only letters, numbers, hyphens, and underscores.")
@@ -57,6 +75,21 @@ def setup_instance(source_name, target_name):
         print(f"   Available players: {list_available_players()}")
         return False
     
+    # Find source script info
+    source_script, source_base_name, source_modules = find_template_script_info(source_dir)
+    if not source_script:
+        print(f"❌ Error: No Python script found in '{source_dir}'")
+        return False
+    
+    # Check if modules folder exists
+    if not os.path.exists(os.path.join(source_dir, source_modules)):
+        print(f"❌ Error: Modules folder '{source_modules}' not found in '{source_dir}'")
+        return False
+    
+    # Define target names
+    target_script = f"yt{target_name}.py"
+    target_modules = f"yt{target_name}_modules"
+    
     # Check if target already exists
     if os.path.exists(target_dir):
         print(f"❌ Error: Target directory '{target_dir}' already exists.")
@@ -70,6 +103,7 @@ def setup_instance(source_name, target_name):
     print(f"\n🚀 Creating new YouTube player instance: {target_name}")
     print(f"   Source: {source_dir}")
     print(f"   Target: {target_dir}")
+    print(f"   Template script: {source_script} → {target_script}")
     
     # Copy the entire folder
     print(f"\n📁 Copying folder structure...")
@@ -79,12 +113,6 @@ def setup_instance(source_name, target_name):
     except Exception as e:
         print(f"   ❌ Error copying folder: {e}")
         return False
-    
-    # Define file mappings
-    source_script = f"yt{source_name}.py"
-    target_script = f"yt{target_name}.py"
-    source_modules = f"yt{source_name}_modules"
-    target_modules = f"yt{target_name}_modules"
     
     # Rename main script
     old_script_path = os.path.join(target_dir, source_script)
@@ -115,10 +143,6 @@ def setup_instance(source_name, target_name):
     replacements = [
         (f"from {source_modules}", f"from {target_modules}"),
         (f"import {source_modules}", f"import {target_modules}"),
-        (f'SCENE_NAME = "yt{source_name}"', f'SCENE_NAME = "yt{target_name}"'),
-        (f'SCENE_NAME = \'yt{source_name}\'', f'SCENE_NAME = \'yt{target_name}\''),
-        (f'scene_name = "yt{source_name}"', f'scene_name = "yt{target_name}"'),
-        (f'scene_name = \'yt{source_name}\'', f'scene_name = \'yt{target_name}\''),
     ]
     
     # Update all Python files
@@ -155,7 +179,10 @@ def setup_instance(source_name, target_name):
     print(f"\n📌 Next Steps:")
     print(f"   1. In OBS, add the script from: {target_dir}/{target_script}")
     print(f"   2. Create a scene named: yt{target_name}")
-    print(f"   3. Configure the playlist URL in script settings")
+    print(f"   3. Add sources to the scene:")
+    print(f"      - Media Source named 'video'")
+    print(f"      - Text Source named 'title' (optional)")
+    print(f"   4. Configure the playlist URL in script settings")
     
     return True
 
@@ -186,24 +213,26 @@ def main():
         for i, player in enumerate(players, 1):
             print(f"  {i}. {player}")
         
-        print("\nUsage: python setup_new_instance.py <source> <target>")
-        print("Example: python setup_new_instance.py main worship")
+        print("\nUsage: python setup_new_instance.py <target_name>")
+        print("Example: python setup_new_instance.py worship")
+        print("\nThis will create yt-player-worship/ from yt-player-main/")
         return
     
-    if len(sys.argv) != 3:
-        print("\n❌ Error: Invalid number of arguments")
-        print("Usage: python setup_new_instance.py <source> <target>")
-        print("Example: python setup_new_instance.py main worship")
+    if len(sys.argv) > 3:
+        print("\n❌ Error: Too many arguments")
+        print("Usage: python setup_new_instance.py <target_name> [source_name]")
+        print("Example: python setup_new_instance.py worship")
+        print("Example: python setup_new_instance.py kids main")
         return
     
-    source_name = sys.argv[1]
-    target_name = sys.argv[2]
+    target_name = sys.argv[1]
+    source_name = sys.argv[2] if len(sys.argv) > 2 else "main"
     
     if source_name == target_name:
         print("❌ Error: Source and target names cannot be the same")
         return
     
-    setup_instance(source_name, target_name)
+    setup_instance(target_name, source_name)
 
 
 if __name__ == "__main__":
