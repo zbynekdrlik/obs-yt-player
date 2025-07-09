@@ -47,13 +47,12 @@ obs-scripts/
 │   ├── ytkids_modules/
 │   └── cache/
 │
-├── create_new_ytplayer.bat      # Windows batch file
-└── setup_new_instance.py        # Python setup script
+└── create_new_ytplayer.bat      # Windows batch file for instances
 ```
 
 ## Creating a New Instance
 
-### Method 1: Windows Batch File (Recommended for Windows)
+### Using the Windows Batch File
 
 ```cmd
 create_new_ytplayer.bat worship
@@ -67,15 +66,7 @@ This will:
 5. Clean the cache directory
 6. Display setup instructions
 
-### Method 2: Python Script (Cross-platform)
-
-```bash
-python setup_new_instance.py worship
-```
-
-Same functionality as the batch file but works on all platforms.
-
-### Method 3: Manual Setup
+### Manual Setup (Advanced Users)
 
 1. **Copy the entire folder**
    ```bash
@@ -93,9 +84,16 @@ Same functionality as the batch file but works on all platforms.
    mv ytplay_modules/ ytworship_modules/
    ```
 
-4. **Update imports**
-   - Replace all `from ytplay_modules` with `from ytworship_modules`
-   - Replace all `import ytplay_modules` with `import ytworship_modules`
+4. **Update imports using PowerShell**
+   ```powershell
+   # Update main script
+   (Get-Content ytworship.py) -replace 'from ytplay_modules', 'from ytworship_modules' | Set-Content ytworship.py
+   
+   # Update all module files
+   Get-ChildItem -Path ytworship_modules -Filter *.py -Recurse | ForEach-Object {
+       (Get-Content $_.FullName) -replace 'from ytplay_modules', 'from ytworship_modules' | Set-Content $_.FullName
+   }
+   ```
 
 5. **Clean cache directory**
    ```bash
@@ -167,7 +165,7 @@ The script name (without .py) becomes the scene name:
 
 3. **Consistent updates**
    - When updating shared functionality, update template first
-   - Use setup scripts to recreate instances
+   - Use batch file to recreate instances
    - Test each instance after updates
 
 4. **Naming strategy**
@@ -176,17 +174,6 @@ The script name (without .py) becomes the scene name:
    - Avoid special characters or spaces
 
 ## Advanced Usage
-
-### Custom Template Names
-
-The setup script supports custom templates:
-
-```bash
-# Create from a different template
-python setup_new_instance.py kids worship
-
-# This copies yt-player-worship/ to yt-player-kids/
-```
 
 ### Batch Operations
 
@@ -243,10 +230,13 @@ If upgrading from the single-file setup:
    cp -r obs-scripts obs-scripts-backup
    ```
 
-2. **Run migration script**
-   ```bash
-   python migrate_to_folders.py
-   ```
+2. **Manual migration steps**
+   - Create `yt-player-main/` directory
+   - Move `ytfast.py` to `yt-player-main/ytplay.py`
+   - Move `ytfast_modules/` to `yt-player-main/ytplay_modules/`
+   - Move cache directory to `yt-player-main/cache/`
+   - Update imports in all Python files
+   - Update OBS to load from new location
 
 3. **Update OBS script paths**
    - Remove old script references
@@ -286,7 +276,7 @@ The folder-based architecture provides true isolation between instances while ma
 
 Key advantages:
 - **Zero shared state** between instances
-- **Simple setup** with helper scripts
+- **Simple setup** with batch file
 - **Clear organization** of files
 - **Independent updates** and testing
 - **Flexible naming** for any use case
