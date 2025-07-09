@@ -3,14 +3,15 @@
 ## Overview
 This document explains the relationship between all documentation files and the new modular code structure.
 
-## Code Architecture (v3.0+)
+## Code Architecture (v4.0+)
 
 ### Main Script
-- **ytfast.py** - Minimal main script containing only OBS interface functions
+- **ytplay.py** - Minimal main script containing only OBS interface functions (template instance)
+- Scripts can be renamed for multiple instances (e.g., `worship.py`, `music.py`)
 
-### Module Structure (`ytfast_modules/`)
-- **__init__.py** - Package marker
-- **config.py** - All configuration constants and settings
+### Module Structure (`{scriptname}_modules/`)
+- **__init__.py** - Package marker for Python imports
+- **config.py** - All configuration constants with dynamic script detection
 - **logger.py** - Thread-aware logging system with file output
 - **state.py** - Thread-safe global state management
 - **utils.py** - Shared utility functions
@@ -22,15 +23,22 @@ This document explains the relationship between all documentation files and the 
 - **gemini_metadata.py** - Google Gemini AI integration with Google Search grounding
 - **normalize.py** - Audio normalization with FFmpeg
 - **playback.py** - Playback control and random selection
+- **playback_controller.py** - Advanced playback state management
+- **media_control.py** - OBS media source control
+- **title_manager.py** - Text source title updates
+- **opacity_control.py** - Title fade effects
 - **scene.py** - Scene management and OBS event handling
 - **reprocess.py** - Automatic retry system for failed Gemini extractions
+- **state_handlers.py** - Complex state change handlers
+- **video_selector.py** - Random video selection logic
 
-### Multi-Instance Support
-When the script is renamed (e.g., `music.py`), the module folder automatically becomes `music_modules/`. This allows multiple independent instances with separate:
-- Module folders
-- Cache directories
-- Settings
-- Playlists
+### Multi-Instance Support (v4.0+)
+The script uses a **folder-based architecture** with dynamic imports:
+- Each instance lives in its own folder (e.g., `yt-player-worship/`)
+- Script name determines module folder: `worship.py` → `worship_modules/`
+- All imports are relative within modules
+- Complete isolation between instances
+- Use `create_new_ytplayer.bat` for easy instance creation
 
 ## Documentation Hierarchy
 
@@ -39,6 +47,10 @@ When the script is renamed (e.g., `music.py`), the module folder automatically b
 2. **02-requirements.md** - Authoritative functional specification
 3. **03-obs_api.md** - OBS-specific constraints and rules
 4. **04-guidelines.md** - Coding style, logging guidelines, and development workflow
+5. **12-playback-modes.md** - Detailed playback mode documentation
+6. **FOLDER_BASED_INSTANCES.md** - Multi-instance architecture guide
+7. **nested-scene-playback.md** - Nested scene support documentation
+8. **nested-scene-update-summary.md** - Technical details of nested scene implementation
 
 ### Implementation Phases (`/phases/`)
 
@@ -78,15 +90,16 @@ When the script is renamed (e.g., `music.py`), the module folder automatically b
 - All modules use the shared logger from `logger.py`
 - Heavy processing happens in background threads
 - OBS API calls only on main thread
+- All imports within modules are relative (e.g., `from .logger import log`)
 
 ### Metadata System (v3.0+)
 The script uses a simplified metadata extraction system:
-1. **Google Gemini AI** (Primary - Required)
-   - Uses Gemini 2.5 Flash with Google Search grounding
+1. **Google Gemini AI** (Primary - Optional)
+   - Uses Gemini 1.5 Flash with Google Search grounding
    - Handles complex title patterns intelligently
    - Failed extractions marked with `_gf` suffix
-2. **Smart Title Parser** (Fallback)
-   - Activates when Gemini fails or is unavailable
+2. **Smart Title Parser** (Fallback - Always Available)
+   - Activates when Gemini fails or is not configured
    - Handles common YouTube title formats
 3. **Automatic Retry**
    - Videos with `_gf` marker are retried on startup
@@ -94,9 +107,9 @@ The script uses a simplified metadata extraction system:
 
 ### Version Management
 - Version constant in `config.py`
-- Current version: 3.0.12
+- Current version: 4.0.7 (Multi-instance support)
 - Each code change increments the version
-- **MAJOR**: Significant changes (e.g., v3.0 for Gemini-only)
+- **MAJOR**: Significant changes (e.g., v4.0 for folder-based architecture)
 - **MINOR**: New features, phase implementations
 - **PATCH**: Bug fixes, minor changes
 
@@ -107,23 +120,31 @@ The script uses a simplified metadata extraction system:
 - Modules reference each other as needed
 
 ## Key Rules
-1. Main script (`ytfast.py`) contains minimal code
-2. All functionality in modules under `<scriptname>_modules/`
+1. Main script (e.g., `ytplay.py`) contains minimal code
+2. All functionality in modules under `{scriptname}_modules/`
 3. All heavy work in background threads
 4. OBS API calls only on main thread
 5. Increment version with every code output
 6. Test before commit
 7. Follow PEP-8 style
 8. Use thread-aware logging
+9. All module imports are relative
+10. Each instance is completely isolated
 
-## Current Implementation Status (v3.0.12)
+## Current Implementation Status (v4.0.7)
 The implementation includes:
-- ✅ Phase 1-4: Foundation and video downloading
-- ✅ Phase 5: Gemini metadata (primary source)
-- ✅ Phase 6: Title parser (fallback)
-- ✅ Phase 7-10: Universal cleaning, normalization, playback, scene management
-- ✅ Phase 11-12: Polish and file-based logging
+- ✅ All phases 1-12 complete
+- ✅ Folder-based multi-instance architecture
+- ✅ Dynamic script name detection
+- ✅ Relative imports throughout
+- ✅ Complete isolation between instances
+- ✅ Batch file for easy instance creation
+- ✅ Gemini metadata (optional)
+- ✅ Title parser fallback (always available)
 - ✅ Automatic retry system for failed Gemini extractions
-- ✅ Simplified metadata pipeline with single primary source
+- ✅ Three playback modes (Continuous, Single, Loop)
+- ✅ Audio-only mode option
+- ✅ Nested scene support
+- ✅ Comprehensive logging system
 
 All videos are processed through: download → Gemini/parser → universal cleaning → normalization → playback.
