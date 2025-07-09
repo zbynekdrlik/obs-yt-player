@@ -4,8 +4,9 @@
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
 - [x] Fixed import error "attempted relative import with no known parent package" (v4.0.5)
 - [x] Fixed syntax error in utils.py - restored double backslash for proper string literal
+- [x] Fixed gemini_metadata.py - removed external library dependency (google.generativeai)
 - [x] Changed main script to use dynamic package imports with importlib
-- [ ] **READY FOR TESTING** - Import system completely redesigned for proper multi-instance support
+- [ ] **READY FOR TESTING** - All import and dependency issues resolved
 
 ## Summary of Changes:
 
@@ -37,6 +38,7 @@
 - **v4.0.4**: ACTUALLY fixed ALL imports to use relative imports in all modules
 - **v4.0.5**: Fixed "attempted relative import with no known parent package" error by redesigning import system
 - **Syntax Fix**: Fixed string literal syntax error in utils.py (corrupted during conversion)
+- **Dependency Fix**: Removed accidental google.generativeai dependency in gemini_metadata.py
 
 ## Import System Redesign (v4.0.5):
 The main script now:
@@ -50,6 +52,9 @@ The main script now:
 - **utils.py syntax error**: Fixed corrupted string literal on line 33
   - Was: `invalid_chars = '<>:"|?*\'` (unclosed string)
   - Fixed to: `invalid_chars = '<>:"|?*\\'` (proper double backslash)
+- **gemini_metadata.py dependency**: Removed google.generativeai import
+  - Reverted to use standard library urllib (matching main branch)
+  - No external dependencies required
 
 ## Testing Checklist:
 - [ ] Test main template (ytplay.py) loads without import errors
@@ -71,12 +76,17 @@ The main script now:
 - Fixed ALL imports to use relative imports for true multi-instance isolation
 - Redesigned import system using importlib for proper package loading
 - Fixed syntax error introduced during conversion
+- Removed external library dependencies
 
 ## PR Status:
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: **Import system redesigned and syntax errors fixed, ready for testing**
-- Changes: Fixed critical import error and syntax error that prevented script from loading in OBS
+- Status: **All issues fixed, ready for testing**
+- Changes: Fixed import errors, syntax errors, and removed external dependencies
 
 ## Critical Note:
-Version 4.0.5 redesigns the import system to properly support multi-instance operation. The main script now uses `importlib` to dynamically import the modules as a proper Python package, which allows the relative imports within modules to work correctly. Also fixed a syntax error in utils.py that was introduced during the conversion process.
+Version 4.0.5 redesigns the import system to properly support multi-instance operation. The main script now uses `importlib` to dynamically import the modules as a proper Python package. Also fixed:
+1. Syntax error in utils.py (string literal)
+2. External dependency on google.generativeai (reverted to urllib)
+
+The script now uses only standard Python libraries and should load properly in OBS.
