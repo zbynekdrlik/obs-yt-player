@@ -6,59 +6,80 @@
 - [x] Fixed __init__.py with proper imports for package functionality
 - [x] Removed all duplicate files from root ytfast_modules/
 - [x] Removed migration script (not needed for v4.0.0)
-- [x] Repository structure is now clean and ready for testing
-- [ ] Need to test basic functionality
-- [ ] Update PR #29 with final status and merge
+- [x] Repository structure is clean
+- [ ] **NEW GOAL**: Rename ytfast → ytplay throughout codebase
 
-## Migration Cleanup Complete! ✅
+## NEW GOAL FOR NEXT THREAD: Rename to ytplay
 
-### Final Cleanup Actions
-1. **Fixed critical __init__.py** - Restored proper imports so the package works correctly
-2. **Removed all duplicate files** from root ytfast_modules/
-3. **Removed migrate_to_folders.py** - Not needed for v4.0.0 release
-4. **Verified clean structure** - No more duplicates or unnecessary files
+### What Needs to Be Done
+1. **Rename main script**: `ytfast.py` → `ytplay.py`
+2. **Rename modules folder**: `ytfast_modules/` → `ytplay_modules/`
+3. **Update all imports** throughout the codebase to use `ytplay_modules`
+4. **Update all references** in:
+   - Documentation (README.md, docs/)
+   - Helper scripts (setup_new_instance.py)
+   - Configuration files
+   - Any hardcoded strings referencing "ytfast"
 
-### Final Clean Structure
+### Current Structure (to be renamed)
 ```
 obs-yt-player/
-├── yt-player-main/          # Main instance (default)
-│   ├── ytfast.py           # Main script
-│   └── ytfast_modules/     # All 21 module files with proper imports
-├── docs/                   # Documentation
-├── phases/                 # Development phases
-├── setup_new_instance.py   # Helper for creating new instances
-└── README.md              # Updated for folder structure
+├── yt-player-main/
+│   ├── ytfast.py           # → ytplay.py
+│   └── ytfast_modules/     # → ytplay_modules/
+├── docs/
+├── phases/
+├── setup_new_instance.py
+└── README.md
 ```
 
-## Next Steps
+### Target Structure
+```
+obs-yt-player/
+├── yt-player-main/
+│   ├── ytplay.py           # Renamed from ytfast.py
+│   └── ytplay_modules/     # Renamed from ytfast_modules/
+├── docs/
+├── phases/
+├── setup_new_instance.py
+└── README.md
+```
 
-1. **Test Basic Functionality**
-   - Run ytfast.py from yt-player-main/ in OBS
-   - Verify imports work correctly
-   - Check that basic operations succeed
+## Work Completed This Thread
+1. ✅ Cleaned up duplicate files from migration
+2. ✅ Fixed critical __init__.py with proper imports
+3. ✅ Removed migration script
+4. ✅ Repository structure is clean and ready
 
-2. **Update PR #29 and Merge**
-   - PR is ready for final testing and merge
-   - After merge, tag as v4.0.0
+## Next Thread Tasks
+1. **Rename files**:
+   - `ytfast.py` → `ytplay.py`
+   - `ytfast_modules/` → `ytplay_modules/`
 
-3. **Release Notes for v4.0.0**
-   - Major change: Folder-based multi-instance architecture
-   - Breaking change: Script location moved to yt-player-main/
-   - Users upgrading from v3.x need to reconfigure script path in OBS
+2. **Update imports in all Python files**:
+   - Change `from ytfast_modules` → `from ytplay_modules`
+   - Change `import ytfast_modules` → `import ytplay_modules`
 
-## Testing Checklist
-- [ ] Script loads in OBS without errors
-- [ ] Imports work from new module location
-- [ ] Basic playlist sync works
-- [ ] setup_new_instance.py creates new instances correctly
-- [ ] No import errors or path issues
+3. **Update documentation**:
+   - README.md
+   - All docs/ files
+   - setup_new_instance.py
+   - Any other references
+
+4. **Update configuration**:
+   - SCRIPT_NAME in config.py
+   - Any logging references
+   - Any hardcoded "ytfast" strings
+
+5. **Test thoroughly** after rename
 
 ## Version for Release
-**v4.0.0** - Major architecture change to folder-based multi-instance support
+**v4.0.0** - Major changes:
+- Folder-based multi-instance architecture
+- Renamed from ytfast to ytplay
 
 ## Critical Information
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- All files migrated and cleaned up
-- Migration script removed (clean v4.0.0 approach)
-- Ready for testing and merge
+- Current state: Clean structure, ready for rename
+- Next goal: Complete rename to ytplay
