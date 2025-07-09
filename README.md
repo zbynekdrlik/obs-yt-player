@@ -2,7 +2,7 @@
 
 A Windows-only OBS Studio Python script that syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), and plays them with multiple playback modes. Features optional AI-powered metadata extraction using Google Gemini for superior artist/song detection.
 
-## 🆕 Multi-Instance Support (v4.0.7+)
+## 🆕 Multi-Instance Support (v4.1.0+)
 
 The player now supports **multiple independent instances** through a clean folder-based architecture. Each instance runs completely isolated with its own playlist, cache, and settings.
 
@@ -12,6 +12,8 @@ create_new_ytplayer.bat worship
 ```
 
 This creates a new instance in seconds! See [Multi-Instance Setup](#multi-instance-setup) for details.
+
+**⚠️ BREAKING CHANGE in v4.1.0**: Source names are now prefixed with the instance name to avoid OBS conflicts. See [Migration Guide](#migration-from-v40x-to-v41x) below.
 
 ## Key Features
 
@@ -72,14 +74,38 @@ The script name determines the scene name:
 - Script: `ytplay.py` → Scene: `ytplay`
 - Script: `worship.py` → Scene: `worship`
 
-Create required OBS sources in your scene:
+Create required OBS sources in your scene (v4.1.0+ naming):
 
-1. **Media Source** named `video`
+1. **Media Source** named `[instance]_video`
+   - For `ytplay.py`: name it `ytplay_video`
+   - For `worship.py`: name it `worship_video`
    - Uncheck "Local File"
    - Leave other settings default
 
-2. **Text Source** named `title` (optional)
+2. **Text Source** named `[instance]_title` (optional)
+   - For `ytplay.py`: name it `ytplay_title`
+   - For `worship.py`: name it `worship_title`
    - Displays current song info
+
+## Migration from v4.0.x to v4.1.x
+
+Version 4.1.0 introduces unique source names to support multiple instances properly. You need to update your OBS scenes:
+
+### Old naming (v4.0.x):
+- Media Source: `video`
+- Text Source: `title`
+
+### New naming (v4.1.0+):
+- Media Source: `[instance]_video`
+- Text Source: `[instance]_title`
+
+### Migration Steps:
+1. Update to v4.1.0
+2. In each OBS scene, rename your sources:
+   - `video` → `ytplay_video` (for main instance)
+   - `title` → `ytplay_title` (for main instance)
+   - For other instances: use their script name prefix
+3. Test that videos play correctly
 
 ## Usage
 
@@ -131,11 +157,18 @@ obs-yt-player/
 3. Cleans the cache directory
 4. Shows setup instructions
 
+### Instance Source Naming (v4.1.0+)
+Each instance automatically uses unique source names:
+- `ytplay` instance: `ytplay_video` and `ytplay_title`
+- `worship` instance: `worship_video` and `worship_title`
+- `kids` instance: `kids_video` and `kids_title`
+
 ### Benefits
 - ✅ **Complete isolation** between instances
 - ✅ **Simple setup** - one command creates everything
 - ✅ **No manual configuration** - works immediately
 - ✅ **Clear organization** - one folder per player
+- ✅ **No source conflicts** - unique names per instance (v4.1.0+)
 
 ### Example Use Cases
 
@@ -211,10 +244,16 @@ The player detects nested scenes automatically and continues playback seamlessly
 ## Troubleshooting
 
 ### Videos Not Playing?
-- Check Media Source is named exactly `video`
+- Check Media Source is named exactly `[instance]_video` (e.g., `ytplay_video`)
 - Ensure scene containing sources is active
 - Verify playlist URL is accessible
 - Check Script Log for errors
+
+### Migration Issues (v4.0.x → v4.1.0)?
+- Make sure to rename sources in OBS scenes
+- Old: `video` → New: `ytplay_video`
+- Old: `title` → New: `ytplay_title`
+- Each instance needs its own prefix
 
 ### High CPU Usage?
 - Normal during initial sync/download
@@ -222,7 +261,7 @@ The player detects nested scenes automatically and continues playback seamlessly
 - Processing runs in background threads
 
 ### Metadata Not Showing?
-- Text source must be named exactly `title`
+- Text source must be named exactly `[instance]_title`
 - Gemini API key improves accuracy significantly
 - Files marked with `_gf` will retry Gemini on next startup
 - Check logs for metadata extraction details
@@ -230,12 +269,13 @@ The player detects nested scenes automatically and continues playback seamlessly
 ### Multi-Instance Problems?
 - Ensure each instance is in its own folder
 - Scene names must match script names
+- Source names must use instance prefix (v4.1.0+)
 - Use batch file for reliable setup
 - Check logs for import errors
 
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
-- Source names must match exactly
+- Source names must match exactly (with prefix)
 - Check logs for scene detection info
 
 ### Download Errors?
@@ -264,6 +304,12 @@ obs-yt-player/
 ```
 
 ## Recent Updates
+
+### v4.1.0 - Unique Source Names
+- **BREAKING**: Source names now prefixed with instance name
+- Fixes OBS limitation where sources must have globally unique names
+- Enables true multi-instance support without conflicts
+- Automatic detection based on script name
 
 ### v4.0.7 - Multi-Instance Ready
 - Improved batch file (no manual import updates needed)
