@@ -5,6 +5,7 @@
 - [x] Fixed import error "attempted relative import with no known parent package" (v4.0.5)
 - [x] Fixed syntax error in utils.py - restored double backslash for proper string literal
 - [x] Fixed gemini_metadata.py - removed external library dependency (google.generativeai)
+- [x] Fixed scene.py - removed non-existent update_window_title import
 - [x] Changed main script to use dynamic package imports with importlib
 - [ ] **READY FOR TESTING** - All import and dependency issues resolved
 
@@ -36,9 +37,11 @@
 - **v4.0.2**: Claims to fix hardcoded imports (but didn't actually fix them)
 - **v4.0.3**: Claims to fix critical missed import in playback.py (but didn't actually fix them)
 - **v4.0.4**: ACTUALLY fixed ALL imports to use relative imports in all modules
-- **v4.0.5**: Fixed "attempted relative import with no known parent package" error by redesigning import system
-- **Syntax Fix**: Fixed string literal syntax error in utils.py (corrupted during conversion)
-- **Dependency Fix**: Removed accidental google.generativeai dependency in gemini_metadata.py
+- **v4.0.5**: Fixed multiple import and dependency issues:
+  - "attempted relative import with no known parent package" error
+  - Syntax error in utils.py
+  - External dependency on google.generativeai
+  - Non-existent update_window_title import
 
 ## Import System Redesign (v4.0.5):
 The main script now:
@@ -55,6 +58,9 @@ The main script now:
 - **gemini_metadata.py dependency**: Removed google.generativeai import
   - Reverted to use standard library urllib (matching main branch)
   - No external dependencies required
+- **scene.py import error**: Removed update_window_title import
+  - Function doesn't exist in the codebase
+  - Was an error introduced during conversion
 
 ## Testing Checklist:
 - [ ] Test main template (ytplay.py) loads without import errors
@@ -75,18 +81,18 @@ The main script now:
 - Simplified setup process
 - Fixed ALL imports to use relative imports for true multi-instance isolation
 - Redesigned import system using importlib for proper package loading
-- Fixed syntax error introduced during conversion
-- Removed external library dependencies
+- Fixed multiple conversion errors (syntax, dependencies, imports)
 
 ## PR Status:
 - Branch: `feature/folder-based-instances`
 - PR: #29
 - Status: **All issues fixed, ready for testing**
-- Changes: Fixed import errors, syntax errors, and removed external dependencies
+- Changes: Fixed all import errors, syntax errors, and removed external dependencies
 
 ## Critical Note:
 Version 4.0.5 redesigns the import system to properly support multi-instance operation. The main script now uses `importlib` to dynamically import the modules as a proper Python package. Also fixed:
 1. Syntax error in utils.py (string literal)
 2. External dependency on google.generativeai (reverted to urllib)
+3. Non-existent update_window_title import in scene.py
 
 The script now uses only standard Python libraries and should load properly in OBS.
