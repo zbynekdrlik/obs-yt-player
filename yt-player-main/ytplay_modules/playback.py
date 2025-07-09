@@ -7,7 +7,7 @@ This module now acts as a facade that imports functionality from specialized mod
 # This maintains backward compatibility with existing code
 
 # From playback_controller
-from ytplay_modules.playback_controller import (
+from .playback_controller import (
     start_playback_controller,
     stop_playback_controller,
     start_next_video,
@@ -18,7 +18,7 @@ from ytplay_modules.playback_controller import (
 )
 
 # From media_control  
-from ytplay_modules.media_control import (
+from .media_control import (
     get_current_video_from_media_source,
     force_disable_media_loop,
     get_media_state,
@@ -30,7 +30,7 @@ from ytplay_modules.media_control import (
 )
 
 # From opacity_control
-from ytplay_modules.opacity_control import (
+from .opacity_control import (
     ensure_opacity_filter,
     update_text_opacity,
     fade_in_text,
@@ -38,7 +38,7 @@ from ytplay_modules.opacity_control import (
 )
 
 # From title_manager
-from ytplay_modules.title_manager import (
+from .title_manager import (
     schedule_title_clear,
     schedule_title_show,
     cancel_title_timers,
@@ -46,12 +46,12 @@ from ytplay_modules.title_manager import (
 )
 
 # From video_selector
-from ytplay_modules.video_selector import (
+from .video_selector import (
     select_next_video
 )
 
 # From state_handlers
-from ytplay_modules.state_handlers import (
+from .state_handlers import (
     handle_playing_state,
     handle_ended_state,
     handle_stopped_state,
