@@ -16,9 +16,9 @@ if "%~1"=="" (
     echo.
     echo This will create:
     echo   - Folder: yt-player-worship
-    echo   - Script: ytworship.py  
-    echo   - Module: ytworship_modules
-    echo   - Scene:  ytworship
+    echo   - Script: worship.py  
+    echo   - Module: worship_modules
+    echo   - Scene:  worship
     echo.
     exit /b 1
 )
@@ -27,9 +27,9 @@ set INSTANCE_NAME=%~1
 set SOURCE_DIR=yt-player-main
 set TARGET_DIR=yt-player-%INSTANCE_NAME%
 set SOURCE_SCRIPT=ytplay.py
-set TARGET_SCRIPT=yt%INSTANCE_NAME%.py
+set TARGET_SCRIPT=%INSTANCE_NAME%.py
 set SOURCE_MODULES=ytplay_modules
-set TARGET_MODULES=yt%INSTANCE_NAME%_modules
+set TARGET_MODULES=%INSTANCE_NAME%_modules
 
 :: Validate instance name (alphanumeric and underscore only)
 echo %INSTANCE_NAME%| findstr /r "^[a-zA-Z0-9_]*$" >nul
@@ -98,25 +98,6 @@ if exist "%TARGET_DIR%\%SOURCE_MODULES%" (
     echo WARNING: Modules folder %SOURCE_MODULES% not found
 )
 
-:: Update imports in all Python files
-echo.
-echo Updating Python imports...
-set UPDATE_COUNT=0
-
-:: Update main script
-if exist "%TARGET_DIR%\%TARGET_SCRIPT%" (
-    powershell -Command "(Get-Content '%TARGET_DIR%\%TARGET_SCRIPT%') -replace 'from %SOURCE_MODULES%', 'from %TARGET_MODULES%' -replace 'import %SOURCE_MODULES%', 'import %TARGET_MODULES%' | Set-Content '%TARGET_DIR%\%TARGET_SCRIPT%'"
-    set /a UPDATE_COUNT+=1
-)
-
-:: Update all module files
-for /r "%TARGET_DIR%\%TARGET_MODULES%" %%f in (*.py) do (
-    powershell -Command "(Get-Content '%%f') -replace 'from %SOURCE_MODULES%', 'from %TARGET_MODULES%' -replace 'import %SOURCE_MODULES%', 'import %TARGET_MODULES%' | Set-Content '%%f'"
-    set /a UPDATE_COUNT+=1
-)
-
-echo [OK] Updated !UPDATE_COUNT! Python files
-
 :: Clean cache directory
 if exist "%TARGET_DIR%\cache" (
     echo.
@@ -135,12 +116,12 @@ echo Configuration Summary:
 echo   Directory:    %TARGET_DIR%\
 echo   Main Script:  %TARGET_SCRIPT%
 echo   Modules:      %TARGET_MODULES%\
-echo   OBS Scene:    yt%INSTANCE_NAME%
+echo   OBS Scene:    %INSTANCE_NAME%
 echo.
 echo Next Steps:
 echo   1. In OBS Studio: Tools -^> Scripts -^> Add Script (+)
 echo   2. Navigate to: %CD%\%TARGET_DIR%\%TARGET_SCRIPT%
-echo   3. Create a scene named: yt%INSTANCE_NAME%
+echo   3. Create a scene named: %INSTANCE_NAME%
 echo   4. Add sources to the scene:
 echo      - Media Source named "video"
 echo      - Text Source named "title" (optional)
