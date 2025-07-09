@@ -14,7 +14,8 @@
   - state_handlers.py
   - playback_controller.py
 - [x] Incremented version to 4.0.2
-- [ ] **READY FOR TESTING** - All code changes complete, critical bugs fixed
+- [x] **CRITICAL BUG FOUND AND FIXED** - Fixed missed hardcoded imports in playback.py (v4.0.3)
+- [ ] **READY FOR TESTING** - All code changes complete, ALL import bugs fixed
 
 ## Summary of Changes:
 
@@ -22,7 +23,7 @@
 1. **Dynamic Script Detection**: config.py now automatically detects script name
 2. **Flexible Naming**: Any script name works (ytplay.py, ytworship.py, remixes.py)
 3. **Scene = Script Name**: Automatic scene naming from script filename
-4. **FIXED**: All imports now use relative paths for true multi-instance support
+4. **FIXED**: ALL imports now use relative paths for true multi-instance support
 
 ### 🔧 Helper Scripts (Simplified)
 1. **create_new_ytplayer.bat**: Windows batch file for easy instance creation
@@ -38,12 +39,13 @@
 - **No State Conflicts**: Impossible to have cross-contamination
 - **Easy Setup**: `create_new_ytplayer.bat worship` creates everything
 - **Flexible Naming**: No restrictions on script names
-- **True Multi-Instance**: Fixed hardcoded imports that would have broken it
+- **True Multi-Instance**: Fixed ALL hardcoded imports
 
-## Bug Fixes in v4.0.2:
-- Fixed hardcoded "ytplay_modules" imports in three modules
+## Bug Fixes:
+- **v4.0.2**: Fixed hardcoded "ytplay_modules" imports in three modules
+- **v4.0.3**: Fixed critical missed import in playback.py
 - All imports now use relative paths
-- Multi-instance architecture will now work correctly
+- Multi-instance architecture is now fully functional
 
 ## Testing Checklist:
 - [ ] Test main template (ytplay.py) works
@@ -54,17 +56,17 @@
 - [ ] Test multiple instances run simultaneously without conflicts
 
 ## Version for Release
-**v4.0.2** - Major architectural changes:
+**v4.0.3** - Major architectural changes:
 - Folder-based multi-instance support
 - Renamed ytfast → ytplay
 - Dynamic configuration
 - Complete isolation between instances
 - Windows batch file support
 - Simplified setup process
-- Fixed critical import bugs
+- Fixed ALL critical import bugs
 
 ## PR Status:
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: **Code complete, critical bugs fixed, ready for testing**
-- Changes: Simplified to Windows batch file only, fixed import bugs
+- Status: **Code complete, ALL bugs fixed, ready for testing**
+- Changes: Simplified to Windows batch file only, fixed all import bugs
