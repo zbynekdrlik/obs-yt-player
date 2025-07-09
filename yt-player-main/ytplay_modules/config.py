@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.1"  # Patch: Fixed dynamic script detection
+SCRIPT_VERSION = "4.0.2"  # Patch: Fixed hardcoded imports for multi-instance support
 
 # Dynamic script detection - works with any script name
 # Look for .py file in parent directory that's not __init__.py
