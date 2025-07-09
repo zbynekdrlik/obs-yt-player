@@ -1,221 +1,252 @@
-"""
-Tool management for OBS YouTube Player (Windows-only).
-Downloads and verifies yt-dlp and FFmpeg.
+"""Tool management for OBS YouTube Player.
+Handles downloading and verification of required tools (yt-dlp, ffmpeg).
 """
 
 import os
 import time
-import subprocess
-import urllib.request
 import threading
+import subprocess
+import zipfile
+import requests
 from pathlib import Path
 
-from config import (
-    YTDLP_FILENAME, FFMPEG_FILENAME,
-    YTDLP_URL, FFMPEG_URL,
-    TOOLS_CHECK_INTERVAL
+from .logger import log
+from .state import (
+    is_tools_ready, set_tools_ready,
+    should_stop_threads, is_tools_logged_waiting,
+    set_tools_logged_waiting, tools_thread
 )
-from logger import log
-from state import (
-    tools_thread, set_tools_ready, is_tools_logged_waiting, 
-    set_tools_logged_waiting, should_stop_threads
+from .config import (
+    TOOLS_CHECK_INTERVAL, YTDLP_URL, FFMPEG_URL,
+    YTDLP_FILENAME, FFMPEG_FILENAME, TOOLS_SUBDIR
 )
-from utils import get_ytdlp_path, get_ffmpeg_path, get_tools_path, ensure_cache_directory
 
-def download_file(url, destination, description="file"):
-    """Download a file from URL to destination with progress logging."""
+# Import utils functions
+from .utils import get_tools_path, get_ytdlp_path, get_ffmpeg_path, ensure_cache_directory
+
+def verify_tool(tool_path, version_arg="--version"):
+    """Verify a tool exists and is executable."""
+    if not os.path.exists(tool_path):
+        return False
+    
     try:
-        log(f"Downloading {description} from {url}")
+        # Test if tool is executable
+        result = subprocess.run(
+            [tool_path, version_arg],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+def download_file(url, dest_path, description="file"):
+    """Download a file with progress reporting."""
+    try:
+        log(f"Downloading {description}...")
+        response = requests.get(url, stream=True, timeout=30)
+        response.raise_for_status()
         
-        # Create parent directory if needed
-        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded = 0
+        last_progress = 0
         
-        # Track which percentages we've already logged
-        logged_percentages = set()
+        # Ensure parent directory exists
+        Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
         
-        # Download with progress
-        def download_progress(block_num, block_size, total_size):
-            if total_size > 0:
-                downloaded = block_num * block_size
-                percent = min(100, (downloaded / total_size) * 100)
+        with open(dest_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if should_stop_threads():
+                    return False
+                f.write(chunk)
+                downloaded += len(chunk)
                 
-                # Log at 0%, 25%, 50%, 75%, and 100% milestones only
-                milestone = None
-                if percent >= 100 and 100 not in logged_percentages:
-                    milestone = 100
-                elif percent >= 75 and 75 not in logged_percentages:
-                    milestone = 75
-                elif percent >= 50 and 50 not in logged_percentages:
-                    milestone = 50
-                elif percent >= 25 and 25 not in logged_percentages:
-                    milestone = 25
-                elif percent >= 0 and 0 not in logged_percentages:
-                    milestone = 0
-                
-                if milestone is not None:
-                    log(f"Downloading {description}: {milestone}%")
-                    logged_percentages.add(milestone)
+                # Log progress every 10%
+                if total_size > 0:
+                    progress = int((downloaded / total_size) * 100)
+                    if progress >= last_progress + 10:
+                        log(f"{description}: {progress}% complete")
+                        last_progress = progress
         
-        urllib.request.urlretrieve(url, destination, reporthook=download_progress)
-        log(f"Successfully downloaded {description}")
+        log(f"{description} downloaded successfully")
         return True
-        
     except Exception as e:
         log(f"Failed to download {description}: {e}")
         return False
 
-def extract_ffmpeg(archive_path, tools_dir):
-    """Extract FFmpeg from downloaded zip archive (Windows)."""
+def extract_ffmpeg_windows():
+    """Extract FFmpeg from downloaded zip."""
     try:
-        import zipfile
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-            # Find ffmpeg.exe in the archive
+        tools_path = get_tools_path()
+        zip_path = os.path.join(tools_path, "ffmpeg.zip")
+        
+        if not os.path.exists(zip_path):
+            return False
+        
+        log("Extracting FFmpeg...")
+        
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Find ffmpeg.exe in the zip
+            ffmpeg_found = False
             for file_info in zip_ref.filelist:
                 if file_info.filename.endswith('ffmpeg.exe'):
-                    # Extract to tools directory
-                    target_path = os.path.join(tools_dir, FFMPEG_FILENAME)
+                    # Extract just ffmpeg.exe
+                    target_path = os.path.join(tools_path, FFMPEG_FILENAME)
                     with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
                         target.write(source.read())
-                    log("Extracted ffmpeg.exe from archive")
-                    return True
+                    ffmpeg_found = True
+                    break
+            
+            if not ffmpeg_found:
+                log("FFmpeg.exe not found in zip")
+                return False
         
-        log("ffmpeg.exe not found in archive")
-        return False
+        # Clean up zip file
+        try:
+            os.remove(zip_path)
+        except Exception:
+            pass
+        
+        log("FFmpeg extracted successfully")
+        return True
         
     except Exception as e:
         log(f"Failed to extract FFmpeg: {e}")
         return False
 
-def verify_tool(tool_path, test_args):
-    """Verify that a tool works by running it with test arguments."""
-    try:
-        # Hide console window on Windows
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startupinfo.wShowWindow = subprocess.SW_HIDE
+def download_ytdlp():
+    """Download yt-dlp executable."""
+    ytdlp_path = get_ytdlp_path()
+    
+    # Check if already exists and works
+    if verify_tool(ytdlp_path):
+        return True
+    
+    # Download yt-dlp
+    return download_file(YTDLP_URL, ytdlp_path, "yt-dlp")
+
+def download_ffmpeg():
+    """Download and extract FFmpeg."""
+    ffmpeg_path = get_ffmpeg_path()
+    
+    # Check if already exists and works
+    if verify_tool(ffmpeg_path):
+        return True
+    
+    # For Windows, download zip and extract
+    if os.name == 'nt':
+        tools_path = get_tools_path()
+        zip_path = os.path.join(tools_path, "ffmpeg.zip")
         
-        # Run tool with test arguments
+        # Download zip
+        if not download_file(FFMPEG_URL, zip_path, "FFmpeg"):
+            return False
+        
+        # Extract ffmpeg.exe
+        if not extract_ffmpeg_windows():
+            return False
+        
+        # Verify it works
+        return verify_tool(ffmpeg_path)
+    
+    # For other platforms, would need different handling
+    log("FFmpeg download not implemented for this platform")
+    return False
+
+def update_ytdlp():
+    """Update yt-dlp to latest version."""
+    ytdlp_path = get_ytdlp_path()
+    
+    if not os.path.exists(ytdlp_path):
+        return False
+    
+    try:
+        log("Updating yt-dlp...")
         result = subprocess.run(
-            [tool_path] + test_args,
+            [ytdlp_path, "-U"],
             capture_output=True,
-            startupinfo=startupinfo,
-            timeout=5
+            text=True,
+            timeout=30
         )
         
-        success = result.returncode == 0
-        if success:
-            log(f"Tool verified: {os.path.basename(tool_path)}")
-        else:
-            log(f"Tool verification failed: {os.path.basename(tool_path)}")
-            
-        return success
-        
-    except Exception as e:
-        log(f"Tool verification error for {tool_path}: {e}")
-        return False
-
-def download_ytdlp(tools_dir):
-    """Download yt-dlp executable for Windows."""
-    ytdlp_path = os.path.join(tools_dir, YTDLP_FILENAME)
-    
-    # Skip if already exists and works
-    if os.path.exists(ytdlp_path) and verify_tool(ytdlp_path, ["--version"]):
-        log("yt-dlp already exists and works")
-        return True
-    
-    # Download Windows version
-    if download_file(YTDLP_URL, ytdlp_path, "yt-dlp"):
-        return True
-    
-    return False
-
-def download_ffmpeg(tools_dir):
-    """Download FFmpeg executable for Windows."""
-    ffmpeg_path = os.path.join(tools_dir, FFMPEG_FILENAME)
-    
-    # Skip if already exists and works
-    if os.path.exists(ffmpeg_path) and verify_tool(ffmpeg_path, ["-version"]):
-        log("FFmpeg already exists and works")
-        return True
-    
-    # Download Windows zip archive
-    archive_path = os.path.join(tools_dir, "ffmpeg_temp.zip")
-    
-    if download_file(FFMPEG_URL, archive_path, "FFmpeg"):
-        # Extract FFmpeg
-        if extract_ffmpeg(archive_path, tools_dir):
-            # Clean up archive
-            try:
-                os.remove(archive_path)
-            except:
-                pass
+        if result.returncode == 0:
+            if "yt-dlp is up to date" in result.stdout:
+                log("yt-dlp is already up to date")
+            else:
+                log("yt-dlp updated successfully")
             return True
-    
-    return False
+        else:
+            log(f"yt-dlp update failed: {result.stderr}")
+            return False
+            
+    except Exception as e:
+        log(f"Failed to update yt-dlp: {e}")
+        return False
 
-def setup_tools():
-    """Download and verify required tools."""
-    # Log waiting message only once
-    if not is_tools_logged_waiting():
-        log("Waiting for tools to be ready. Please be patient, downloading FFmpeg may take several minutes.")
-        set_tools_logged_waiting(True)
-    
-    # Ensure tools directory exists
-    tools_dir = get_tools_path()
-    os.makedirs(tools_dir, exist_ok=True)
-    
-    # Download all tools
-    ytdlp_success = download_ytdlp(tools_dir)
-    if not ytdlp_success:
-        log("Failed to setup yt-dlp, will retry in 60 seconds")
+def check_and_setup_tools():
+    """Check for required tools and download if needed."""
+    # Ensure cache directory exists
+    if not ensure_cache_directory():
         return False
     
-    ffmpeg_success = download_ffmpeg(tools_dir)
-    if not ffmpeg_success:
-        log("Failed to setup FFmpeg, will retry in 60 seconds")
-        return False
+    tools_ready = True
     
-    # All tools downloaded and verified successfully
-    set_tools_ready(True)
-    log("All tools are ready and verified!")
-    return True
+    # Check yt-dlp
+    ytdlp_path = get_ytdlp_path()
+    if not verify_tool(ytdlp_path):
+        log("yt-dlp not found, downloading...")
+        if not download_ytdlp():
+            tools_ready = False
+        else:
+            # Try to update after download
+            update_ytdlp()
+    else:
+        log("yt-dlp found and working")
+        # Try to update existing yt-dlp
+        update_ytdlp()
+    
+    # Check FFmpeg
+    ffmpeg_path = get_ffmpeg_path()
+    if not verify_tool(ffmpeg_path):
+        log("FFmpeg not found, downloading...")
+        if not download_ffmpeg():
+            tools_ready = False
+    else:
+        log("FFmpeg found and working")
+    
+    return tools_ready
 
-def tools_setup_worker():
-    """Background thread for setting up tools."""
+def tools_check_thread():
+    """Background thread to check and download required tools."""
+    log("[Tools Thread] Starting tools check...")
+    
     while not should_stop_threads():
         try:
-            # Ensure cache directory exists
-            if not ensure_cache_directory():
-                time.sleep(TOOLS_CHECK_INTERVAL)
-                continue
-            
-            # Try to setup tools
-            if setup_tools():
-                # Tools are ready, trigger startup sync
-                log("Tools setup complete")
-                # Import here to avoid circular import
-                from playlist import trigger_startup_sync
-                trigger_startup_sync()
+            if check_and_setup_tools():
+                log("[Tools Thread] All tools ready!")
+                set_tools_ready(True)
                 break
-            
-            # Wait before retry
-            log(f"Retrying tool setup in {TOOLS_CHECK_INTERVAL} seconds...")
-            
-            # Sleep in small increments to check stop_threads
-            for _ in range(TOOLS_CHECK_INTERVAL):
-                if should_stop_threads():
-                    break
-                time.sleep(1)
+            else:
+                if not is_tools_logged_waiting():
+                    log("[Tools Thread] Some tools missing, will retry...")
+                    set_tools_logged_waiting(True)
+                time.sleep(TOOLS_CHECK_INTERVAL)
                 
         except Exception as e:
-            log(f"Error in tools setup: {e}")
+            log(f"[Tools Thread] Error: {e}")
             time.sleep(TOOLS_CHECK_INTERVAL)
     
-    log("Tools setup thread exiting")
+    log("[Tools Thread] Exiting")
 
 def start_tools_thread():
-    """Start the tools setup thread."""
+    """Start the tools checking thread."""
     global tools_thread
-    import state
-    state.tools_thread = threading.Thread(target=tools_setup_worker, daemon=True)
-    state.tools_thread.start()
+    
+    if tools_thread and tools_thread.is_alive():
+        return
+    
+    from .state import tools_thread as state_tools_thread
+    state_tools_thread = threading.Thread(target=tools_check_thread, name="ToolsThread")
+    state_tools_thread.daemon = True
+    state_tools_thread.start()
