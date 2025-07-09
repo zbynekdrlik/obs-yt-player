@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.0.5"  # Patch: Fixed import system for proper multi-instance support
+SCRIPT_VERSION = "4.0.6"  # Restored scene.py to match main branch functionality
 
 # Dynamic script detection - works with any script name
 # Look for .py file in parent directory that's not __init__.py
