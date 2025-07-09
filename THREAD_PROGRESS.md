@@ -2,76 +2,75 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: COMPLETE - Ready for merge!
-- [ ] Waiting for: User approval to merge PR #30
+- [x] Currently working on: Created update_all_instances.bat script
+- [ ] Waiting for: User testing and approval
 - [ ] Blocked by: None
 
-## 🎉 READY FOR MERGE - v4.1.0
-
-### Implementation Complete ✅
-- Unique source naming implemented and tested
-- User confirmed: "new source naming is working"
-- All documentation updated
-- PR #30 ready for merge
-
 ## Implementation Status
-- Phase: Source Name Redesign
-- Step: COMPLETE
-- Status: TESTED AND WORKING
+- Phase: Feature Implementation - Instance Update Script
+- Step: COMPLETE - Ready for testing
+- Status: IMPLEMENTED_NOT_TESTED
 
-## Version History
-- v4.0.7 → v4.1.0: Implemented unique source names for multi-instance support
+## Feature: Batch Script for Updating All Instances
+
+### What Was Requested:
+- A batch script that updates all instances from main
+- Uses git to update the repository first
+- Updates all existing instances with latest code from template
+
+### What Was Implemented:
+1. **update_all_instances.bat** - Version 1.0.0
+   - Runs `git pull origin main` to update repository
+   - Finds all `yt-player-*` directories
+   - Updates each instance from template (`yt-player-main`)
+   - Preserves cache and configuration
+   - Shows summary of updates/errors
+   
+2. **Documentation Updates:**
+   - Updated README.md with new "Updating All Instances" section
+   - Added script to project structure listing
+   - Clear instructions on usage
+
+### How It Works:
+```cmd
+update_all_instances.bat
+```
+
+The script will:
+1. Update main repository from GitHub
+2. Find all instance directories (yt-player-*)
+3. Skip the template directory
+4. Update each instance's modules and main script
+5. Preserve cache and configuration
+6. Show summary of what was updated
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| config.py | ✅ v4.1.0  | ✅          | ✅                 | ✅                    |
-| All modules | ✅        | ✅          | ✅                 | ✅                    |
-| Documentation | ✅      | N/A         | N/A                | N/A                   |
-
-## Changes Made
-1. **config.py**: 
-   - Updated version to 4.1.0
-   - Changed source naming to use dynamic prefixes:
-     - MEDIA_SOURCE_NAME = f"{SCENE_NAME}_video"
-     - TEXT_SOURCE_NAME = f"{SCENE_NAME}_title"
-   - This ensures unique names like ytplay_video, ytfast_video, etc.
-
-2. **.gitignore**:
-   - Added `yt-player-*/` to protect instance folders from git operations
-
-3. **README.md**:
-   - Added migration guide for v4.0.x → v4.1.0
-   - Updated installation instructions with new source names
-   - Added breaking change warning
-
-4. **DOCUMENTATION_STRUCTURE.md**:
-   - Updated to reflect v4.1.0 changes
-   - Added unique source names section
-
-5. **docs/FOLDER_BASED_INSTANCES.md**:
-   - Added comprehensive documentation for source naming
-   - Included troubleshooting for source conflicts
-   - Updated migration guide
+| update_all_instances.bat | ✅ v1.0.0 | ❌ | ❌ | ❌ |
+| README.md updates | ✅ | N/A | N/A | N/A |
 
 ## Last User Action
 - Date/Time: Recent
-- Action: Confirmed "new source naming is working"
-- Result: Feature working correctly
-- Next Required: Merge PR #30
+- Action: Requested new feature for updating all instances
+- Result: Script created and documentation updated
+- Next Required: Test the script and provide feedback
 
-## PR #30 Summary
-- Title: Implement unique source names for multi-instance support
-- Changes: 5 files changed (+122, -86)
-- Breaking change: Users must update OBS source names
-- Migration guide included
-- Testing complete
+## Next Steps
+1. User should test `update_all_instances.bat`
+2. Verify it correctly updates instances
+3. Check that cache/config are preserved
+4. Approve for merge if working correctly
+
+## PR Summary (To Be Created)
+- Title: Add batch script to update all instances from main
+- Branch: feature/update-all-instances-script
+- Files changed: 2 (new script + README update)
+- Breaking changes: None
+- Testing required: Yes
 
 ## Important Notes
-- This is a BREAKING CHANGE - users need to update their OBS source references
-- Old source names (video, title) won't work anymore
-- New source names follow pattern: [instance]_video and [instance]_title
-- Instance folders are now protected by .gitignore
-
-## Ready for Production
-All testing complete, documentation updated, and user confirmed working. Ready to merge to main branch!
+- This is a new utility script, not a breaking change
+- Instances must follow the yt-player-* naming convention
+- The script preserves each instance's cache and configuration
+- Works with the existing folder-based architecture (v4.0.7+)
