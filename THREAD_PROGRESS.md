@@ -7,44 +7,57 @@
 - [x] Updated setup_new_instance.py for flexible naming
 - [x] Updated README.md (fixed media source name to "video")
 - [x] Updated docs/FOLDER_BASED_INSTANCES.md
-- [ ] **NEXT**: Need to delete old ytfast_modules directory
-- [ ] Test that everything works properly
-- [ ] Consider updating version numbers across all files
+- [x] Created cleanup_old_modules.bat for cleanup
+- [x] Created migrate_to_folders.py for v3.x users
+- [ ] **READY FOR TESTING** - All code changes complete
 
-## Architecture Changes:
-### Completed:
-- ✅ Dynamic script detection in config.py
-- ✅ Batch file for Windows users
-- ✅ Flexible setup script that handles any naming pattern
-- ✅ Documentation updated to reflect media source = "video"
-- ✅ Clear instructions for multi-instance setup
+## Summary of Changes:
 
-### Key Improvements:
-1. **Script name = Scene name** (automatic detection)
-2. **Any naming pattern works** (ytplay.py, ytworship.py, remixes.py, etc.)
-3. **Simple instance creation**: `create_new_ytplayer.bat worship`
-4. **Complete isolation** between instances
+### 🎯 Core Architecture
+1. **Dynamic Script Detection**: config.py now automatically detects script name
+2. **Flexible Naming**: Any script name works (ytplay.py, ytworship.py, remixes.py)
+3. **Scene = Script Name**: Automatic scene naming from script filename
 
-## Module Files Status:
-### Completed (21/21) - ALL DONE! ✅
-All files successfully migrated from ytfast_modules to ytplay_modules with updated imports.
+### 🔧 Helper Scripts
+1. **create_new_ytplayer.bat**: Windows batch file for easy instance creation
+2. **setup_new_instance.py**: Cross-platform Python script (improved)
+3. **migrate_to_folders.py**: Migration tool for v3.x users
+4. **cleanup_old_modules.bat**: Cleanup tool for old modules
 
-## Next Steps:
-1. Delete old ytfast_modules directory (cleanup)
-2. Test instance creation with batch file
-3. Test that main template works
-4. Create example instance and verify functionality
-5. Final testing before merge
+### 📚 Documentation Updates
+1. **README.md**: Fixed media source name, updated for v4.0.1
+2. **FOLDER_BASED_INSTANCES.md**: Complete rewrite with new approach
+3. Clear instructions for all use cases
+
+### 🏗️ Architecture Benefits
+- **Complete Isolation**: Each instance in its own folder
+- **No State Conflicts**: Impossible to have cross-contamination
+- **Easy Setup**: `create_new_ytplayer.bat worship` creates everything
+- **Flexible Naming**: No restrictions on script names
+
+## Testing Checklist:
+- [ ] Test main template (ytplay.py) works
+- [ ] Test create_new_ytplayer.bat creates instance correctly
+- [ ] Test that instance works independently
+- [ ] Test migration script on old setup
+- [ ] Verify scene detection works
+- [ ] Confirm media source "video" plays correctly
 
 ## Version for Release
-**v4.0.1** - Major changes with fixes:
-- Folder-based multi-instance architecture  
-- Renamed from ytfast to ytplay
-- Dynamic script name detection
-- Batch file for easy Windows setup
+**v4.0.1** - Major architectural changes:
+- Folder-based multi-instance support
+- Renamed ytfast → ytplay
+- Dynamic configuration
 - Complete isolation between instances
+- Windows batch file support
+- Migration tools included
 
-## Critical Information
+## Files Ready for Deletion:
+- yt-player-main/ytfast_modules/* (old modules directory)
+- Use cleanup_old_modules.bat to remove
+
+## PR Status:
 - Branch: `feature/folder-based-instances`
 - PR: #29
-- Status: Architecture complete, cleanup needed
+- Status: **Code complete, ready for testing**
+- Next: User testing and feedback
