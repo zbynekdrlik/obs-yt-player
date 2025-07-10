@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 :: YouTube Player Instance Creator - Simplified Version
-:: Version: 2.2.2 - Fixed false warning and character encoding
+:: Version: 2.2.3 - Properly fixed parameter checking
 
 echo ==========================================
-echo YouTube Player Instance Creator v2.2.2
+echo YouTube Player Instance Creator v2.2.3
 echo ==========================================
 echo.
 
@@ -52,8 +52,8 @@ if not exist "%TEMPLATE_DIR%" (
 :: Parse command line options - default to parent directory
 set "TARGET_DIR=..\yt-player-%INSTANCE_NAME%"
 
-:: Check if there's a second parameter
-if not "%~2"=="" (
+:: Only process second parameter if it exists
+if "%~2" NEQ "" (
     :: Check for /repo option
     if /i "%~2"=="/repo" (
         set "TARGET_DIR=yt-player-%INSTANCE_NAME%"
