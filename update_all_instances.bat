@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 :: Script to update all yt-player instances from main - Simplified
-:: Version: 2.2.0 - No prompts, auto-search current + parent directories
+:: Version: 2.2.1 - Fixed character encoding
 
 echo ==========================================
-echo YouTube Player Instance Updater v2.2.0
+echo YouTube Player Instance Updater v2.2.1
 echo ==========================================
 echo.
 
@@ -137,9 +137,9 @@ echo.
 echo ========================================
 echo Update Summary
 echo ========================================
-echo ✓ Updated:  %updated_count% instances
+echo [SUCCESS] Updated: %updated_count% instances
 if %error_count% gtr 0 (
-    echo ✗ Errors:   %error_count%
+    echo [ERROR] Failed:    %error_count%
 )
 echo ========================================
 
@@ -199,7 +199,7 @@ if exist "!instance_path!\!script_name!_modules" (
         copy /Y "%TEMPLATE_DIR%\ytplay_modules\__init__.py" "!instance_path!\!script_name!_modules\" >nul 2>&1
     )
     
-    echo ✓ Modules updated
+    echo [OK] Modules updated
 ) else (
     echo ERROR: Module directory !script_name!_modules not found!
     set /a error_count+=1
@@ -212,7 +212,7 @@ if errorlevel 1 (
     echo ERROR: Failed to update main script!
     set /a error_count+=1
 ) else (
-    echo ✓ Main script updated
+    echo [OK] Main script updated
 )
 
 :: Update README
@@ -230,6 +230,6 @@ if exist "%TEMPLATE_DIR%\README.md" (
     echo Last updated from template version in: %TEMPLATE_DIR%
 ) > "!instance_path!\INSTANCE_INFO.txt"
 
-echo ✓ Instance updated successfully
+echo [OK] Instance updated successfully
 set /a updated_count+=1
 exit /b 0
