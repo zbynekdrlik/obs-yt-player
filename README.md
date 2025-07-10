@@ -11,7 +11,7 @@ The player now supports **multiple independent instances** through a clean folde
 create_new_ytplayer.bat worship
 ```
 
-This creates a new instance in seconds! See [Multi-Instance Setup](#multi-instance-setup) for details.
+This creates a new instance in seconds - no questions asked! See [Multi-Instance Setup](#multi-instance-setup) for details.
 
 **⚠️ BREAKING CHANGE in v4.1.0**: Source names are now prefixed with the instance name to avoid OBS conflicts. See [Migration Guide](#migration-from-v40x-to-v41x) below.
 
@@ -134,28 +134,73 @@ Check the OBS Script Log for:
 
 ### Creating Additional Instances
 
-Use the included batch file to create new instances in seconds:
+**🆕 v2.2.4 - Simplified!** No more prompts - just run:
 
 ```cmd
 create_new_ytplayer.bat worship
 ```
 
-This creates:
+This creates a new instance in the parent directory (outside the git repository for safety):
 ```
-obs-yt-player/
-├── yt-player-main/        # Original template
-│   ├── ytplay.py          # Scene: ytplay
-│   └── ytplay_modules/
-└── yt-player-worship/     # New instance
-    ├── worship.py         # Scene: worship
-    └── worship_modules/
+C:\OBS-Scripts\
+├── obs-yt-player\              # Git repository
+│   └── yt-player-main\         # Template
+│
+└── yt-player-worship\          # New instance (safe from git!)
+    ├── worship.py              # Scene: worship
+    └── worship_modules\
+```
+
+#### Advanced Options:
+```cmd
+# Create in repository (not recommended - git may delete it!)
+create_new_ytplayer.bat test /repo
+
+# Create in custom location
+create_new_ytplayer.bat kids /path:D:\OBS\Instances
 ```
 
 ### What Happens:
-1. Copies the template folder
+1. Copies the template folder to parent directory (default)
 2. Renames script and modules to match instance name
 3. Cleans the cache directory
 4. Shows setup instructions
+5. **No prompts** - just works!
+
+### Updating All Instances
+
+**🆕 v2.2.1 - Simplified!** Update all instances without interruption:
+
+```cmd
+update_all_instances.bat
+```
+
+This automatically:
+1. Pulls latest changes from GitHub
+2. Searches current and parent directories
+3. Updates all instances from template
+4. Preserves cache and configuration
+5. Shows summary - **no prompts!**
+
+#### Advanced Options:
+```cmd
+# Bring back the old confirmation prompt
+update_all_instances.bat /confirm
+
+# Skip parent directory search
+update_all_instances.bat /noparent
+
+# Add custom search location
+update_all_instances.bat /path:D:\OBS\Instances
+```
+
+### Safety Features
+
+The batch scripts are designed to keep your instances safe:
+- **Default to parent directory** - Instances created outside git repository
+- **Automatic search** - Finds instances in common locations
+- **Preserve user data** - Cache and config never deleted during updates
+- **Clear feedback** - Shows exactly what's happening
 
 ### Instance Source Naming (v4.1.0+)
 Each instance automatically uses unique source names:
@@ -169,6 +214,7 @@ Each instance automatically uses unique source names:
 - ✅ **No manual configuration** - works immediately
 - ✅ **Clear organization** - one folder per player
 - ✅ **No source conflicts** - unique names per instance (v4.1.0+)
+- ✅ **Git-safe by default** - instances created outside repository
 
 ### Example Use Cases
 
@@ -273,6 +319,12 @@ The player detects nested scenes automatically and continues playback seamlessly
 - Use batch file for reliable setup
 - Check logs for import errors
 
+### Batch Script Issues?
+- Make sure you're in the repository directory
+- Template folder `yt-player-main` must exist
+- For custom locations, use full paths
+- Check file permissions if errors occur
+
 ### Nested Scene Not Working?
 - Ensure nested source is visible (eye icon)
 - Source names must match exactly (with prefix)
@@ -288,22 +340,31 @@ The player detects nested scenes automatically and continues playback seamlessly
 
 ```
 obs-yt-player/
-├── yt-player-main/          # Template instance
-│   ├── ytplay.py            # Main script
-│   ├── ytplay_modules/      # All modules
-│   │   ├── __init__.py      # Package marker
-│   │   ├── config.py        # Dynamic configuration
-│   │   ├── download.py      # Video downloading
-│   │   ├── playback.py      # Playback control
-│   │   └── ...              # Other modules
-│   └── cache/               # Video cache
+├── yt-player-main/             # Template instance
+│   ├── ytplay.py               # Main script
+│   ├── ytplay_modules/         # All modules
+│   │   ├── __init__.py         # Package marker
+│   │   ├── config.py           # Dynamic configuration
+│   │   ├── download.py         # Video downloading
+│   │   ├── playback.py         # Playback control
+│   │   └── ...                 # Other modules
+│   └── cache/                  # Video cache
 │
-├── create_new_ytplayer.bat  # Instance creator
-└── docs/                    # Documentation
+├── create_new_ytplayer.bat     # Instance creator (v2.2.4)
+├── update_all_instances.bat    # Bulk updater (v2.2.1)
+└── docs/                       # Documentation
     └── FOLDER_BASED_INSTANCES.md
 ```
 
 ## Recent Updates
+
+### v4.2.0 - Simplified Batch Scripts
+- **NEW**: No-prompt operation by default for both scripts
+- `create_new_ytplayer.bat` v2.2.4: Creates instances in parent directory automatically
+- `update_all_instances.bat` v2.2.1: Updates all instances without interruption
+- Added command-line options for advanced users
+- Fixed character encoding for Windows console
+- Improved safety with parent directory defaults
 
 ### v4.1.0 - Unique Source Names
 - **BREAKING**: Source names now prefixed with instance name

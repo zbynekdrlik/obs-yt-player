@@ -1,130 +1,166 @@
 @echo off
-:: YouTube Player Instance Creator
-:: Creates a new YouTube player instance from the template
-
 setlocal enabledelayedexpansion
 
-:: Check if instance name was provided
+:: YouTube Player Instance Creator - Simplified Version
+:: Version: 2.2.4 - Final fix for parameter handling
+
+echo ==========================================
+echo YouTube Player Instance Creator v2.2.4
+echo ==========================================
+echo.
+
+:: Check if an instance name was provided
 if "%~1"=="" (
+    echo ERROR: No instance name provided!
     echo.
-    echo YouTube Player Instance Creator
-    echo ===============================
+    echo Usage: %~nx0 ^<instance_name^> [options]
+    echo Example: %~nx0 worship
     echo.
-    echo Usage: create_new_ytplayer.bat ^<instance_name^>
+    echo Options:
+    echo   /repo         Create in repository directory
+    echo   /path:^<dir^>   Create in custom directory
     echo.
-    echo Example: create_new_ytplayer.bat worship
-    echo.
-    echo This will create:
-    echo   - Folder: yt-player-worship
-    echo   - Script: worship.py  
-    echo   - Module: worship_modules
-    echo   - Scene:  worship
-    echo.
+    echo Default: Creates in parent directory
+    pause
     exit /b 1
 )
 
-set INSTANCE_NAME=%~1
-set SOURCE_DIR=yt-player-main
-set TARGET_DIR=yt-player-%INSTANCE_NAME%
-set SOURCE_SCRIPT=ytplay.py
-set TARGET_SCRIPT=%INSTANCE_NAME%.py
-set SOURCE_MODULES=ytplay_modules
-set TARGET_MODULES=%INSTANCE_NAME%_modules
+:: Get the instance name
+set "INSTANCE_NAME=%~1"
 
-:: Validate instance name (alphanumeric and underscore only)
-echo %INSTANCE_NAME%| findstr /r "^[a-zA-Z0-9_]*$" >nul
+:: Remove quotes if present
+set "INSTANCE_NAME=%INSTANCE_NAME:"=%"
+
+:: Basic validation - only allow alphanumeric and basic characters
+echo %INSTANCE_NAME%| findstr /R "^[a-zA-Z0-9_-]*$" >nul
 if errorlevel 1 (
-    echo.
-    echo ERROR: Instance name can only contain letters, numbers, and underscores
-    echo.
+    echo ERROR: Invalid instance name!
+    echo Instance names can only contain letters, numbers, underscore and hyphen.
+    pause
     exit /b 1
 )
 
-:: Check if source template exists
-if not exist "%SOURCE_DIR%" (
-    echo.
-    echo ERROR: Template directory '%SOURCE_DIR%' not found!
-    echo Please ensure yt-player-main exists with the template files.
-    echo.
+:: Check for template directory
+set "TEMPLATE_DIR=yt-player-main"
+if not exist "%TEMPLATE_DIR%" (
+    echo ERROR: Template directory not found!
+    echo Please ensure %TEMPLATE_DIR% exists in the current directory.
+    pause
     exit /b 1
 )
+
+:: Parse command line options - default to parent directory
+set "TARGET_DIR=..\yt-player-%INSTANCE_NAME%"
+
+:: Check for /repo option
+if /i "%~2"=="/repo" (
+    set "TARGET_DIR=yt-player-%INSTANCE_NAME%"
+    echo Note: Creating in repository (not recommended for safety)
+    goto :skip_further_params
+)
+
+:: Check for /path option (without directory)
+if /i "%~2"=="/path" (
+    echo ERROR: /path requires a directory. Use /path:C:\your\directory
+    pause
+    exit /b 1
+)
+
+:: Check for /path:directory option
+if "%~2" NEQ "" (
+    set "param2=%~2"
+    set "prefix=!param2:~0,6!"
+    if /i "!prefix!"=="/path:" (
+        set "custom_path=!param2:~6!"
+        set "TARGET_DIR=!custom_path!\yt-player-%INSTANCE_NAME%"
+        echo Note: Creating in custom location: !custom_path!
+    ) else (
+        echo WARNING: Unknown option: %~2
+        echo Continuing with default parent directory...
+    )
+)
+
+:skip_further_params
 
 :: Check if target already exists
 if exist "%TARGET_DIR%" (
-    echo.
-    echo WARNING: Directory '%TARGET_DIR%' already exists!
-    echo.
-    set /p CONFIRM="Do you want to overwrite it? (Y/N): "
-    if /i not "!CONFIRM!"=="Y" (
-        echo Operation cancelled.
-        exit /b 0
-    )
-    echo.
-    echo Removing existing directory...
-    rmdir /s /q "%TARGET_DIR%"
-)
-
-echo.
-echo Creating new YouTube player instance: %INSTANCE_NAME%
-echo =====================================================
-echo Source: %SOURCE_DIR%
-echo Target: %TARGET_DIR%
-echo.
-
-:: Copy the entire folder
-echo Copying folder structure...
-xcopy /e /i /q "%SOURCE_DIR%" "%TARGET_DIR%" >nul
-if errorlevel 1 (
-    echo ERROR: Failed to copy folder
+    echo ERROR: Instance directory already exists: %TARGET_DIR%
+    echo Please choose a different name or delete the existing directory.
+    pause
     exit /b 1
 )
-echo [OK] Folder copied
 
-:: Rename main script
-if exist "%TARGET_DIR%\%SOURCE_SCRIPT%" (
-    echo Renaming main script...
-    ren "%TARGET_DIR%\%SOURCE_SCRIPT%" "%TARGET_SCRIPT%"
-    echo [OK] %SOURCE_SCRIPT% -^> %TARGET_SCRIPT%
-) else (
-    echo WARNING: Main script %SOURCE_SCRIPT% not found
+:: Create the instance
+echo.
+echo Creating instance: %INSTANCE_NAME%
+echo Target directory: %TARGET_DIR%
+echo ========================================
+
+:: Copy template to new instance
+echo Copying template files...
+xcopy /E /I /Q "%TEMPLATE_DIR%" "%TARGET_DIR%"
+if errorlevel 1 (
+    echo ERROR: Failed to copy template files!
+    pause
+    exit /b 1
 )
 
-:: Rename modules folder
-if exist "%TARGET_DIR%\%SOURCE_MODULES%" (
-    echo Renaming modules folder...
-    ren "%TARGET_DIR%\%SOURCE_MODULES%" "%TARGET_MODULES%"
-    echo [OK] %SOURCE_MODULES%\ -^> %TARGET_MODULES%\
-) else (
-    echo WARNING: Modules folder %SOURCE_MODULES% not found
+:: Count copied files for feedback
+set file_count=0
+for /r "%TARGET_DIR%" %%f in (*) do set /a file_count+=1
+echo   %file_count% files copied
+
+:: Rename the main script
+echo Renaming main script...
+move "%TARGET_DIR%\ytplay.py" "%TARGET_DIR%\%INSTANCE_NAME%.py" >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Failed to rename main script!
+    pause
+    exit /b 1
 )
 
-:: Clean cache directory
+:: Rename the modules directory
+echo Renaming modules directory...
+move "%TARGET_DIR%\ytplay_modules" "%TARGET_DIR%\%INSTANCE_NAME%_modules" >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Failed to rename modules directory!
+    pause
+    exit /b 1
+)
+
+:: Clean up cache directory
+echo Cleaning cache directory...
 if exist "%TARGET_DIR%\cache" (
-    echo.
-    echo Cleaning cache directory...
-    del /q "%TARGET_DIR%\cache\*.*" 2>nul
-    echo [OK] Cache cleaned
+    del /Q "%TARGET_DIR%\cache\*.*" >nul 2>&1
 )
 
-:: Create success message
+:: Create a configuration note
+echo Creating configuration note...
+(
+echo Instance: %INSTANCE_NAME%
+echo Created: %DATE% %TIME%
+echo Script: %INSTANCE_NAME%.py
+echo Modules: %INSTANCE_NAME%_modules
+echo.
+echo This instance is completely independent and can be moved anywhere.
+) > "%TARGET_DIR%\INSTANCE_INFO.txt"
+
+:: Success message
 echo.
 echo ========================================
-echo SUCCESS! New instance '%INSTANCE_NAME%' created
+echo [SUCCESS] Instance created successfully!
 echo ========================================
 echo.
-echo Configuration Summary:
-echo   Directory:    %TARGET_DIR%\
-echo   Main Script:  %TARGET_SCRIPT%
-echo   Modules:      %TARGET_MODULES%\
-echo   OBS Scene:    %INSTANCE_NAME%
+echo Instance Details:
+echo - Name: %INSTANCE_NAME%
+echo - Location: %TARGET_DIR%
+echo - Script: %INSTANCE_NAME%.py
+echo - Modules: %INSTANCE_NAME%_modules
 echo.
-echo Next Steps:
-echo   1. In OBS Studio: Tools -^> Scripts -^> Add Script (+)
-echo   2. Navigate to: %CD%\%TARGET_DIR%\%TARGET_SCRIPT%
-echo   3. Create a scene named: %INSTANCE_NAME%
-echo   4. Add sources to the scene:
-echo      - Media Source named "video"
-echo      - Text Source named "title" (optional)
-echo   5. Configure the playlist URL in script settings
+echo Quick OBS Setup:
+echo 1. Tools -^> Scripts -^> + -^> Add %INSTANCE_NAME%.py
+echo 2. Create scene: %INSTANCE_NAME%
+echo 3. Add Media Source: %INSTANCE_NAME%_video
+echo 4. Add Text Source: %INSTANCE_NAME%_title (optional)
 echo.
 pause
