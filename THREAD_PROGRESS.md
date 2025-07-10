@@ -10,6 +10,7 @@
 - Phase: Feature Enhancement - Simplification
 - Step: Implementation complete, awaiting testing
 - Status: IMPLEMENTED_NOT_TESTED (v2.2.0)
+- Cleanup: Debug script removed ✅
 
 ## Simplified Scripts Created
 
@@ -32,6 +33,9 @@
      - `/path:C:\custom\path` - add custom search path
      - `/confirm` - ask for confirmation (old behavior)
    - **USAGE**: `update_all_instances.bat`
+
+3. **Cleanup Done**:
+   - ✅ Removed `update_all_instances_debug.bat` from repository
 
 ### Simplified Workflow:
 ```cmd
@@ -79,6 +83,7 @@ update_all_instances.bat /path:D:\OBS\Instances
 4. **Cleaner output**: Removed excessive echo statements
 5. **File count**: Shows number of files copied
 6. **Quick setup**: Simplified OBS instructions
+7. **Cleanup**: Removed debug script
 
 ## Preserved Features:
 - ✅ Safety (instances outside repo by default)
