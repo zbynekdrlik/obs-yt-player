@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 :: YouTube Player Instance Creator - Simplified Version
-:: Version: 2.2.3 - Properly fixed parameter checking
+:: Version: 2.2.4 - Final fix for parameter handling
 
 echo ==========================================
-echo YouTube Player Instance Creator v2.2.3
+echo YouTube Player Instance Creator v2.2.4
 echo ==========================================
 echo.
 
@@ -52,30 +52,35 @@ if not exist "%TEMPLATE_DIR%" (
 :: Parse command line options - default to parent directory
 set "TARGET_DIR=..\yt-player-%INSTANCE_NAME%"
 
-:: Only process second parameter if it exists
+:: Check for /repo option
+if /i "%~2"=="/repo" (
+    set "TARGET_DIR=yt-player-%INSTANCE_NAME%"
+    echo Note: Creating in repository (not recommended for safety)
+    goto :skip_further_params
+)
+
+:: Check for /path option (without directory)
+if /i "%~2"=="/path" (
+    echo ERROR: /path requires a directory. Use /path:C:\your\directory
+    pause
+    exit /b 1
+)
+
+:: Check for /path:directory option
 if "%~2" NEQ "" (
-    :: Check for /repo option
-    if /i "%~2"=="/repo" (
-        set "TARGET_DIR=yt-player-%INSTANCE_NAME%"
-        echo Note: Creating in repository (not recommended for safety)
-    ) else if /i "%~2"=="/path" (
-        echo ERROR: /path requires a directory. Use /path:C:\your\directory
-        pause
-        exit /b 1
+    set "param2=%~2"
+    set "prefix=!param2:~0,6!"
+    if /i "!prefix!"=="/path:" (
+        set "custom_path=!param2:~6!"
+        set "TARGET_DIR=!custom_path!\yt-player-%INSTANCE_NAME%"
+        echo Note: Creating in custom location: !custom_path!
     ) else (
-        :: Check for /path:directory option
-        set "param2=%~2"
-        set "prefix=!param2:~0,6!"
-        if /i "!prefix!"=="/path:" (
-            set "custom_path=!param2:~6!"
-            set "TARGET_DIR=!custom_path!\yt-player-%INSTANCE_NAME%"
-            echo Note: Creating in custom location: !custom_path!
-        ) else (
-            echo WARNING: Unknown option: %~2
-            echo Continuing with default parent directory...
-        )
+        echo WARNING: Unknown option: %~2
+        echo Continuing with default parent directory...
     )
 )
+
+:skip_further_params
 
 :: Check if target already exists
 if exist "%TARGET_DIR%" (
