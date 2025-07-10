@@ -1,13 +1,39 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Script to update all yt-player instances from main
-:: Version: 2.1.0 - Simplified structure to avoid batch syntax issues
+:: Script to update all yt-player instances from main - Simplified
+:: Version: 2.2.0 - No prompts, auto-search current + parent directories
 
 echo ==========================================
-echo YouTube Player Instance Updater v2.1.0
+echo YouTube Player Instance Updater v2.2.0
 echo ==========================================
 echo.
+
+:: Parse command line options
+set "SKIP_PARENT=0"
+set "CUSTOM_PATH="
+set "ASK_CONFIRM=0"
+
+:parse_args
+if "%~1"=="" goto end_parse
+if /i "%~1"=="/noparent" (
+    set "SKIP_PARENT=1"
+) else if /i "%~1"=="/confirm" (
+    set "ASK_CONFIRM=1"
+) else if /i "%~1"=="/path" (
+    echo ERROR: /path requires a directory. Use /path:C:\your\directory
+    pause
+    exit /b 1
+) else (
+    set "param=%~1"
+    set "prefix=!param:~0,6!"
+    if /i "!prefix!"=="/path:" (
+        set "CUSTOM_PATH=!param:~6!"
+    )
+)
+shift
+goto parse_args
+:end_parse
 
 :: Step 1: Update main repository with git
 echo [1/4] Updating main repository from GitHub...
@@ -42,21 +68,20 @@ for /d %%D in (yt-player-*) do (
     )
 )
 
-:: Search in parent directory
-echo Searching in parent directory...
-for /d %%D in (..\yt-player-*) do (
-    set /a instance_count+=1
-    set "instances[!instance_count!]=%%D"
-    echo Found: %%D
+:: Search in parent directory (unless disabled)
+if "%SKIP_PARENT%"=="0" (
+    echo Searching in parent directory...
+    for /d %%D in (..\yt-player-*) do (
+        set /a instance_count+=1
+        set "instances[!instance_count!]=%%D"
+        echo Found: %%D
+    )
 )
 
-:: Ask if user wants to search additional locations
-echo.
-set /p "SEARCH_MORE=Search additional locations? (y/n): "
-if /i "%SEARCH_MORE%"=="y" (
-    set /p "CUSTOM_PATH=Enter path to search: "
-    echo Searching in !CUSTOM_PATH!...
-    for /d %%D in ("!CUSTOM_PATH!\yt-player-*") do (
+:: Search custom path if provided
+if not "%CUSTOM_PATH%"=="" (
+    echo Searching in %CUSTOM_PATH%...
+    for /d %%D in ("%CUSTOM_PATH%\yt-player-*") do (
         set /a instance_count+=1
         set "instances[!instance_count!]=%%D"
         echo Found: %%D
@@ -67,27 +92,33 @@ if %instance_count%==0 (
     echo.
     echo No instances found to update.
     echo.
-    echo Tip: Instances should be named yt-player-*
-    echo Examples: yt-player-worship, yt-player-kids
+    echo Tip: Use /path:C:\custom\path to search additional locations
+    echo Examples: update_all_instances.bat /path:D:\OBS\Instances
     pause
     exit /b 0
 )
 
 echo.
 echo Found %instance_count% instance(s) to update
-echo.
 
-:: Step 4: Confirm update
-echo [3/4] Ready to update instances
-echo ----------------------------------------
-echo This will update all instances from the template.
-echo Cache and configuration will be preserved.
-echo.
-set /p "CONFIRM=Continue with update? (y/n): "
-if /i not "%CONFIRM%"=="y" (
-    echo Update cancelled.
-    pause
-    exit /b 0
+:: Step 4: Confirm update (only if /confirm was used)
+if "%ASK_CONFIRM%"=="1" (
+    echo.
+    echo [3/4] Confirmation required
+    echo ----------------------------------------
+    echo This will update all instances from the template.
+    echo Cache and configuration will be preserved.
+    echo.
+    set /p "CONFIRM=Continue with update? (y/n): "
+    if /i not "!CONFIRM!"=="y" (
+        echo Update cancelled.
+        pause
+        exit /b 0
+    )
+) else (
+    echo.
+    echo [3/4] Starting automatic update...
+    echo ----------------------------------------
 )
 
 :: Step 5: Update each instance
@@ -112,18 +143,11 @@ if %error_count% gtr 0 (
 )
 echo ========================================
 
-:: Important notes
+:: Quick notes
 echo.
-echo IMPORTANT NOTES:
-echo ----------------
-echo 1. Each instance's cache and configuration are preserved
-echo 2. You may need to restart OBS or reload scripts
-echo 3. Test each instance after update to ensure it works
-echo 4. Instances can be located anywhere on your system
-echo.
-echo TIP: To prevent Git from deleting instances, keep them
-echo      outside the repository or in a separate folder.
-
+echo Update complete! Remember to:
+echo - Restart OBS or reload scripts
+echo - Test each instance after update
 echo.
 pause
 exit /b 0

@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: YouTube Player Instance Creator with Safety Features
-:: Version: 2.0.1
+:: YouTube Player Instance Creator - Simplified Version
+:: Version: 2.2.0 - No prompts, defaults to parent directory
 
 echo ==========================================
-echo YouTube Player Instance Creator v2.0.1
+echo YouTube Player Instance Creator v2.2.0
 echo ==========================================
 echo.
 
@@ -13,15 +13,19 @@ echo.
 if "%~1"=="" (
     echo ERROR: No instance name provided!
     echo.
-    echo Usage: %~nx0 ^<instance_name^>
+    echo Usage: %~nx0 ^<instance_name^> [options]
     echo Example: %~nx0 worship
     echo.
-    echo This will create a new instance named "worship"
+    echo Options:
+    echo   /repo         Create in repository directory
+    echo   /path:^<dir^>   Create in custom directory
+    echo.
+    echo Default: Creates in parent directory
     pause
     exit /b 1
 )
 
-:: Get the instance name and validate it
+:: Get the instance name
 set "INSTANCE_NAME=%~1"
 
 :: Remove quotes if present
@@ -45,26 +49,28 @@ if not exist "%TEMPLATE_DIR%" (
     exit /b 1
 )
 
-:: Determine where to create instances
-echo.
-echo Where would you like to create the instance?
-echo 1. In this repository (yt-player-%INSTANCE_NAME%)
-echo 2. In parent directory (..\yt-player-%INSTANCE_NAME%)
-echo 3. In custom location
-echo.
-set /p "LOCATION_CHOICE=Enter choice (1-3): "
+:: Parse command line options - default to parent directory
+set "TARGET_DIR=..\yt-player-%INSTANCE_NAME%"
 
-if "%LOCATION_CHOICE%"=="1" (
+:: Check for /repo option
+if /i "%~2"=="/repo" (
     set "TARGET_DIR=yt-player-%INSTANCE_NAME%"
-) else if "%LOCATION_CHOICE%"=="2" (
-    set "TARGET_DIR=..\yt-player-%INSTANCE_NAME%"
-) else if "%LOCATION_CHOICE%"=="3" (
-    set /p "CUSTOM_PATH=Enter full path for instances directory: "
-    set "TARGET_DIR=!CUSTOM_PATH!\yt-player-%INSTANCE_NAME%"
-) else (
-    echo Invalid choice!
+    echo Note: Creating in repository (not recommended for safety)
+) else if /i "%~2"=="/path" (
+    echo ERROR: /path requires a directory. Use /path:C:\your\directory
     pause
     exit /b 1
+) else (
+    :: Check for /path:directory option
+    set "param2=%~2"
+    if not "!param2!"=="" (
+        set "prefix=!param2:~0,6!"
+        if /i "!prefix!"=="/path:" (
+            set "custom_path=!param2:~6!"
+            set "TARGET_DIR=!custom_path!\yt-player-%INSTANCE_NAME%"
+            echo Note: Creating in custom location: !custom_path!
+        )
+    )
 )
 
 :: Check if target already exists
@@ -89,6 +95,11 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+:: Count copied files for feedback
+set file_count=0
+for /r "%TARGET_DIR%" %%f in (*) do set /a file_count+=1
+echo   %file_count% files copied
 
 :: Rename the main script
 echo Renaming main script...
@@ -132,20 +143,15 @@ echo ✓ Instance created successfully!
 echo ========================================
 echo.
 echo Instance Details:
+echo - Name: %INSTANCE_NAME%
 echo - Location: %TARGET_DIR%
-echo - Script name: %INSTANCE_NAME%.py
-echo - Module directory: %INSTANCE_NAME%_modules
-echo - Scene name: %INSTANCE_NAME%
+echo - Script: %INSTANCE_NAME%.py
+echo - Modules: %INSTANCE_NAME%_modules
 echo.
-echo OBS Setup Instructions:
-echo 1. In OBS, go to Tools → Scripts → +
-echo 2. Add: %TARGET_DIR%\%INSTANCE_NAME%.py
-echo 3. Create a scene named: %INSTANCE_NAME%
-echo 4. Add Media Source named: %INSTANCE_NAME%_video
-echo 5. Add Text Source named: %INSTANCE_NAME%_title (optional)
-echo.
-echo IMPORTANT: This instance is portable!
-echo You can move the entire %TARGET_DIR% folder
-echo anywhere on your system and it will still work.
+echo Quick OBS Setup:
+echo 1. Tools → Scripts → + → Add %INSTANCE_NAME%.py
+echo 2. Create scene: %INSTANCE_NAME%
+echo 3. Add Media Source: %INSTANCE_NAME%_video
+echo 4. Add Text Source: %INSTANCE_NAME%_title (optional)
 echo.
 pause
