@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 :: YouTube Player Instance Creator - Simplified Version
-:: Version: 2.2.1 - Fixed parameter parsing bug
+:: Version: 2.2.2 - Fixed false warning and character encoding
 
 echo ==========================================
-echo YouTube Player Instance Creator v2.2.1
+echo YouTube Player Instance Creator v2.2.2
 echo ==========================================
 echo.
 
@@ -143,7 +143,7 @@ echo This instance is completely independent and can be moved anywhere.
 :: Success message
 echo.
 echo ========================================
-echo ✓ Instance created successfully!
+echo [SUCCESS] Instance created successfully!
 echo ========================================
 echo.
 echo Instance Details:
@@ -153,7 +153,7 @@ echo - Script: %INSTANCE_NAME%.py
 echo - Modules: %INSTANCE_NAME%_modules
 echo.
 echo Quick OBS Setup:
-echo 1. Tools → Scripts → + → Add %INSTANCE_NAME%.py
+echo 1. Tools -^> Scripts -^> + -^> Add %INSTANCE_NAME%.py
 echo 2. Create scene: %INSTANCE_NAME%
 echo 3. Add Media Source: %INSTANCE_NAME%_video
 echo 4. Add Text Source: %INSTANCE_NAME%_title (optional)
