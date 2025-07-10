@@ -2,36 +2,31 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Script simplification COMPLETE
-- [ ] Waiting for: User to test simplified scripts
+- [x] Currently working on: Bug fix completed v2.2.1
+- [ ] Waiting for: User to test fixed script
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Feature Enhancement - Simplification
-- Step: Implementation complete, awaiting testing
-- Status: IMPLEMENTED_NOT_TESTED (v2.2.0)
-- Cleanup: Debug script removed ✅
+- Phase: Bug Fix
+- Step: Fixed parameter parsing issue
+- Status: FIXED_NOT_TESTED (v2.2.1)
 
-## Simplified Scripts Created
+## Bug Fix v2.2.1:
+- **ISSUE**: Script was incorrectly parsing parameters when only instance name provided
+- **FIX**: Added check for empty second parameter before processing options
+- **RESULT**: `create_new_ytplayer.bat test` should now work correctly
 
-### Version 2.2.0 Changes:
+## Simplified Scripts Status
 
-1. **create_new_ytplayer.bat** - Version 2.2.0 ✅
-   - **REMOVED**: Location choice prompt
-   - **DEFAULT**: Creates in parent directory (safer)
-   - **NEW**: Command line options:
-     - `/repo` - create in repository
-     - `/path:C:\custom\path` - custom location
+### Version History:
+
+1. **create_new_ytplayer.bat** - Version 2.2.1 🐛 FIXED
+   - v2.2.0: Had parameter parsing bug
+   - v2.2.1: Fixed - now correctly handles single parameter
    - **USAGE**: `create_new_ytplayer.bat worship`
 
 2. **update_all_instances.bat** - Version 2.2.0 ✅
-   - **REMOVED**: "Search additional locations?" prompt
-   - **REMOVED**: "Continue with update?" prompt
-   - **DEFAULT**: Auto-searches current + parent directories
-   - **NEW**: Command line options:
-     - `/noparent` - skip parent directory search
-     - `/path:C:\custom\path` - add custom search path
-     - `/confirm` - ask for confirmation (old behavior)
+   - No issues reported
    - **USAGE**: `update_all_instances.bat`
 
 3. **Cleanup Done**:
@@ -65,7 +60,7 @@ update_all_instances.bat /path:D:\OBS\Instances
 ```
 
 ## Testing Checklist:
-- [ ] Test create_new_ytplayer.bat with default (parent)
+- [ ] Test create_new_ytplayer.bat with default (parent) - RETRY WITH v2.2.1
 - [ ] Test create with /repo option
 - [ ] Test create with /path: option
 - [ ] Test update_all_instances.bat with no options
@@ -84,6 +79,7 @@ update_all_instances.bat /path:D:\OBS\Instances
 5. **File count**: Shows number of files copied
 6. **Quick setup**: Simplified OBS instructions
 7. **Cleanup**: Removed debug script
+8. **Bug fix**: Fixed parameter parsing in create script
 
 ## Preserved Features:
 - ✅ Safety (instances outside repo by default)
@@ -95,18 +91,20 @@ update_all_instances.bat /path:D:\OBS\Instances
 - ✅ Git pull on update
 
 ## Next Steps:
-1. User tests the simplified scripts
-2. Fix any issues found during testing
-3. Update documentation/README
-4. Merge PR after approval
+1. User tests the fixed create script (v2.2.1)
+2. Continue testing other scenarios
+3. Fix any other issues found
+4. Update documentation/README
+5. Merge PR after approval
 
 ## PR Status:
 - Branch: feature/update-all-instances-script
-- PR #31: Open - Added simplification
+- PR #31: Open - Added simplification + bug fix
 - Previous versions (2.0.1, 2.1.0) tested and working
-- New versions (2.2.0) need testing
+- New versions (2.2.0, 2.2.1) need testing
 
 ## Important Notes:
+- Fixed parameter parsing bug in create script
 - Scripts maintain backward compatibility
 - Command line options are optional
 - Default behavior is the simplest use case
