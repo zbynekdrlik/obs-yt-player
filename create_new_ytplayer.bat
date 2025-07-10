@@ -2,10 +2,10 @@
 setlocal enabledelayedexpansion
 
 :: YouTube Player Instance Creator - Simplified Version
-:: Version: 2.2.0 - No prompts, defaults to parent directory
+:: Version: 2.2.1 - Fixed parameter parsing bug
 
 echo ==========================================
-echo YouTube Player Instance Creator v2.2.0
+echo YouTube Player Instance Creator v2.2.1
 echo ==========================================
 echo.
 
@@ -52,23 +52,27 @@ if not exist "%TEMPLATE_DIR%" (
 :: Parse command line options - default to parent directory
 set "TARGET_DIR=..\yt-player-%INSTANCE_NAME%"
 
-:: Check for /repo option
-if /i "%~2"=="/repo" (
-    set "TARGET_DIR=yt-player-%INSTANCE_NAME%"
-    echo Note: Creating in repository (not recommended for safety)
-) else if /i "%~2"=="/path" (
-    echo ERROR: /path requires a directory. Use /path:C:\your\directory
-    pause
-    exit /b 1
-) else (
-    :: Check for /path:directory option
-    set "param2=%~2"
-    if not "!param2!"=="" (
+:: Check if there's a second parameter
+if not "%~2"=="" (
+    :: Check for /repo option
+    if /i "%~2"=="/repo" (
+        set "TARGET_DIR=yt-player-%INSTANCE_NAME%"
+        echo Note: Creating in repository (not recommended for safety)
+    ) else if /i "%~2"=="/path" (
+        echo ERROR: /path requires a directory. Use /path:C:\your\directory
+        pause
+        exit /b 1
+    ) else (
+        :: Check for /path:directory option
+        set "param2=%~2"
         set "prefix=!param2:~0,6!"
         if /i "!prefix!"=="/path:" (
             set "custom_path=!param2:~6!"
             set "TARGET_DIR=!custom_path!\yt-player-%INSTANCE_NAME%"
             echo Note: Creating in custom location: !custom_path!
+        ) else (
+            echo WARNING: Unknown option: %~2
+            echo Continuing with default parent directory...
         )
     )
 )
