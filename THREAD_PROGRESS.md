@@ -2,122 +2,107 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Testing completed successfully!
-- [x] Waiting for: Nothing - scripts are working
+- [x] Currently working on: Script simplification COMPLETE
+- [ ] Waiting for: User to test simplified scripts
 - [ ] Blocked by: None
-- [ ] NEXT THREAD GOAL: Simplify scripts to remove prompts
 
 ## Implementation Status
-- Phase: Feature COMPLETE - Testing Successful
-- Step: Ready for simplification in next thread
-- Status: TESTED_AND_WORKING (v2.1.0)
+- Phase: Feature Enhancement - Simplification
+- Step: Implementation complete, awaiting testing
+- Status: IMPLEMENTED_NOT_TESTED (v2.2.0)
 
-## Feature: Batch Scripts for Managing Instances
+## Simplified Scripts Created
 
-### FINAL WORKING VERSIONS:
+### Version 2.2.0 Changes:
 
-1. **create_new_ytplayer.bat** - Version 2.0.1 ✅
-   - Creates instances with location choice
-   - Fixed validation bug
-   - TESTED: Successfully created "ytfast" instance
-
-2. **update_all_instances.bat** - Version 2.1.0 ✅
-   - Updates all instances from main
-   - Restructured with :process_instance function
-   - TESTED: Successfully updated 2 instances
-   - All 21 module files copied
-   - Main scripts updated
-   - INSTANCE_INFO.txt shows "Updated" status
-
-### Test Results Summary:
-- **create_new_ytplayer.bat**: ✅ WORKING
-  - Created "ytfast" in parent directory
-  - 63 files copied successfully
-  
-- **update_all_instances.bat**: ✅ WORKING
-  - Found and updated 2 instances
-  - No syntax errors with v2.1.0 structure
-  - All files copied successfully
-  - Debug version confirmed all operations
-
-### Current Directory Structure:
-```
-C:\Users\zbynek\Documents\GitHub\
-├── obs-yt-player\              # Git repository
-│   ├── yt-player-main\         # Template
-│   ├── create_new_ytplayer.bat # v2.0.1
-│   ├── update_all_instances.bat # v2.1.0
-│   └── update_all_instances_debug.bat
-│
-├── yt-player-ytfast\           # Instance (SAFE!)
-│   ├── ytfast.py
-│   ├── ytfast_modules\
-│   └── INSTANCE_INFO.txt (Updated)
-│
-└── yt-player-ytslow\           # Instance (SAFE!)
-    ├── ytslow.py
-    ├── ytslow_modules\
-    └── INSTANCE_INFO.txt (Updated)
-```
-
-## NEXT THREAD GOALS - SIMPLIFICATION:
-
-### Goal: Remove Interactive Prompts
-1. **create_new_ytplayer.bat**:
-   - Default to parent directory (no location prompt)
-   - Just run: `create_new_ytplayer.bat instancename`
-   - Optional parameters for advanced use:
+1. **create_new_ytplayer.bat** - Version 2.2.0 ✅
+   - **REMOVED**: Location choice prompt
+   - **DEFAULT**: Creates in parent directory (safer)
+   - **NEW**: Command line options:
      - `/repo` - create in repository
      - `/path:C:\custom\path` - custom location
+   - **USAGE**: `create_new_ytplayer.bat worship`
 
-2. **update_all_instances.bat**:
-   - Remove "Search additional locations?" prompt
-   - Remove "Continue with update?" prompt
-   - Just run: `update_all_instances.bat`
-   - Auto-search current + parent directories
-   - Optional parameters:
-     - `/noparent` - skip parent directory
-     - `/path:C:\custom\path` - add custom path
-     - `/confirm` - ask for confirmation
+2. **update_all_instances.bat** - Version 2.2.0 ✅
+   - **REMOVED**: "Search additional locations?" prompt
+   - **REMOVED**: "Continue with update?" prompt
+   - **DEFAULT**: Auto-searches current + parent directories
+   - **NEW**: Command line options:
+     - `/noparent` - skip parent directory search
+     - `/path:C:\custom\path` - add custom search path
+     - `/confirm` - ask for confirmation (old behavior)
+   - **USAGE**: `update_all_instances.bat`
 
 ### Simplified Workflow:
 ```cmd
-# Create instance (defaults to parent)
+# Create instance (defaults to parent directory)
 create_new_ytplayer.bat worship
 
-# Update all instances (no questions)
+# Update all instances (no prompts)
 update_all_instances.bat
 ```
 
-### Keep Current Features:
-- Safety features (instances outside repo)
-- Cache/config preservation
-- Error handling
-- Progress output
-- Summary report
+### Advanced Usage Examples:
+```cmd
+# Create in repository (not recommended)
+create_new_ytplayer.bat test /repo
 
-### Remove:
-- Location choice prompt
-- Search additional locations prompt
-- Continue confirmation prompt
-- Excessive "echo" statements
+# Create in custom location
+create_new_ytplayer.bat kids /path:D:\OBS\Instances
+
+# Update with confirmation prompt
+update_all_instances.bat /confirm
+
+# Update only current directory instances
+update_all_instances.bat /noparent
+
+# Update with additional search path
+update_all_instances.bat /path:D:\OBS\Instances
+```
+
+## Testing Checklist:
+- [ ] Test create_new_ytplayer.bat with default (parent)
+- [ ] Test create with /repo option
+- [ ] Test create with /path: option
+- [ ] Test update_all_instances.bat with no options
+- [ ] Test update with /confirm option
+- [ ] Test update with /noparent option
+- [ ] Test update with /path: option
+- [ ] Verify file count feedback works
+- [ ] Verify no prompts in default mode
+- [ ] Verify error handling still works
+
+## What Changed:
+1. **Better defaults**: Parent directory for safety
+2. **No interruptions**: Scripts run without prompts
+3. **Flexible options**: Command line args for advanced users
+4. **Cleaner output**: Removed excessive echo statements
+5. **File count**: Shows number of files copied
+6. **Quick setup**: Simplified OBS instructions
+
+## Preserved Features:
+- ✅ Safety (instances outside repo by default)
+- ✅ Cache/config preservation
+- ✅ Error handling
+- ✅ Progress output
+- ✅ Summary reports
+- ✅ Instance validation
+- ✅ Git pull on update
+
+## Next Steps:
+1. User tests the simplified scripts
+2. Fix any issues found during testing
+3. Update documentation/README
+4. Merge PR after approval
 
 ## PR Status:
 - Branch: feature/update-all-instances-script
-- PR #31: Open and ready
-- All features working as designed
-- Ready for merge after user approval
+- PR #31: Open - Added simplification
+- Previous versions (2.0.1, 2.1.0) tested and working
+- New versions (2.2.0) need testing
 
-## Important Notes for Next Thread:
-- Scripts are WORKING - don't break them!
-- Keep v2.1.0 structure (function calls work)
-- Test thoroughly after simplification
-- Consider creating "simple" versions first
-- Document command line parameters clearly
-
-## Safety Checklist:
-- [✅] Instances created outside repository
-- [✅] Scripts tested and working
-- [✅] Updates preserve cache/config
-- [✅] Branch switching won't delete instances
-- [✅] Both scripts at stable versions
+## Important Notes:
+- Scripts maintain backward compatibility
+- Command line options are optional
+- Default behavior is the simplest use case
+- Previous working versions preserved if rollback needed
