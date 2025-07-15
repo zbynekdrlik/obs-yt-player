@@ -15,7 +15,7 @@ from .state import (
     set_current_playback_video_id, get_cached_video_info,
     get_cached_videos, is_scene_active, should_stop_threads,
     get_playback_mode, is_first_video_played, set_first_video_played,
-    get_loop_video_id, set_loop_video_id
+    get_loop_video_id, set_loop_video_id, add_played_video
 )
 from .media_control import (
     force_disable_media_loop, get_media_state, get_media_duration,
@@ -185,6 +185,10 @@ def playback_controller():
                 if current_video_id:
                     set_current_playback_video_id(current_video_id)
                     log(f"Identified pre-loaded video: {current_video_id}")
+                    
+                    # Add the pre-loaded video to the played videos list
+                    add_played_video(current_video_id)
+                    log(f"Added pre-loaded video to played list: {current_video_id}")
                     
                     # If we're in loop mode, set this as the loop video
                     if get_playback_mode() == PLAYBACK_MODE_LOOP and not get_loop_video_id():
