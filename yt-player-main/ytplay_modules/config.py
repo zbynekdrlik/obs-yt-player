@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.1.0"  # Implemented unique source names for multi-instance support
+SCRIPT_VERSION = "4.1.1"  # Fixed pre-loaded video tracking in played videos list
 
 # Dynamic script detection - works with any script name
 # Look for .py file in parent directory that's not __init__.py
