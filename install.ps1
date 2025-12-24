@@ -735,7 +735,9 @@ function Install-OBSYouTubePlayer {
             }
 
             if (Test-Path $obsExe) {
-                Start-Process -FilePath $obsExe
+                # Start OBS from its own directory (required for locale files)
+                $obsDir = Split-Path -Parent $obsExe
+                Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
                 Write-Info "Waiting for OBS to start (up to 30 seconds)..."
 
                 # Wait for OBS to start (up to 30 seconds)
