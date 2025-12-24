@@ -322,14 +322,16 @@ class TestEnsureCacheDirectory:
         tools_dir = cache_dir / "tools"
         assert tools_dir.exists()
 
-    def test_handles_permission_error(self, mocker, configured_state):
+    def test_handles_permission_error(self, tmp_path, mocker, configured_state):
         """Should handle permission errors gracefully."""
         from ytplay_modules import state
         from ytplay_modules.tools import ensure_cache_directory
 
-        state.set_cache_dir("/root/forbidden_cache")  # Likely permission denied
+        # Use a real path so state is set correctly
+        state.set_cache_dir(str(tmp_path / "forbidden_cache"))
 
-        mocker.patch("os.makedirs", side_effect=PermissionError("Access denied"))
+        # Mock Path.mkdir to raise PermissionError
+        mocker.patch("pathlib.Path.mkdir", side_effect=PermissionError("Access denied"))
 
         result = ensure_cache_directory()
 
