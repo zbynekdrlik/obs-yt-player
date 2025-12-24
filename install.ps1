@@ -392,6 +392,35 @@ function Enable-OBSWebSocket {
     }
 }
 
+function Disable-OBSWebSocketAuth {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    try {
+        if ($IsPortable) {
+            $configDir = Join-Path $OBSPath "config\obs-studio\plugin_config\obs-websocket"
+        } else {
+            $configDir = Join-Path $env:APPDATA "obs-studio\plugin_config\obs-websocket"
+        }
+
+        $configFile = Join-Path $configDir "config.json"
+
+        if (Test-Path $configFile) {
+            $config = Get-Content $configFile -Raw | ConvertFrom-Json
+            $config | Add-Member -NotePropertyName "auth_required" -NotePropertyValue $false -Force
+            $config | Add-Member -NotePropertyName "server_password" -NotePropertyValue "" -Force
+            $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
+            return $true
+        }
+        return $false
+    } catch {
+        Write-Warning "Could not disable authentication: $_"
+        return $false
+    }
+}
+
 function New-OBSScene {
     param(
         [System.Net.WebSockets.ClientWebSocket]$WebSocket,
@@ -807,10 +836,25 @@ function Install-OBSYouTubePlayer {
             if ($wsConfig.Success) {
                 Write-Success "WebSocket configuration ready"
 
-                # If auth is required, prompt for password now
+                # If auth is required, offer to disable or enter password
                 if ($wsConfig.AuthRequired) {
                     Write-Warning "WebSocket authentication is enabled"
-                    $script:wsPassword = Read-Host "Enter your OBS WebSocket password"
+                    Write-Host ""
+                    Write-Host "Options:" -ForegroundColor White
+                    Write-Host "  1. Enter your WebSocket password" -ForegroundColor Gray
+                    Write-Host "  2. Disable authentication (recommended for local use)" -ForegroundColor Gray
+                    Write-Host ""
+                    $authChoice = Read-Host "Choose (1 or 2)"
+
+                    if ($authChoice -eq "2") {
+                        # Disable authentication
+                        $disableResult = Disable-OBSWebSocketAuth -OBSPath $obsPath -IsPortable $isPortable
+                        if ($disableResult) {
+                            Write-Success "Authentication disabled"
+                        }
+                    } else {
+                        $script:wsPassword = Read-Host "Enter your OBS WebSocket password"
+                    }
                 }
             }
 
