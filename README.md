@@ -112,8 +112,8 @@ Version 4.1.0 introduces unique source names to support multiple instances prope
 ### Basic Operation
 
 1. **Load Script**: OBS automatically loads the script on startup
-2. **Automatic Sync**: Playlist syncs every 15 minutes (when scene active)
-3. **Manual Sync**: Click "Sync Playlist Now" button anytime
+2. **Startup Sync**: Playlist syncs once when tools are ready (after script load)
+3. **Manual Sync**: Click "Sync Playlist Now" button to refresh playlist
 4. **Scene Activation**: Videos only download/play when scene is active
 
 ### Playback Modes Explained
