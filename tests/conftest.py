@@ -69,25 +69,28 @@ def reset_obs_mock():
 
 
 @pytest.fixture(autouse=True)
-def reset_state_module():
+def reset_state_module(tmp_path):
     """
     Reset the ytplay_modules.state module between tests.
     This ensures no state leaks between tests.
+    Uses tmp_path to provide a valid cache directory for each test.
     """
     try:
         from ytplay_modules import state
         from ytplay_modules.config import (
             DEFAULT_PLAYLIST_URL,
-            DEFAULT_CACHE_DIR,
             DEFAULT_PLAYBACK_MODE,
             DEFAULT_AUDIO_ONLY_MODE,
         )
+
+        # Use tmp_path as cache dir so persistence works in tests
+        test_cache_dir = str(tmp_path / "test_cache")
 
         # Reset all module-level state variables directly
         with state._state_lock:
             # Configuration state
             state._playlist_url = DEFAULT_PLAYLIST_URL
-            state._cache_dir = DEFAULT_CACHE_DIR
+            state._cache_dir = test_cache_dir
             state._gemini_api_key = None
             state._playback_mode = DEFAULT_PLAYBACK_MODE
             state._audio_only_mode = DEFAULT_AUDIO_ONLY_MODE
@@ -122,14 +125,13 @@ def reset_state_module():
         from ytplay_modules import state
         from ytplay_modules.config import (
             DEFAULT_PLAYLIST_URL,
-            DEFAULT_CACHE_DIR,
             DEFAULT_PLAYBACK_MODE,
             DEFAULT_AUDIO_ONLY_MODE,
         )
 
         with state._state_lock:
             state._playlist_url = DEFAULT_PLAYLIST_URL
-            state._cache_dir = DEFAULT_CACHE_DIR
+            state._cache_dir = test_cache_dir  # Use same temp dir
             state._gemini_api_key = None
             state._playback_mode = DEFAULT_PLAYBACK_MODE
             state._audio_only_mode = DEFAULT_AUDIO_ONLY_MODE

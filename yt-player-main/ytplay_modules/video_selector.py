@@ -35,7 +35,19 @@ def select_next_video():
     
     available_videos = list(cached_videos.keys())
     played_videos = get_played_videos()
-    
+
+    # Filter played_videos to only include videos still in cache
+    # (handles case where playlist changed between sessions)
+    valid_played = [v for v in played_videos if v in available_videos]
+    if len(valid_played) != len(played_videos):
+        # Clean up stale entries by resetting and re-adding valid ones
+        stale_count = len(played_videos) - len(valid_played)
+        log(f"Cleaned {stale_count} stale entries from play history")
+        clear_played_videos()
+        for v in valid_played:
+            add_played_video(v)
+        played_videos = valid_played
+
     # If we only have one video, always play it
     if len(available_videos) == 1:
         selected = available_videos[0]

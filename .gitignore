@@ -62,12 +62,13 @@ logs/
 temp/
 tmp/
 
-# Test scripts (renamed instances)
-music*.py
-bgm*.py
-stream*.py
-test*.py
+# Test scripts (renamed instances in root directory)
+/music*.py
+/bgm*.py
+/stream*.py
+/test*.py
 
-# Multi-instance folders
+# Multi-instance folders (but not yt-player-main)
 yt-player-*/
+!yt-player-main/
 .coverage

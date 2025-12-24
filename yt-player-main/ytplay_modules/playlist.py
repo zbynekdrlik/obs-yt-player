@@ -98,7 +98,11 @@ def playlist_sync_worker():
         try:
             # First scan existing cache (Phase 3 addition)
             scan_existing_cache()
-            
+
+            # Initialize play history from persistent storage
+            from .state import initialize_played_videos
+            initialize_played_videos()
+
             # Fetch playlist
             playlist_url = get_playlist_url()
             videos = fetch_playlist_with_ytdlp(playlist_url)

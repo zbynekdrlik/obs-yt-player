@@ -257,20 +257,54 @@ def set_playlist_video_ids(video_ids):
         _playlist_video_ids.update(video_ids)
 
 def add_played_video(video_id):
-    """Add video to played list."""
+    """Add video to played list and persist to disk."""
+    from .play_history import save_play_history
+
+    should_save = False
+    videos_copy = None
     with _state_lock:
         if video_id not in _played_videos:
             _played_videos.append(video_id)
+            videos_copy = _played_videos.copy()
+            should_save = True
+
+    # Save outside the lock to avoid deadlock
+    if should_save:
+        save_play_history(videos_copy)
 
 def clear_played_videos():
-    """Clear played videos list."""
+    """Clear played videos list and persist to disk."""
+    from .play_history import save_play_history
+
     with _state_lock:
         _played_videos.clear()
+
+    # Save outside the lock to avoid deadlock
+    save_play_history([])
 
 def get_played_videos():
     """Get a copy of played videos list."""
     with _state_lock:
         return _played_videos.copy()
+
+
+def initialize_played_videos():
+    """
+    Load played videos from persistent storage on startup.
+    Should be called once during script initialization.
+    """
+    global _played_videos
+    from .play_history import load_play_history
+    from .logger import log
+
+    # Load outside the lock to avoid deadlock (load_play_history calls get_cache_dir)
+    loaded_videos = load_play_history()
+
+    with _state_lock:
+        _played_videos = loaded_videos
+
+    log(f"Loaded {len(loaded_videos)} played videos from history")
+
 
 def is_video_being_processed(video_id):
     """Check if video is currently being downloaded/processed."""
