@@ -26,6 +26,7 @@ $OBSWebSocketPort = 4455
 # Global WebSocket state
 $script:wsConnection = $null
 $script:wsMessageId = 0
+$script:wsPassword = ""
 
 function Write-Header {
     Write-Host ""
@@ -332,31 +333,59 @@ function Enable-OBSWebSocket {
             $configDir = Join-Path $env:APPDATA "obs-studio\plugin_config\obs-websocket"
         }
 
-        Write-Info "WebSocket config: $configDir"
+        $configFile = Join-Path $configDir "config.json"
+
+        # Read existing config or create new
+        $config = $null
+        $existingAuth = $false
+
+        if (Test-Path $configFile) {
+            try {
+                $config = Get-Content $configFile -Raw | ConvertFrom-Json
+                # Check if auth is configured
+                if ($config.auth_required -eq $true) {
+                    $existingAuth = $true
+                }
+            } catch {
+                $config = $null
+            }
+        }
 
         # Create directory if needed
         if (-not (Test-Path $configDir)) {
             New-Item -ItemType Directory -Path $configDir -Force | Out-Null
         }
 
-        $configFile = Join-Path $configDir "config.json"
-
-        # Create config with WebSocket enabled and NO authentication
-        $config = @{
-            server_enabled = $true
-            server_port = 4455
-            alerts_enabled = $false
-            auth_required = $false
-            server_password = ""
+        if ($null -eq $config) {
+            # No existing config - create fresh with no auth
+            $config = @{
+                server_enabled = $true
+                server_port = 4455
+                alerts_enabled = $false
+                auth_required = $false
+            }
+            $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
+            Write-Info "Created new WebSocket config (no authentication)"
+        } elseif ($config.server_enabled -ne $true) {
+            # Only enable server, preserve other settings
+            $config | Add-Member -NotePropertyName "server_enabled" -NotePropertyValue $true -Force
+            $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
+            Write-Info "Enabled WebSocket server (preserved existing settings)"
+        } else {
+            Write-Info "WebSocket already enabled"
         }
 
-        # Write config
-        $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
-
-        return $true
+        # Return whether auth is required (so we can prompt for password)
+        return @{
+            Success = $true
+            AuthRequired = $existingAuth
+        }
     } catch {
-        Write-Warning "Could not enable WebSocket: $_"
-        return $false
+        Write-Warning "Could not configure WebSocket: $_"
+        return @{
+            Success = $false
+            AuthRequired = $false
+        }
     }
 }
 
@@ -769,10 +798,17 @@ function Install-OBSYouTubePlayer {
 
         if ($startOBS -eq "" -or $startOBS -ieq "y" -or $startOBS -ieq "yes") {
             # Enable WebSocket in OBS config before starting
-            Write-Step "Enabling OBS WebSocket..."
-            $wsEnabled = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
-            if ($wsEnabled) {
-                Write-Success "WebSocket enabled in OBS config"
+            Write-Step "Configuring OBS WebSocket..."
+            $wsConfig = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
+
+            if ($wsConfig.Success) {
+                Write-Success "WebSocket configuration ready"
+
+                # If auth is required, prompt for password now
+                if ($wsConfig.AuthRequired) {
+                    Write-Warning "WebSocket authentication is enabled"
+                    $script:wsPassword = Read-Host "Enter your OBS WebSocket password"
+                }
             }
 
             Write-Step "Starting OBS Studio..."
@@ -824,7 +860,8 @@ function Install-OBSYouTubePlayer {
     if ($obsRunning -and (Test-OBSRunning)) {
         Write-Step "Connecting to OBS WebSocket..."
 
-        $ws = Connect-OBSWebSocket
+        # Use saved password if available
+        $ws = Connect-OBSWebSocket -Password $script:wsPassword
 
         if ($ws) {
             Write-Success "Connected to OBS WebSocket"
