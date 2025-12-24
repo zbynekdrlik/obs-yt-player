@@ -18,7 +18,7 @@ $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
 $InstallerVersion = "1.0.0"
-$InstallerCommit = "4b9a11a"  # Update on each commit
+$InstallerCommit = "0af6e3f"  # Update on each commit
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $ScriptFolder = "yt-player-main"
