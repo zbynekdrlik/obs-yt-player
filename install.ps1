@@ -107,9 +107,18 @@ function Find-SystemOBS {
 }
 
 function Get-InstallDirectory {
-    # Install to Documents\OBS-YouTube-Player by default
-    # Each instance goes in its own subfolder: yt-player-{name}
-    return $DefaultInstallDir
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    if ($IsPortable) {
+        # Portable OBS: Install inside OBS folder for easy transfer/backup
+        return Join-Path $OBSPath "scripts\OBS-YouTube-Player"
+    } else {
+        # System OBS: Install to Documents
+        return $DefaultInstallDir
+    }
 }
 
 function Get-OBSConfigDirectory {
@@ -976,8 +985,17 @@ function Install-OBSYouTubePlayer {
         $obsPath = $customPath
     }
 
-    # Step 4: Determine install directory (Documents\OBS-YouTube-Player)
-    $installDir = Get-InstallDirectory
+    # Step 4: Determine install directory
+    # - Portable OBS: Inside OBS folder (scripts\OBS-YouTube-Player)
+    # - System OBS: Documents\OBS-YouTube-Player
+    $installDir = Get-InstallDirectory -OBSPath $obsPath -IsPortable $isPortable
+
+    Write-Step "Install location:"
+    if ($isPortable) {
+        Write-Info "$installDir (inside portable OBS)"
+    } else {
+        Write-Info "$installDir (Documents folder)"
+    }
 
     # Check for latest release version first
     Write-Step "Checking for latest version..."
