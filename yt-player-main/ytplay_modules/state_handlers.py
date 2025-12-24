@@ -57,10 +57,10 @@ def log_playback_progress(video_id, current_time, duration):
     global _last_progress_log
 
     # Log every 30 seconds
-    progress_key = f"{video_id}_{int(current_time/30000)}"
+    progress_key = f"{video_id}_{int(current_time / 30000)}"
     if progress_key not in _last_progress_log:
         _last_progress_log[progress_key] = True
-        percent = int((current_time/duration) * 100)
+        percent = int((current_time / duration) * 100)
 
         # Get video info for better logging
         video_info = get_cached_video_info(video_id)
@@ -69,8 +69,10 @@ def log_playback_progress(video_id, current_time, duration):
             current_time_formatted = format_duration(current_time / 1000)
             duration_formatted = format_duration(duration / 1000)
 
-            log(f"Playing: {video_info['song']} - {video_info['artist']} "
-                f"[{percent}% - {current_time_formatted} / {duration_formatted}]")
+            log(
+                f"Playing: {video_info['song']} - {video_info['artist']} "
+                f"[{percent}% - {current_time_formatted} / {duration_formatted}]"
+            )
 
 
 def handle_playing_state():
@@ -100,6 +102,7 @@ def handle_playing_state():
             log("No valid media loaded, starting playback")
             # Import here to avoid circular dependency
             from .playback_controller import start_next_video
+
             start_next_video()
             return
         # Valid media is playing, sync the state
@@ -128,7 +131,7 @@ def handle_playing_state():
             time_diff = current_time - _last_playback_time
             # If time jumped forward by more than threshold, it's likely a seek
             if time_diff > SEEK_THRESHOLD:
-                log(f"Seek detected: jumped from {_last_playback_time/1000:.1f}s to {current_time/1000:.1f}s")
+                log(f"Seek detected: jumped from {_last_playback_time / 1000:.1f}s to {current_time / 1000:.1f}s")
                 # Reset the rescheduled flag to allow rescheduling
                 _title_clear_rescheduled = False
 
@@ -154,7 +157,7 @@ def handle_playing_state():
                 # Schedule the fade out based on current remaining time
                 schedule_title_clear_from_current(remaining_ms)
                 _title_clear_rescheduled = True
-                log(f"Title fade rescheduled for remaining time: {remaining_ms/1000:.1f}s")
+                log(f"Title fade rescheduled for remaining time: {remaining_ms / 1000:.1f}s")
 
 
 def handle_ended_state():
@@ -210,6 +213,7 @@ def handle_ended_state():
                 set_first_video_played(True)
                 # Import here to avoid circular dependency
                 from .playback_controller import stop_current_playback
+
                 stop_current_playback()
                 return
             else:
@@ -221,6 +225,7 @@ def handle_ended_state():
                 log("Single mode: First video ended, stopping playback")
                 # Import here to avoid circular dependency
                 from .playback_controller import stop_current_playback
+
                 stop_current_playback()
                 return
             else:
@@ -229,6 +234,7 @@ def handle_ended_state():
 
         # Import here to avoid circular dependency
         from .playback_controller import start_next_video
+
         start_next_video()
     elif is_scene_active() and get_cached_videos():
         # Check if we're in single mode and already played first video
@@ -239,6 +245,7 @@ def handle_ended_state():
         log("Scene active and videos available, starting playback")
         # Import here to avoid circular dependency
         from .playback_controller import start_next_video
+
         start_next_video()
 
 
@@ -264,6 +271,7 @@ def schedule_loop_restart(video_id):
         # Don't clear _loop_restart_pending here - wait until video is actually playing
         # Import here to avoid circular dependency
         from .playback_controller import start_specific_video
+
         start_specific_video(video_id)
 
     # Schedule the restart with a longer delay to ensure media source is ready
@@ -289,6 +297,7 @@ def handle_stopped_state():
             # Stop playback cleanly
             # Import here to avoid circular dependency
             from .playback_controller import stop_current_playback
+
             stop_current_playback()
             return
 
@@ -299,11 +308,13 @@ def handle_stopped_state():
             log(f"Retry attempt {_playback_retry_count}")
             # Import here to avoid circular dependency
             from .playback_controller import start_next_video
+
             start_next_video()
         else:
             log("Max retries reached, stopping playback")
             # Import here to avoid circular dependency
             from .playback_controller import stop_current_playback
+
             stop_current_playback()
 
 
@@ -328,6 +339,7 @@ def handle_none_state():
             log("Scene active and videos available, starting playback")
             # Import here to avoid circular dependency
             from .playback_controller import start_next_video
+
             start_next_video()
     elif is_scene_active() and is_playing():
         # This shouldn't happen - playing but no media?

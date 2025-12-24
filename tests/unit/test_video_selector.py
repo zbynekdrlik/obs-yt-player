@@ -6,7 +6,6 @@ Target: 100% coverage
 """
 
 
-
 class TestSelectNextVideo:
     """Tests for select_next_video function."""
 
@@ -26,11 +25,7 @@ class TestSelectNextVideo:
         from ytplay_modules.state import add_cached_video
         from ytplay_modules.video_selector import select_next_video
 
-        add_cached_video("test_vid1", {
-            "path": "/cache/test1.mp4",
-            "song": "Test Song",
-            "artist": "Test Artist"
-        })
+        add_cached_video("test_vid1", {"path": "/cache/test1.mp4", "song": "Test Song", "artist": "Test Artist"})
 
         result = select_next_video()
         assert result == "test_vid1"
@@ -41,11 +36,7 @@ class TestSelectNextVideo:
         from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
-        add_cached_video("only_video", {
-            "path": "/cache/only.mp4",
-            "song": "Only Song",
-            "artist": "Only Artist"
-        })
+        add_cached_video("only_video", {"path": "/cache/only.mp4", "song": "Only Song", "artist": "Only Artist"})
 
         # Select multiple times
         for _ in range(5):
@@ -60,11 +51,9 @@ class TestSelectNextVideo:
         clear_played_videos()
         video_ids = ["vid_a", "vid_b", "vid_c"]
         for vid_id in video_ids:
-            add_cached_video(vid_id, {
-                "path": f"/cache/{vid_id}.mp4",
-                "song": f"Song {vid_id}",
-                "artist": f"Artist {vid_id}"
-            })
+            add_cached_video(
+                vid_id, {"path": f"/cache/{vid_id}.mp4", "song": f"Song {vid_id}", "artist": f"Artist {vid_id}"}
+            )
 
         result = select_next_video()
         assert result in video_ids
@@ -77,11 +66,9 @@ class TestSelectNextVideo:
         clear_played_videos()
         video_ids = ["no_repeat_a", "no_repeat_b", "no_repeat_c"]
         for vid_id in video_ids:
-            add_cached_video(vid_id, {
-                "path": f"/cache/{vid_id}.mp4",
-                "song": f"Song {vid_id}",
-                "artist": f"Artist {vid_id}"
-            })
+            add_cached_video(
+                vid_id, {"path": f"/cache/{vid_id}.mp4", "song": f"Song {vid_id}", "artist": f"Artist {vid_id}"}
+            )
 
         selected = []
         for _ in range(3):
@@ -99,11 +86,9 @@ class TestSelectNextVideo:
         clear_played_videos()
         video_ids = ["reset_a", "reset_b"]
         for vid_id in video_ids:
-            add_cached_video(vid_id, {
-                "path": f"/cache/{vid_id}.mp4",
-                "song": f"Song {vid_id}",
-                "artist": f"Artist {vid_id}"
-            })
+            add_cached_video(
+                vid_id, {"path": f"/cache/{vid_id}.mp4", "song": f"Song {vid_id}", "artist": f"Artist {vid_id}"}
+            )
 
         # Play all videos
         select_next_video()
@@ -120,16 +105,8 @@ class TestSelectNextVideo:
         from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
-        add_cached_video("loop_vid", {
-            "path": "/cache/loop.mp4",
-            "song": "Loop Song",
-            "artist": "Loop Artist"
-        })
-        add_cached_video("other_vid", {
-            "path": "/cache/other.mp4",
-            "song": "Other Song",
-            "artist": "Other Artist"
-        })
+        add_cached_video("loop_vid", {"path": "/cache/loop.mp4", "song": "Loop Song", "artist": "Loop Artist"})
+        add_cached_video("other_vid", {"path": "/cache/other.mp4", "song": "Other Song", "artist": "Other Artist"})
 
         set_playback_mode(PLAYBACK_MODE_LOOP)
         set_loop_video_id("loop_vid")
@@ -154,11 +131,7 @@ class TestSelectNextVideo:
         clear_played_videos()
         set_loop_video_id(None)  # Clear any existing loop video
 
-        add_cached_video("auto_loop", {
-            "path": "/cache/auto_loop.mp4",
-            "song": "Auto Loop",
-            "artist": "Artist"
-        })
+        add_cached_video("auto_loop", {"path": "/cache/auto_loop.mp4", "song": "Auto Loop", "artist": "Artist"})
 
         set_playback_mode(PLAYBACK_MODE_LOOP)
 
@@ -175,11 +148,7 @@ class TestSelectNextVideo:
         clear_played_videos()
         set_loop_video_id("missing_video")  # Set loop to non-existent video
 
-        add_cached_video("fallback_vid", {
-            "path": "/cache/fallback.mp4",
-            "song": "Fallback",
-            "artist": "Artist"
-        })
+        add_cached_video("fallback_vid", {"path": "/cache/fallback.mp4", "song": "Fallback", "artist": "Artist"})
 
         set_playback_mode(PLAYBACK_MODE_LOOP)
 
@@ -219,11 +188,7 @@ class TestValidateVideoFile:
         from ytplay_modules.state import add_cached_video
         from ytplay_modules.video_selector import validate_video_file
 
-        add_cached_video("missing_file_vid", {
-            "path": "/nonexistent/path/video.mp4",
-            "song": "Test",
-            "artist": "Test"
-        })
+        add_cached_video("missing_file_vid", {"path": "/nonexistent/path/video.mp4", "song": "Test", "artist": "Test"})
 
         result = validate_video_file("missing_file_vid")
         assert result is False
@@ -237,11 +202,7 @@ class TestValidateVideoFile:
         video_file = tmp_path / "test_video.mp4"
         video_file.write_bytes(b"x" * 1024)
 
-        add_cached_video("existing_file_vid", {
-            "path": str(video_file),
-            "song": "Test",
-            "artist": "Test"
-        })
+        add_cached_video("existing_file_vid", {"path": str(video_file), "song": "Test", "artist": "Test"})
 
         result = validate_video_file("existing_file_vid")
         assert result is True
@@ -265,12 +226,10 @@ class TestGetVideoDisplayInfo:
         from ytplay_modules.state import add_cached_video
         from ytplay_modules.video_selector import get_video_display_info
 
-        add_cached_video("display_info_vid", {
-            "path": "/cache/test.mp4",
-            "song": "My Song Title",
-            "artist": "My Artist Name",
-            "gemini_failed": True
-        })
+        add_cached_video(
+            "display_info_vid",
+            {"path": "/cache/test.mp4", "song": "My Song Title", "artist": "My Artist Name", "gemini_failed": True},
+        )
 
         result = get_video_display_info("display_info_vid")
 
@@ -284,9 +243,7 @@ class TestGetVideoDisplayInfo:
         from ytplay_modules.video_selector import get_video_display_info
 
         # Video with minimal info
-        add_cached_video("minimal_info_vid", {
-            "path": "/cache/test.mp4"
-        })
+        add_cached_video("minimal_info_vid", {"path": "/cache/test.mp4"})
 
         result = get_video_display_info("minimal_info_vid")
 
@@ -299,11 +256,14 @@ class TestGetVideoDisplayInfo:
         from ytplay_modules.state import add_cached_video
         from ytplay_modules.video_selector import get_video_display_info
 
-        add_cached_video("partial_info_vid", {
-            "path": "/cache/test.mp4",
-            "song": "Only Song"
-            # Missing artist and gemini_failed
-        })
+        add_cached_video(
+            "partial_info_vid",
+            {
+                "path": "/cache/test.mp4",
+                "song": "Only Song",
+                # Missing artist and gemini_failed
+            },
+        )
 
         result = get_video_display_info("partial_info_vid")
 
@@ -324,11 +284,7 @@ class TestPlaybackModeIntegration:
         clear_played_videos()
         set_playback_mode(PLAYBACK_MODE_SINGLE)
 
-        add_cached_video("single_vid", {
-            "path": "/cache/single.mp4",
-            "song": "Single",
-            "artist": "Artist"
-        })
+        add_cached_video("single_vid", {"path": "/cache/single.mp4", "song": "Single", "artist": "Artist"})
 
         # Video selector still selects, single mode is handled at playback level
         result = select_next_video()
@@ -382,11 +338,7 @@ class TestRandomnessAndDistribution:
 
         video_ids = [f"dist_vid_{i}" for i in range(5)]
         for vid_id in video_ids:
-            add_cached_video(vid_id, {
-                "path": f"/cache/{vid_id}.mp4",
-                "song": f"Song {vid_id}",
-                "artist": "Artist"
-            })
+            add_cached_video(vid_id, {"path": f"/cache/{vid_id}.mp4", "song": f"Song {vid_id}", "artist": "Artist"})
 
         selected_set = set()
         # Select enough times to cover all videos at least once

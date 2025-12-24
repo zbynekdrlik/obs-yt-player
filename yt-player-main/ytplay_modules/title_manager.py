@@ -31,6 +31,7 @@ def clear_title_before_end_callback():
 
     # Import here to avoid circular dependency
     from .opacity_control import fade_out_text
+
     fade_out_text()
 
 
@@ -43,9 +44,9 @@ def show_title_after_start_callback():
         _title_show_timer = None
 
     if _pending_title_info:
-        song = _pending_title_info.get('song', 'Unknown Song')
-        artist = _pending_title_info.get('artist', 'Unknown Artist')
-        gemini_failed = _pending_title_info.get('gemini_failed', False)
+        song = _pending_title_info.get("song", "Unknown Song")
+        artist = _pending_title_info.get("artist", "Unknown Artist")
+        gemini_failed = _pending_title_info.get("gemini_failed", False)
         log(f"Showing title after delay: {song} - {artist}")
 
         # Import here to avoid circular dependency
@@ -94,7 +95,7 @@ def schedule_title_clear(duration_ms):
         _title_clear_timer = clear_title_before_end_callback
         obs.timer_add(_title_clear_timer, int(clear_time_ms))
         _title_clear_scheduled = True
-        log(f"Scheduled title fade out in {clear_time_ms/1000:.1f} seconds")
+        log(f"Scheduled title fade out in {clear_time_ms / 1000:.1f} seconds")
 
 
 def schedule_title_show(video_info):
@@ -141,7 +142,7 @@ def schedule_title_clear_from_current(remaining_ms):
         _title_clear_timer = clear_title_before_end_callback
         obs.timer_add(_title_clear_timer, int(clear_in_ms))
         _title_clear_scheduled = True
-        log(f"Scheduled title fade out in {clear_in_ms/1000:.1f} seconds (remaining: {remaining_ms/1000:.1f}s)")
+        log(f"Scheduled title fade out in {clear_in_ms / 1000:.1f} seconds (remaining: {remaining_ms / 1000:.1f}s)")
     else:
         # Import here to avoid circular dependency
         from .opacity_control import fade_out_text, get_current_opacity
@@ -169,7 +170,7 @@ def delayed_duration_check_callback():
     duration = get_media_duration(MEDIA_SOURCE_NAME)
     if duration > 0:
         schedule_title_clear(duration)
-        log(f"Got duration after delay: {duration/1000:.1f}s")
+        log(f"Got duration after delay: {duration / 1000:.1f}s")
     else:
         # Try again after another delay
         log("No duration yet, trying again...")
@@ -217,7 +218,7 @@ def update_text_source(song, artist, gemini_failed=False):
 
     # If opacity is not 0, fade out first then update
     if get_current_opacity() > 0:
-        set_pending_text({'song': song, 'artist': artist, 'gemini_failed': gemini_failed})
+        set_pending_text({"song": song, "artist": artist, "gemini_failed": gemini_failed})
         fade_out_text()
     else:
         # Already at 0, just update and fade in

@@ -87,11 +87,7 @@ class TestScheduleTitleShow:
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
 
-        video_info = {
-            "song": "Test Song",
-            "artist": "Test Artist",
-            "gemini_failed": False
-        }
+        video_info = {"song": "Test Song", "artist": "Test Artist", "gemini_failed": False}
 
         schedule_title_show(video_info)
 
@@ -106,10 +102,7 @@ class TestScheduleTitleShow:
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
 
-        video_info = {
-            "song": "Test Song",
-            "artist": "Test Artist"
-        }
+        video_info = {"song": "Test Song", "artist": "Test Artist"}
 
         schedule_title_show(video_info)
 
@@ -269,11 +262,7 @@ class TestShowTitleAfterStartCallback:
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
         title_manager._title_show_timer = lambda: None
-        title_manager._pending_title_info = {
-            "song": "Test Song",
-            "artist": "Test Artist",
-            "gemini_failed": False
-        }
+        title_manager._pending_title_info = {"song": "Test Song", "artist": "Test Artist", "gemini_failed": False}
 
         with patch("ytplay_modules.media_control.update_text_source_content") as mock_update:
             with patch("ytplay_modules.opacity_control.fade_in_text") as mock_fade:

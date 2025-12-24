@@ -232,16 +232,8 @@ class TestCleanupRemovedVideos:
         video_file = tmp_path / "remove_me.mp4"
         video_file.write_bytes(b"x" * 100)
 
-        add_cached_video("keep_vid", {
-            "path": str(tmp_path / "keep.mp4"),
-            "song": "Keep",
-            "artist": "Artist"
-        })
-        add_cached_video("remove_vid", {
-            "path": str(video_file),
-            "song": "Remove",
-            "artist": "Artist"
-        })
+        add_cached_video("keep_vid", {"path": str(tmp_path / "keep.mp4"), "song": "Keep", "artist": "Artist"})
+        add_cached_video("remove_vid", {"path": str(video_file), "song": "Remove", "artist": "Artist"})
 
         # Only keep_vid is in playlist
         set_playlist_video_ids({"keep_vid"})
@@ -265,11 +257,7 @@ class TestCleanupRemovedVideos:
 
         set_cache_dir(str(tmp_path))
 
-        add_cached_video("playing_vid", {
-            "path": str(tmp_path / "playing.mp4"),
-            "song": "Playing",
-            "artist": "Artist"
-        })
+        add_cached_video("playing_vid", {"path": str(tmp_path / "playing.mp4"), "song": "Playing", "artist": "Artist"})
 
         # Video not in playlist but currently playing
         set_playlist_video_ids(set())
@@ -291,11 +279,7 @@ class TestCleanupRemovedVideos:
         video_file = tmp_path / "to_delete.mp4"
         video_file.write_bytes(b"x" * 100)
 
-        add_cached_video("delete_vid", {
-            "path": str(video_file),
-            "song": "Delete",
-            "artist": "Artist"
-        })
+        add_cached_video("delete_vid", {"path": str(video_file), "song": "Delete", "artist": "Artist"})
 
         set_playlist_video_ids(set())  # Empty playlist
 
@@ -310,11 +294,9 @@ class TestCleanupRemovedVideos:
 
         set_cache_dir(str(tmp_path))
 
-        add_cached_video("missing_vid", {
-            "path": str(tmp_path / "nonexistent.mp4"),
-            "song": "Missing",
-            "artist": "Artist"
-        })
+        add_cached_video(
+            "missing_vid", {"path": str(tmp_path / "nonexistent.mp4"), "song": "Missing", "artist": "Artist"}
+        )
 
         set_playlist_video_ids(set())
 
@@ -331,11 +313,7 @@ class TestCleanupRemovedVideos:
 
         set_cache_dir(str(tmp_path))
 
-        add_cached_video("in_playlist", {
-            "path": str(tmp_path / "in.mp4"),
-            "song": "In Playlist",
-            "artist": "Artist"
-        })
+        add_cached_video("in_playlist", {"path": str(tmp_path / "in.mp4"), "song": "In Playlist", "artist": "Artist"})
 
         set_playlist_video_ids({"in_playlist"})
 

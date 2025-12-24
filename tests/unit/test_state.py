@@ -364,12 +364,7 @@ class TestCachedVideosState:
         from ytplay_modules.state import add_cached_video, get_cached_videos
 
         video_id = "test123"
-        video_info = {
-            "path": "/cache/test.mp4",
-            "song": "Test Song",
-            "artist": "Test Artist",
-            "normalized": True
-        }
+        video_info = {"path": "/cache/test.mp4", "song": "Test Song", "artist": "Test Artist", "normalized": True}
 
         add_cached_video(video_id, video_info)
 
@@ -562,11 +557,10 @@ class TestThreadSafety:
             try:
                 for i in range(10):
                     video_id = f"thread{thread_id}_video{i}"
-                    add_cached_video(video_id, {
-                        "path": f"/cache/{video_id}.mp4",
-                        "song": f"Song {i}",
-                        "artist": f"Artist {thread_id}"
-                    })
+                    add_cached_video(
+                        video_id,
+                        {"path": f"/cache/{video_id}.mp4", "song": f"Song {i}", "artist": f"Artist {thread_id}"},
+                    )
             except Exception as e:
                 errors.append(e)
 

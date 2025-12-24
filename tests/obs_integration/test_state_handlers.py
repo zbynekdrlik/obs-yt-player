@@ -41,11 +41,7 @@ class TestLogPlaybackProgress:
 
         obs.reset()
         video_id = "test123"
-        add_cached_video(video_id, {
-            "path": "/path/to/video.mp4",
-            "song": "Test Song",
-            "artist": "Test Artist"
-        })
+        add_cached_video(video_id, {"path": "/path/to/video.mp4", "song": "Test Song", "artist": "Test Artist"})
 
         # First log at 0 seconds
         log_playback_progress(video_id, 0, 180000)
@@ -55,6 +51,7 @@ class TestLogPlaybackProgress:
 
         # Third log at 31 seconds - should NOT log (same 30s bucket)
         from ytplay_modules import state_handlers
+
         initial_count = len(state_handlers._last_progress_log)
         log_playback_progress(video_id, 31000, 180000)
         assert len(state_handlers._last_progress_log) == initial_count
@@ -67,6 +64,7 @@ class TestHandlePlayingState:
         """Reset state before each test."""
         obs.reset()
         from ytplay_modules import state_handlers
+
         state_handlers._is_preloaded_video = False
         state_handlers._last_playback_time = 0
         state_handlers._manual_stop_detected = False
@@ -87,6 +85,7 @@ class TestHandlePlayingState:
         set_playing(True)
 
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = True
 
         handle_playing_state()
@@ -124,6 +123,7 @@ class TestHandlePlayingState:
         set_current_playback_video_id(video_id)
 
         from ytplay_modules import state_handlers
+
         state_handlers._last_playback_time = 10000  # Was at 10 seconds
 
         handle_playing_state()
@@ -139,6 +139,7 @@ class TestHandleEndedState:
         """Reset state before each test."""
         obs.reset()
         from ytplay_modules import state_handlers
+
         state_handlers._preloaded_video_handled = False
         state_handlers._is_preloaded_video = False
         state_handlers._loop_restart_pending = False
@@ -153,6 +154,7 @@ class TestHandleEndedState:
         set_playback_mode(PLAYBACK_MODE_LOOP)
 
         from ytplay_modules import state_handlers
+
         state_handlers._loop_restart_pending = True
 
         handle_ended_state()
@@ -200,6 +202,7 @@ class TestHandleStoppedState:
         """Reset state before each test."""
         obs.reset()
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = False
         state_handlers._playback_retry_count = 0
 
@@ -216,6 +219,7 @@ class TestHandleStoppedState:
         handle_stopped_state()
 
         from ytplay_modules import state_handlers
+
         assert state_handlers._manual_stop_detected is True
 
     def test_retries_when_playback_stops_unexpectedly(self):
@@ -226,6 +230,7 @@ class TestHandleStoppedState:
         set_playing(True)
 
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = True  # Already detected
         state_handlers._playback_retry_count = 0
 
@@ -249,6 +254,7 @@ class TestHandleStoppedState:
         set_playing(True)
 
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = True
         state_handlers._playback_retry_count = state_handlers._max_retry_attempts
 

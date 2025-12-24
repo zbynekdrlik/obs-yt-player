@@ -30,28 +30,16 @@ def fetch_playlist_with_ytdlp(playlist_url):
         ytdlp_path = get_ytdlp_path()
 
         # Prepare command
-        cmd = [
-            ytdlp_path,
-            '--flat-playlist',
-            '--dump-json',
-            '--no-warnings',
-            playlist_url
-        ]
+        cmd = [ytdlp_path, "--flat-playlist", "--dump-json", "--no-warnings", playlist_url]
 
         # Run command with hidden window on Windows
         startupinfo = None
-        if os.name == 'nt':
+        if os.name == "nt":
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = subprocess.SW_HIDE
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            startupinfo=startupinfo,
-            timeout=30
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, startupinfo=startupinfo, timeout=30)
 
         if result.returncode != 0:
             log(f"yt-dlp failed: {result.stderr}")
@@ -59,15 +47,17 @@ def fetch_playlist_with_ytdlp(playlist_url):
 
         # Parse JSON output (one JSON object per line)
         videos = []
-        for line in result.stdout.strip().split('\n'):
+        for line in result.stdout.strip().split("\n"):
             if line:
                 try:
                     video_data = json.loads(line)
-                    videos.append({
-                        'id': video_data.get('id', ''),
-                        'title': video_data.get('title', 'Unknown'),
-                        'duration': video_data.get('duration', 0)
-                    })
+                    videos.append(
+                        {
+                            "id": video_data.get("id", ""),
+                            "title": video_data.get("title", "Unknown"),
+                            "duration": video_data.get("duration", 0),
+                        }
+                    )
                 except json.JSONDecodeError:
                     continue
 
@@ -77,6 +67,7 @@ def fetch_playlist_with_ytdlp(playlist_url):
     except Exception as e:
         log(f"Error fetching playlist: {e}")
         return []
+
 
 def playlist_sync_worker():
     """Background thread for playlist synchronization - NO PERIODIC SYNC."""
@@ -105,6 +96,7 @@ def playlist_sync_worker():
 
             # Initialize play history from persistent storage
             from .state import initialize_played_videos
+
             initialize_played_videos()
 
             # Fetch playlist
@@ -116,7 +108,7 @@ def playlist_sync_worker():
                 continue
 
             # Update playlist video IDs
-            video_ids = [video['id'] for video in videos]
+            video_ids = [video["id"] for video in videos]
             set_playlist_video_ids(video_ids)
 
             # Queue only videos not in cache (Phase 3 enhancement)
@@ -124,7 +116,7 @@ def playlist_sync_worker():
             skipped_count = 0
 
             for video in videos:
-                video_id = video['id']
+                video_id = video["id"]
 
                 # Check if already cached
                 if is_video_cached(video_id):
@@ -145,6 +137,7 @@ def playlist_sync_worker():
 
     log("Playlist sync thread exiting")
 
+
 def trigger_startup_sync():
     """Trigger one-time sync on startup after tools are ready."""
     if is_sync_on_startup_done():
@@ -154,13 +147,16 @@ def trigger_startup_sync():
     log("Starting one-time playlist sync on startup")
     sync_event.set()  # Signal playlist sync thread to run
 
+
 def trigger_manual_sync():
     """Trigger manual playlist sync."""
     sync_event.set()
+
 
 def start_playlist_sync_thread():
     """Start the playlist sync thread."""
     global playlist_sync_thread
     from . import state
+
     state.playlist_sync_thread = threading.Thread(target=playlist_sync_worker, daemon=True)
     state.playlist_sync_thread.start()

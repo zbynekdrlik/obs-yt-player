@@ -5,7 +5,6 @@ Tests for main playback controller and video management.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-
 import obspython as obs
 
 
@@ -24,6 +23,7 @@ class TestVerifySources:
 
         # Reset the verified flag
         from ytplay_modules import playback_controller
+
         playback_controller._sources_verified = False
 
         result = verify_sources()
@@ -40,6 +40,7 @@ class TestVerifySources:
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
 
         from ytplay_modules import playback_controller
+
         playback_controller._sources_verified = False
 
         result = verify_sources()
@@ -56,6 +57,7 @@ class TestVerifySources:
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
 
         from ytplay_modules import playback_controller
+
         playback_controller._sources_verified = False
 
         result = verify_sources()
@@ -70,6 +72,7 @@ class TestPlaybackController:
         """Reset state before each test."""
         obs.reset()
         from ytplay_modules import playback_controller
+
         playback_controller._sources_verified = False
         playback_controller._waiting_for_videos_logged = False
         playback_controller._last_cached_count = 0
@@ -110,6 +113,7 @@ class TestPlaybackController:
         set_playing(True)
 
         from ytplay_modules import playback_controller as pc
+
         pc._sources_verified = True  # Skip verification
 
         playback_controller()
@@ -131,6 +135,7 @@ class TestPlaybackController:
         set_scene_active(True)
 
         from ytplay_modules import playback_controller as pc
+
         pc._sources_verified = True
         pc._waiting_for_videos_logged = False
 

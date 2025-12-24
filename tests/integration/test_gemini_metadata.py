@@ -17,11 +17,7 @@ class TestExtractMetadataWithGemini:
         """Should return None, None when no API key provided."""
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
-        artist, song = extract_metadata_with_gemini(
-            video_id="dQw4w9WgXcQ",
-            video_title="Test Title",
-            api_key=None
-        )
+        artist, song = extract_metadata_with_gemini(video_id="dQw4w9WgXcQ", video_title="Test Title", api_key=None)
 
         assert artist is None
         assert song is None
@@ -30,11 +26,7 @@ class TestExtractMetadataWithGemini:
         """Should return None, None when API key is empty."""
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
-        artist, song = extract_metadata_with_gemini(
-            video_id="dQw4w9WgXcQ",
-            video_title="Test Title",
-            api_key=""
-        )
+        artist, song = extract_metadata_with_gemini(video_id="dQw4w9WgXcQ", video_title="Test Title", api_key="")
 
         assert artist is None
         assert song is None
@@ -46,25 +38,19 @@ class TestExtractMetadataWithGemini:
 
         # Create mock response
         response_data = {
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "text": '{"artist": "Rick Astley", "song": "Never Gonna Give You Up"}'
-                    }]
-                }
-            }]
+            "candidates": [
+                {"content": {"parts": [{"text": '{"artist": "Rick Astley", "song": "Never Gonna Give You Up"}'}]}}
+            ]
         }
 
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(response_data).encode('utf-8')
+        mock_response.read.return_value = json.dumps(response_data).encode("utf-8")
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_response
 
         artist, song = extract_metadata_with_gemini(
-            video_id="dQw4w9WgXcQ",
-            video_title="Rick Astley - Never Gonna Give You Up",
-            api_key="test_api_key"
+            video_id="dQw4w9WgXcQ", video_title="Rick Astley - Never Gonna Give You Up", api_key="test_api_key"
         )
 
         assert artist == "Rick Astley"
@@ -76,25 +62,23 @@ class TestExtractMetadataWithGemini:
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
         response_data = {
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "text": '```json\n{"artist": "Elevation Worship", "song": "The Blessing"}\n```'
-                    }]
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{"text": '```json\n{"artist": "Elevation Worship", "song": "The Blessing"}\n```'}]
+                    }
                 }
-            }]
+            ]
         }
 
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(response_data).encode('utf-8')
+        mock_response.read.return_value = json.dumps(response_data).encode("utf-8")
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_response
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="The Blessing | Elevation Worship",
-            api_key="test_api_key"
+            video_id="test123", video_title="The Blessing | Elevation Worship", api_key="test_api_key"
         )
 
         assert artist == "Elevation Worship"
@@ -106,25 +90,17 @@ class TestExtractMetadataWithGemini:
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
         response_data = {
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "text": '{"artist": "", "song": "Unknown Song Title"}'
-                    }]
-                }
-            }]
+            "candidates": [{"content": {"parts": [{"text": '{"artist": "", "song": "Unknown Song Title"}'}]}}]
         }
 
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(response_data).encode('utf-8')
+        mock_response.read.return_value = json.dumps(response_data).encode("utf-8")
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_response
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="Some Video",
-            api_key="test_api_key"
+            video_id="test123", video_title="Some Video", api_key="test_api_key"
         )
 
         assert artist is None  # Empty string becomes None
@@ -136,19 +112,13 @@ class TestExtractMetadataWithGemini:
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
         mock_error = urllib.error.HTTPError(
-            url="http://test.com",
-            code=500,
-            msg="Internal Server Error",
-            hdrs={},
-            fp=MagicMock()
+            url="http://test.com", code=500, msg="Internal Server Error", hdrs={}, fp=MagicMock()
         )
         mock_error.read = MagicMock(return_value=b'{"error": "test"}')
         mock_urlopen.side_effect = mock_error
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="Test Title",
-            api_key="test_api_key"
+            video_id="test123", video_title="Test Title", api_key="test_api_key"
         )
 
         assert artist is None
@@ -162,35 +132,23 @@ class TestExtractMetadataWithGemini:
 
         # First call fails with 429, second succeeds
         mock_error = urllib.error.HTTPError(
-            url="http://test.com",
-            code=429,
-            msg="Rate Limited",
-            hdrs={},
-            fp=MagicMock()
+            url="http://test.com", code=429, msg="Rate Limited", hdrs={}, fp=MagicMock()
         )
         mock_error.read = MagicMock(return_value=b'{"error": "rate limited"}')
 
         success_response_data = {
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "text": '{"artist": "Artist", "song": "Song"}'
-                    }]
-                }
-            }]
+            "candidates": [{"content": {"parts": [{"text": '{"artist": "Artist", "song": "Song"}'}]}}]
         }
 
         mock_success = MagicMock()
-        mock_success.read.return_value = json.dumps(success_response_data).encode('utf-8')
+        mock_success.read.return_value = json.dumps(success_response_data).encode("utf-8")
         mock_success.__enter__ = MagicMock(return_value=mock_success)
         mock_success.__exit__ = MagicMock(return_value=False)
 
         mock_urlopen.side_effect = [mock_error, mock_success]
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="Test Title",
-            api_key="test_api_key"
+            video_id="test123", video_title="Test Title", api_key="test_api_key"
         )
 
         # Should have succeeded on retry
@@ -207,9 +165,7 @@ class TestExtractMetadataWithGemini:
         mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="Test Title",
-            api_key="test_api_key"
+            video_id="test123", video_title="Test Title", api_key="test_api_key"
         )
 
         assert artist is None
@@ -220,26 +176,16 @@ class TestExtractMetadataWithGemini:
         """Should handle invalid JSON in response text."""
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
-        response_data = {
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "text": "Not valid JSON at all"
-                    }]
-                }
-            }]
-        }
+        response_data = {"candidates": [{"content": {"parts": [{"text": "Not valid JSON at all"}]}}]}
 
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(response_data).encode('utf-8')
+        mock_response.read.return_value = json.dumps(response_data).encode("utf-8")
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_response
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="Test Title",
-            api_key="test_api_key"
+            video_id="test123", video_title="Test Title", api_key="test_api_key"
         )
 
         assert artist is None
@@ -250,20 +196,16 @@ class TestExtractMetadataWithGemini:
         """Should handle response with no candidates."""
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
-        response_data = {
-            "candidates": []
-        }
+        response_data = {"candidates": []}
 
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(response_data).encode('utf-8')
+        mock_response.read.return_value = json.dumps(response_data).encode("utf-8")
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_response
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="Test Title",
-            api_key="test_api_key"
+            video_id="test123", video_title="Test Title", api_key="test_api_key"
         )
 
         assert artist is None
@@ -274,26 +216,16 @@ class TestExtractMetadataWithGemini:
         """Should handle response missing song field."""
         from ytplay_modules.gemini_metadata import extract_metadata_with_gemini
 
-        response_data = {
-            "candidates": [{
-                "content": {
-                    "parts": [{
-                        "text": '{"artist": "Some Artist"}'
-                    }]
-                }
-            }]
-        }
+        response_data = {"candidates": [{"content": {"parts": [{"text": '{"artist": "Some Artist"}'}]}}]}
 
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(response_data).encode('utf-8')
+        mock_response.read.return_value = json.dumps(response_data).encode("utf-8")
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_response
 
         artist, song = extract_metadata_with_gemini(
-            video_id="test123",
-            video_title="Test Title",
-            api_key="test_api_key"
+            video_id="test123", video_title="Test Title", api_key="test_api_key"
         )
 
         # Song is required, so should return None

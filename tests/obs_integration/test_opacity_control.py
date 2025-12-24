@@ -5,7 +5,6 @@ Tests for text fade effects and opacity management.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-
 import obspython as obs
 
 
@@ -137,7 +136,7 @@ class TestFadeOutText:
         obs.reset()
         obs.clear_call_log()
         opacity_control._current_opacity = 50.0
-        opacity_control._fade_direction = 'out'
+        opacity_control._fade_direction = "out"
         opacity_control._opacity_timer = lambda: None  # Timer exists
 
         fade_out_text()
@@ -255,7 +254,7 @@ class TestStartOpacityTransition:
         opacity_control._opacity_timer = lambda: None
         opacity_control._current_opacity = 0.0
 
-        start_opacity_transition(100.0, 'in')
+        start_opacity_transition(100.0, "in")
 
         assert obs.assert_call_made("timer_remove")
 
@@ -268,10 +267,10 @@ class TestStartOpacityTransition:
         opacity_control._opacity_timer = None
         opacity_control._current_opacity = 0.0
 
-        start_opacity_transition(100.0, 'in')
+        start_opacity_transition(100.0, "in")
 
         assert opacity_control._target_opacity == 100.0
-        assert opacity_control._fade_direction == 'in'
+        assert opacity_control._fade_direction == "in"
         assert obs.assert_call_made("timer_add")
 
 
@@ -292,7 +291,7 @@ class TestOpacityTransitionCallback:
         opacity_control._current_opacity = 50.0
         opacity_control._target_opacity = 100.0
         opacity_control._opacity_step = 10.0
-        opacity_control._fade_direction = 'in'
+        opacity_control._fade_direction = "in"
         opacity_control._opacity_timer = opacity_transition_callback
 
         opacity_transition_callback()
@@ -314,7 +313,7 @@ class TestOpacityTransitionCallback:
         opacity_control._current_opacity = 95.0
         opacity_control._target_opacity = 100.0
         opacity_control._opacity_step = 10.0  # Would overshoot
-        opacity_control._fade_direction = 'in'
+        opacity_control._fade_direction = "in"
         opacity_control._opacity_timer = opacity_transition_callback
 
         opacity_transition_callback()

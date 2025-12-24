@@ -111,7 +111,7 @@ def validate_video_file(video_id):
         return False
 
     # Validate video file exists
-    if not os.path.exists(video_info['path']):
+    if not os.path.exists(video_info["path"]):
         log(f"ERROR: Video file missing: {video_info['path']}")
         return False
 
@@ -127,23 +127,15 @@ def get_video_display_info(video_id):
 
     video_info = get_cached_video_info(video_id)
     if not video_info:
-        return {
-            'song': 'Unknown Song',
-            'artist': 'Unknown Artist',
-            'gemini_failed': False
-        }
+        return {"song": "Unknown Song", "artist": "Unknown Artist", "gemini_failed": False}
 
     # Extract metadata with fallbacks
-    song = video_info.get('song', 'Unknown Song')
-    artist = video_info.get('artist', 'Unknown Artist')
-    gemini_failed = video_info.get('gemini_failed', False)
+    song = video_info.get("song", "Unknown Song")
+    artist = video_info.get("artist", "Unknown Artist")
+    gemini_failed = video_info.get("gemini_failed", False)
 
     # Log if metadata is missing
-    if song == 'Unknown Song' or artist == 'Unknown Artist':
+    if song == "Unknown Song" or artist == "Unknown Artist":
         log(f"WARNING: Missing metadata for video {video_id} - Song: '{song}', Artist: '{artist}'")
 
-    return {
-        'song': song,
-        'artist': artist,
-        'gemini_failed': gemini_failed
-    }
+    return {"song": song, "artist": artist, "gemini_failed": gemini_failed}

@@ -36,11 +36,12 @@ def get_current_video_from_media_source():
         # Expected format: <song>_<artist>_<id>_normalized.mp4
         filename = os.path.basename(file_path)
         if filename.endswith("_normalized.mp4"):
-            parts = filename[:-15].rsplit('_', 1)  # Remove _normalized.mp4 and split from right
+            parts = filename[:-15].rsplit("_", 1)  # Remove _normalized.mp4 and split from right
             if len(parts) >= 2:
                 video_id = parts[-1]
                 # Verify this video is in our cache
                 from .state import get_cached_video_info
+
                 if get_cached_video_info(video_id):
                     return video_id
 
@@ -108,7 +109,7 @@ def update_media_source(video_path, force_reload=False):
     """
     Update OBS Media Source with new video.
     Must be called from main thread.
-    
+
     Args:
         video_path: Path to the video file
         force_reload: If True, clears the source first to force a reload
@@ -133,7 +134,9 @@ def update_media_source(video_path, force_reload=False):
 
             # If it's the same file or force_reload is True, we need a multi-step reload
             if is_same_file or force_reload:
-                log(f"{'Force reloading' if force_reload else 'Same file detected, performing multi-step reload:'} {os.path.basename(video_path)}")
+                log(
+                    f"{'Force reloading' if force_reload else 'Same file detected, performing multi-step reload:'} {os.path.basename(video_path)}"
+                )
 
                 # Step 1: Stop the media completely
                 obs.obs_source_media_stop(source)

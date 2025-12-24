@@ -18,8 +18,8 @@ def extract_loudnorm_stats(ffmpeg_output):
     """Extract loudnorm statistics from FFmpeg output."""
     try:
         # Find JSON output in stderr
-        json_start = ffmpeg_output.rfind('{')
-        json_end = ffmpeg_output.rfind('}') + 1
+        json_start = ffmpeg_output.rfind("{")
+        json_end = ffmpeg_output.rfind("}") + 1
 
         if json_start == -1 or json_end == 0:
             log("No JSON data found in FFmpeg output")
@@ -29,7 +29,7 @@ def extract_loudnorm_stats(ffmpeg_output):
         stats = json.loads(json_str)
 
         # Verify required fields
-        required_fields = ['input_i', 'input_tp', 'input_lra', 'input_thresh', 'target_offset']
+        required_fields = ["input_i", "input_tp", "input_lra", "input_thresh", "target_offset"]
         for field in required_fields:
             if field not in stats:
                 log(f"Missing required field: {field}")
@@ -44,6 +44,7 @@ def extract_loudnorm_stats(ffmpeg_output):
         log(f"Error extracting loudnorm stats: {e}")
         return None
 
+
 def normalize_audio(input_path, video_id, metadata, gemini_failed=False):
     """
     Normalize audio to -14 LUFS using FFmpeg's loudnorm filter.
@@ -54,8 +55,8 @@ def normalize_audio(input_path, video_id, metadata, gemini_failed=False):
         cache_dir = get_cache_dir()
 
         # Generate output filename based on metadata
-        safe_song = sanitize_filename(metadata.get('song', 'Unknown'))
-        safe_artist = sanitize_filename(metadata.get('artist', 'Unknown'))
+        safe_song = sanitize_filename(metadata.get("song", "Unknown"))
+        safe_artist = sanitize_filename(metadata.get("artist", "Unknown"))
 
         # Add gemini failed marker if needed
         if gemini_failed:
@@ -90,10 +91,13 @@ def normalize_audio(input_path, video_id, metadata, gemini_failed=False):
         log("Running first pass audio analysis...")
         analysis_cmd = [
             get_ffmpeg_path(),
-            '-i', input_path,
-            '-af', 'loudnorm=I=-14:TP=-1:LRA=11:print_format=json',
-            '-f', 'null',
-            '-'
+            "-i",
+            input_path,
+            "-af",
+            "loudnorm=I=-14:TP=-1:LRA=11:print_format=json",
+            "-f",
+            "null",
+            "-",
         ]
 
         # Hide console window on Windows
@@ -103,11 +107,7 @@ def normalize_audio(input_path, video_id, metadata, gemini_failed=False):
 
         # Run analysis
         result = subprocess.run(
-            analysis_cmd,
-            capture_output=True,
-            text=True,
-            startupinfo=startupinfo,
-            timeout=NORMALIZE_TIMEOUT
+            analysis_cmd, capture_output=True, text=True, startupinfo=startupinfo, timeout=NORMALIZE_TIMEOUT
         )
 
         if result.returncode != 0:
@@ -137,28 +137,30 @@ def normalize_audio(input_path, video_id, metadata, gemini_failed=False):
 
         normalize_cmd = [
             get_ffmpeg_path(),
-            '-i', input_path,
-            '-af', loudnorm_filter,
-            '-c:v', 'copy',  # Copy video stream without re-encoding
-            '-c:a', 'aac',   # Re-encode audio to AAC
-            '-b:a', '192k',  # Audio bitrate
-            '-y',  # Overwrite output
-            output_path
+            "-i",
+            input_path,
+            "-af",
+            loudnorm_filter,
+            "-c:v",
+            "copy",  # Copy video stream without re-encoding
+            "-c:a",
+            "aac",  # Re-encode audio to AAC
+            "-b:a",
+            "192k",  # Audio bitrate
+            "-y",  # Overwrite output
+            output_path,
         ]
 
         # Show progress for long operation with hidden window
         process = subprocess.Popen(
-            normalize_cmd,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            startupinfo=startupinfo
+            normalize_cmd, stderr=subprocess.PIPE, universal_newlines=True, startupinfo=startupinfo
         )
 
         # Monitor progress
         for line in process.stderr:
-            if 'time=' in line:
+            if "time=" in line:
                 # Extract time progress
-                time_match = re.search(r'time=(\d+):(\d+):(\d+)', line)
+                time_match = re.search(r"time=(\d+):(\d+):(\d+)", line)
                 if time_match:
                     hours, minutes, seconds = map(int, time_match.groups())
                     total_seconds = hours * 3600 + minutes * 60 + seconds

@@ -31,13 +31,14 @@ def validate_video_file(file_path):
             return False
 
         # Check if it's a valid video file by extension
-        valid_extensions = ['.mp4', '.webm', '.mkv']
+        valid_extensions = [".mp4", ".webm", ".mkv"]
         if not any(file_path.lower().endswith(ext) for ext in valid_extensions):
             return False
 
         return True
     except Exception:
         return False
+
 
 def scan_existing_cache():
     """Scan cache directory for existing normalized videos."""
@@ -68,14 +69,14 @@ def scan_existing_cache():
 
             # Check if this is a Gemini failed file
             gemini_failed = False
-            if filename.endswith('_gf'):
+            if filename.endswith("_gf"):
                 gemini_failed = True
                 gemini_failed_count += 1
                 # Remove _gf suffix for parsing
                 filename = filename[:-3]
 
             # Must end with _normalized
-            if not filename.endswith('_normalized'):
+            if not filename.endswith("_normalized"):
                 continue
 
             # Remove _normalized suffix
@@ -83,18 +84,18 @@ def scan_existing_cache():
 
             # Find video ID by searching from the end
             # YouTube IDs are 11 characters and can contain letters, numbers, - and _
-            parts = without_suffix.split('_')
+            parts = without_suffix.split("_")
 
             # Try to find a valid YouTube ID from the end
             video_id = None
             for i in range(len(parts) - 1, -1, -1):
                 # Try combining parts to form an 11-character ID
                 for j in range(i, len(parts)):
-                    potential_id = '_'.join(parts[i:j+1])
+                    potential_id = "_".join(parts[i : j + 1])
                     if validate_youtube_id(potential_id):
                         video_id = potential_id
                         # Everything before this is song_artist
-                        remaining = '_'.join(parts[:i])
+                        remaining = "_".join(parts[:i])
                         break
                 if video_id:
                     break
@@ -108,7 +109,7 @@ def scan_existing_cache():
             if remaining:
                 # Try to split into song and artist
                 # The last part before video ID should be artist
-                remaining_parts = remaining.rsplit('_', 1)
+                remaining_parts = remaining.rsplit("_", 1)
                 if len(remaining_parts) == 2:
                     song, artist = remaining_parts
                 else:
@@ -119,13 +120,16 @@ def scan_existing_cache():
                 artist = "Unknown Artist"
 
             # Add to cached videos
-            add_cached_video(video_id, {
-                'path': str(file_path),
-                'song': song.replace('_', ' '),
-                'artist': artist.replace('_', ' '),
-                'normalized': True,
-                'gemini_failed': gemini_failed
-            })
+            add_cached_video(
+                video_id,
+                {
+                    "path": str(file_path),
+                    "song": song.replace("_", " "),
+                    "artist": artist.replace("_", " "),
+                    "normalized": True,
+                    "gemini_failed": gemini_failed,
+                },
+            )
             found_count += 1
 
             # Debug log for first few files
@@ -145,6 +149,7 @@ def scan_existing_cache():
 
     # Return whether we found any videos that need reprocessing
     return gemini_failed_count > 0
+
 
 def cleanup_removed_videos():
     """Remove videos that are no longer in playlist."""
@@ -168,8 +173,8 @@ def cleanup_removed_videos():
         video_info = get_cached_video_info(video_id)
         if video_info:
             try:
-                if os.path.exists(video_info['path']):
-                    os.remove(video_info['path'])
+                if os.path.exists(video_info["path"]):
+                    os.remove(video_info["path"])
                 remove_cached_video(video_id)
                 log(f"Removed: {video_info['artist']} - {video_info['song']}")
             except Exception as e:
@@ -177,6 +182,7 @@ def cleanup_removed_videos():
 
     if videos_to_remove:
         log(f"Cleaned up {len(videos_to_remove)} removed videos")
+
 
 def cleanup_temp_files():
     """Clean up any temporary files."""

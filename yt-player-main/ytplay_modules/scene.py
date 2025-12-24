@@ -24,6 +24,7 @@ _last_scene_change_time = 0
 _pending_deactivation = False
 _deactivation_timer = None
 
+
 def verify_scene_setup():
     """Verify that required scene and sources exist."""
     scene_source = obs.obs_get_source_by_name(SCENE_NAME)
@@ -52,14 +53,15 @@ def verify_scene_setup():
     # Remove this timer - only run once
     obs.timer_remove(verify_scene_setup)
 
+
 def is_scene_visible_nested(scene_name, check_scene_source=None):
     """
     Check if a scene is visible as a nested source in the current program scene.
-    
+
     Args:
         scene_name: The name of the scene to check for
         check_scene_source: Optional scene source to check within (defaults to current program scene)
-    
+
     Returns:
         bool: True if the scene is visible as a nested source
     """
@@ -120,10 +122,11 @@ def is_scene_visible_nested(scene_name, check_scene_source=None):
         if need_release:
             obs.obs_source_release(check_scene_source)
 
+
 def is_scene_active_or_nested():
     """
     Check if our scene is active either directly in program or as a nested source.
-    
+
     Returns:
         bool: True if scene is active in any way
     """
@@ -138,11 +141,13 @@ def is_scene_active_or_nested():
     # Then check if we're nested in the current program scene
     return is_scene_visible_nested(SCENE_NAME)
 
+
 def verify_initial_state():
     """Verify initial state when OBS finishes loading."""
     is_active = is_scene_active_or_nested()
     set_scene_active(is_active)
     log(f"Initial scene check: {SCENE_NAME} (active or nested: {is_active})")
+
 
 def get_preview_scene_name():
     """Get the name of the scene in preview (for Studio Mode)."""
@@ -153,9 +158,11 @@ def get_preview_scene_name():
         return name
     return None
 
+
 def is_studio_mode_active():
     """Check if Studio Mode (preview/program) is active."""
     return obs.obs_frontend_preview_program_mode_active()
+
 
 def delayed_deactivation():
     """Handle delayed deactivation after transition."""
@@ -171,6 +178,7 @@ def delayed_deactivation():
         set_scene_active(False)
         # Playback controller will handle stopping when scene is inactive
         _pending_deactivation = False
+
 
 def on_frontend_event(event):
     """Handle OBS frontend events."""
@@ -188,6 +196,7 @@ def on_frontend_event(event):
             verify_initial_state()
     except Exception as e:
         log(f"ERROR in frontend event handler: {e}")
+
 
 def handle_preview_change():
     """
@@ -208,11 +217,13 @@ def handle_preview_change():
             if preview_scene_name == SCENE_NAME and current_scene_name != SCENE_NAME:
                 log(f"Scene '{SCENE_NAME}' loaded in preview, ready to transition")
 
+
 def handle_transition_duration_changed():
     """Handle transition duration change event."""
     # Get the new transition duration when user changes it
     duration = obs.obs_frontend_get_transition_duration()
     log(f"Transition duration changed to: {duration}ms")
+
 
 def handle_scene_change():
     """
@@ -283,6 +294,7 @@ def handle_scene_change():
             log(f"Scene deactivated (no longer visible in: {current_scene_name})")
             set_scene_active(False)
             # Playback controller will handle stopping
+
 
 def handle_obs_exit():
     """Handle OBS exit event."""

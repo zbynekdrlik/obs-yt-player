@@ -270,16 +270,12 @@ class TestApplyUniversalSongCleaning:
 
     def test_applies_cleaning_to_song(self):
         """Should clean song title."""
-        song, artist = apply_universal_song_cleaning(
-            "Song (Live)", "Artist", "test_source"
-        )
+        song, artist = apply_universal_song_cleaning("Song (Live)", "Artist", "test_source")
         assert "Live" not in song
 
     def test_preserves_artist(self):
         """Artist should be unchanged."""
-        song, artist = apply_universal_song_cleaning(
-            "Song (Live)", "The Artist", "test_source"
-        )
+        song, artist = apply_universal_song_cleaning("Song (Live)", "The Artist", "test_source")
         assert artist == "The Artist"
 
     def test_none_song_returns_none(self):
@@ -302,9 +298,7 @@ class TestGetVideoMetadata:
         mock_api_key.return_value = None
 
         song, artist, source, gemini_failed = get_video_metadata(
-            "/path/to/video.mp4",
-            "Artist - Song Title",
-            "dQw4w9WgXcQ"
+            "/path/to/video.mp4", "Artist - Song Title", "dQw4w9WgXcQ"
         )
 
         assert source == "title_parsing"
@@ -317,11 +311,7 @@ class TestGetVideoMetadata:
         mock_api_key.return_value = "fake_api_key"
         mock_gemini.return_value = ("Test Artist", "Test Song")
 
-        song, artist, source, gemini_failed = get_video_metadata(
-            "/path/to/video.mp4",
-            "Some Title",
-            "dQw4w9WgXcQ"
-        )
+        song, artist, source, gemini_failed = get_video_metadata("/path/to/video.mp4", "Some Title", "dQw4w9WgXcQ")
 
         assert source == "Gemini"
         assert gemini_failed is False
@@ -334,11 +324,7 @@ class TestGetVideoMetadata:
         mock_api_key.return_value = "fake_api_key"
         mock_gemini.return_value = (None, None)
 
-        song, artist, source, gemini_failed = get_video_metadata(
-            "/path/to/video.mp4",
-            "Artist - Song",
-            "dQw4w9WgXcQ"
-        )
+        song, artist, source, gemini_failed = get_video_metadata("/path/to/video.mp4", "Artist - Song", "dQw4w9WgXcQ")
 
         assert source == "title_parsing"
         assert gemini_failed is True
@@ -352,11 +338,14 @@ class TestGetVideoMetadata:
 class TestRealWorldTitles:
     """Tests with real-world YouTube title formats."""
 
-    @pytest.mark.parametrize("title,expected_artist,expected_song", [
-        ("Hillsong UNITED - Oceans (Where Feet May Fail)", "Hillsong UNITED", "Oceans"),
-        ("Elevation Worship - The Blessing (Live)", "Elevation Worship", "The Blessing"),
-        # More complex formats may not parse perfectly without Gemini
-    ])
+    @pytest.mark.parametrize(
+        "title,expected_artist,expected_song",
+        [
+            ("Hillsong UNITED - Oceans (Where Feet May Fail)", "Hillsong UNITED", "Oceans"),
+            ("Elevation Worship - The Blessing (Live)", "Elevation Worship", "The Blessing"),
+            # More complex formats may not parse perfectly without Gemini
+        ],
+    )
     def test_worship_song_formats(self, title, expected_artist, expected_song):
         """Test common worship music title formats."""
         song, artist = parse_title_smart(title)

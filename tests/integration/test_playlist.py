@@ -10,7 +10,7 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
-if not hasattr(subprocess, 'STARTUPINFO'):
+if not hasattr(subprocess, "STARTUPINFO"):
     subprocess.STARTUPINFO = MagicMock
     subprocess.STARTF_USESHOWWINDOW = 0x00000001
     subprocess.SW_HIDE = 0
@@ -28,17 +28,15 @@ class TestFetchPlaylistWithYtdlp:
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
 
         # Simulate yt-dlp output (one JSON object per line)
-        mock_output = "\n".join([
-            json.dumps({"id": "dQw4w9WgXcQ", "title": "Rick Astley - Never Gonna Give You Up", "duration": 213}),
-            json.dumps({"id": "9bZkp7q19f0", "title": "PSY - Gangnam Style", "duration": 252}),
-            json.dumps({"id": "kJQP7kiw5Fk", "title": "Luis Fonsi - Despacito", "duration": 282}),
-        ])
-
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=mock_output,
-            stderr=""
+        mock_output = "\n".join(
+            [
+                json.dumps({"id": "dQw4w9WgXcQ", "title": "Rick Astley - Never Gonna Give You Up", "duration": 213}),
+                json.dumps({"id": "9bZkp7q19f0", "title": "PSY - Gangnam Style", "duration": 252}),
+                json.dumps({"id": "kJQP7kiw5Fk", "title": "Luis Fonsi - Despacito", "duration": 282}),
+            ]
         )
+
+        mock_run.return_value = MagicMock(returncode=0, stdout=mock_output, stderr="")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=TEST")
 
@@ -56,11 +54,7 @@ class TestFetchPlaylistWithYtdlp:
         from ytplay_modules.playlist import fetch_playlist_with_ytdlp
 
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout="",
-            stderr="ERROR: Unable to download playlist"
-        )
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="ERROR: Unable to download playlist")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=INVALID")
 
@@ -75,18 +69,16 @@ class TestFetchPlaylistWithYtdlp:
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
 
         # Mix of valid and invalid lines
-        mock_output = "\n".join([
-            json.dumps({"id": "valid1", "title": "Valid Video 1", "duration": 100}),
-            "Not valid JSON",
-            json.dumps({"id": "valid2", "title": "Valid Video 2", "duration": 200}),
-            "",  # Empty line
-        ])
-
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=mock_output,
-            stderr=""
+        mock_output = "\n".join(
+            [
+                json.dumps({"id": "valid1", "title": "Valid Video 1", "duration": 100}),
+                "Not valid JSON",
+                json.dumps({"id": "valid2", "title": "Valid Video 2", "duration": 200}),
+                "",  # Empty line
+            ]
         )
+
+        mock_run.return_value = MagicMock(returncode=0, stdout=mock_output, stderr="")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=TEST")
 
@@ -131,11 +123,7 @@ class TestFetchPlaylistWithYtdlp:
         # Video with minimal data
         mock_output = json.dumps({"id": "minimal123"})
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=mock_output,
-            stderr=""
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout=mock_output, stderr="")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=TEST")
 
@@ -199,9 +187,7 @@ class TestPlaylistSyncWorker:
     @patch("ytplay_modules.playlist.scan_existing_cache")
     @patch("ytplay_modules.playlist.fetch_playlist_with_ytdlp")
     @patch("ytplay_modules.playlist.cleanup_removed_videos")
-    def test_queues_uncached_videos(
-        self, mock_cleanup, mock_fetch, mock_scan
-    ):
+    def test_queues_uncached_videos(self, mock_cleanup, mock_fetch, mock_scan):
         """Should queue videos that are not in cache."""
         from ytplay_modules.state import (
             add_cached_video,

@@ -1,6 +1,6 @@
 """
-OBS YouTube Player - Syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS), 
-and plays them randomly via Media Source. Features optional AI-powered metadata extraction using Google Gemini 
+OBS YouTube Player - Syncs YouTube playlists, caches videos locally with loudness normalization (-14 LUFS),
+and plays them randomly via Media Source. Features optional AI-powered metadata extraction using Google Gemini
 for superior artist/song detection. All processing runs in background threads.
 """
 
@@ -48,38 +48,26 @@ cleanup_logging = logger.cleanup_logging
 # Store timer references
 _verify_scene_timer = None
 
+
 # ===== OBS SCRIPT INTERFACE =====
 def script_description():
     """Return script description for OBS."""
     return __doc__.strip()
+
 
 def script_properties():
     """Define script properties shown in OBS UI."""
     props = obs.obs_properties_create()
 
     # Playlist URL text field
-    obs.obs_properties_add_text(
-        props,
-        "playlist_url",
-        "YouTube Playlist URL",
-        obs.OBS_TEXT_DEFAULT
-    )
+    obs.obs_properties_add_text(props, "playlist_url", "YouTube Playlist URL", obs.OBS_TEXT_DEFAULT)
 
     # Cache directory text field - editable for easy customization
-    obs.obs_properties_add_text(
-        props,
-        "cache_dir",
-        "Cache Directory",
-        obs.OBS_TEXT_DEFAULT
-    )
+    obs.obs_properties_add_text(props, "cache_dir", "Cache Directory", obs.OBS_TEXT_DEFAULT)
 
     # Playback mode dropdown
     playback_mode = obs.obs_properties_add_list(
-        props,
-        "playback_mode",
-        "Playback Mode",
-        obs.OBS_COMBO_TYPE_LIST,
-        obs.OBS_COMBO_FORMAT_STRING
+        props, "playback_mode", "Playback Mode", obs.OBS_COMBO_TYPE_LIST, obs.OBS_COMBO_FORMAT_STRING
     )
 
     obs.obs_property_list_add_string(playback_mode, "Continuous (Play all videos)", config.PLAYBACK_MODE_CONTINUOUS)
@@ -87,45 +75,27 @@ def script_properties():
     obs.obs_property_list_add_string(playback_mode, "Loop (Repeat current video)", config.PLAYBACK_MODE_LOOP)
 
     # Audio-only mode checkbox
-    obs.obs_properties_add_bool(
-        props,
-        "audio_only_mode",
-        "Audio Only Mode (Minimal video quality, high audio quality)"
-    )
+    obs.obs_properties_add_bool(props, "audio_only_mode", "Audio Only Mode (Minimal video quality, high audio quality)")
 
     # Gemini API key field (password type for security)
-    obs.obs_properties_add_text(
-        props,
-        "gemini_api_key",
-        "Gemini API Key",
-        obs.OBS_TEXT_PASSWORD
-    )
+    obs.obs_properties_add_text(props, "gemini_api_key", "Gemini API Key", obs.OBS_TEXT_PASSWORD)
 
     # Add description text below Gemini API key field
     obs.obs_properties_add_text(
         props,
         "gemini_description",
         "Optional: Provides better artist/song detection than title parsing",
-        obs.OBS_TEXT_INFO
+        obs.OBS_TEXT_INFO,
     )
 
     # Add separator before sync button
-    obs.obs_properties_add_text(
-        props,
-        "separator",
-        "─────────────────────────────",
-        obs.OBS_TEXT_INFO
-    )
+    obs.obs_properties_add_text(props, "separator", "─────────────────────────────", obs.OBS_TEXT_INFO)
 
     # Sync Now button at the bottom
-    obs.obs_properties_add_button(
-        props,
-        "sync_now",
-        "Sync Playlist Now",
-        sync_now_callback
-    )
+    obs.obs_properties_add_button(props, "sync_now", "Sync Playlist Now", sync_now_callback)
 
     return props
+
 
 def script_defaults(settings):
     """Set default values for script properties."""
@@ -134,6 +104,7 @@ def script_defaults(settings):
     obs.obs_data_set_default_string(settings, "playback_mode", config.DEFAULT_PLAYBACK_MODE)
     obs.obs_data_set_default_bool(settings, "audio_only_mode", config.DEFAULT_AUDIO_ONLY_MODE)
     obs.obs_data_set_default_string(settings, "gemini_api_key", "")
+
 
 def script_update(settings):
     """Called when script properties are updated."""
@@ -189,7 +160,10 @@ def script_update(settings):
     else:
         state.set_gemini_api_key(None)
 
-    log(f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}, Audio-only: {audio_only_mode}")
+    log(
+        f"Settings updated - Playlist: {playlist_url}, Cache: {cache_dir}, Mode: {playback_mode}, Audio-only: {audio_only_mode}"
+    )
+
 
 def script_load(settings):
     """Called when script is loaded."""
@@ -217,6 +191,7 @@ def script_load(settings):
 
     log("Script loaded successfully")
 
+
 def script_unload():
     """Called when script is unloaded."""
     global _verify_scene_timer
@@ -243,6 +218,7 @@ def script_unload():
 
     log("Script unloaded")
 
+
 # ===== CALLBACK FUNCTIONS =====
 def sync_now_callback(props, prop):
     """Callback for Sync Now button."""
@@ -257,6 +233,7 @@ def sync_now_callback(props, prop):
     playlist.trigger_manual_sync()
     return True
 
+
 # ===== WORKER THREAD MANAGEMENT =====
 def start_worker_threads():
     """Start all background worker threads."""
@@ -270,6 +247,7 @@ def start_worker_threads():
     reprocess.start_reprocess_thread()  # Start the Gemini reprocess thread
 
     log("Worker threads started")
+
 
 def stop_worker_threads():
     """Stop all background worker threads."""

@@ -5,7 +5,6 @@ Tests for media source operations and text source updates.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-
 import obspython as obs
 
 
@@ -43,14 +42,12 @@ class TestGetCurrentVideoFromMediaSource:
         obs.reset()
         video_id = "abc123xyz"
         # Add video to cache so it can be found
-        add_cached_video(video_id, {
-            "path": f"/cache/Song_Artist_{video_id}_normalized.mp4",
-            "song": "Song",
-            "artist": "Artist"
-        })
-        obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {
-            "local_file": f"/cache/Song_Artist_{video_id}_normalized.mp4"
-        })
+        add_cached_video(
+            video_id, {"path": f"/cache/Song_Artist_{video_id}_normalized.mp4", "song": "Song", "artist": "Artist"}
+        )
+        obs.create_source(
+            MEDIA_SOURCE_NAME, "ffmpeg_source", {"local_file": f"/cache/Song_Artist_{video_id}_normalized.mp4"}
+        )
 
         result = get_current_video_from_media_source()
 
@@ -62,9 +59,7 @@ class TestGetCurrentVideoFromMediaSource:
         from ytplay_modules.media_control import get_current_video_from_media_source
 
         obs.reset()
-        obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {
-            "local_file": "/cache/some_random_video.mp4"
-        })
+        obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {"local_file": "/cache/some_random_video.mp4"})
 
         result = get_current_video_from_media_source()
 
@@ -246,9 +241,7 @@ class TestUpdateMediaSource:
         video_file = tmp_path / "test_video.mp4"
         video_file.write_bytes(b"x" * 1024)
 
-        obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {
-            "local_file": str(video_file)
-        })
+        obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {"local_file": str(video_file)})
 
         result = update_media_source(str(video_file), force_reload=False)
 
@@ -322,9 +315,7 @@ class TestStopMediaSource:
         from ytplay_modules.media_control import stop_media_source
 
         obs.reset()
-        obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {
-            "local_file": "/path/to/video.mp4"
-        })
+        obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {"local_file": "/path/to/video.mp4"})
         obs.set_media_state(obs.OBS_MEDIA_STATE_PLAYING)
 
         stop_media_source()

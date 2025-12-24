@@ -57,17 +57,19 @@ def download_file(url, destination, description="file"):
         log(f"Failed to download {description}: {e}")
         return False
 
+
 def extract_ffmpeg(archive_path, tools_dir):
     """Extract FFmpeg from downloaded zip archive (Windows)."""
     try:
         import zipfile
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+
+        with zipfile.ZipFile(archive_path, "r") as zip_ref:
             # Find ffmpeg.exe in the archive
             for file_info in zip_ref.filelist:
-                if file_info.filename.endswith('ffmpeg.exe'):
+                if file_info.filename.endswith("ffmpeg.exe"):
                     # Extract to tools directory
                     target_path = os.path.join(tools_dir, FFMPEG_FILENAME)
-                    with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
+                    with zip_ref.open(file_info) as source, open(target_path, "wb") as target:
                         target.write(source.read())
                     log("Extracted ffmpeg.exe from archive")
                     return True
@@ -79,6 +81,7 @@ def extract_ffmpeg(archive_path, tools_dir):
         log(f"Failed to extract FFmpeg: {e}")
         return False
 
+
 def verify_tool(tool_path, test_args):
     """Verify that a tool works by running it with test arguments."""
     try:
@@ -88,12 +91,7 @@ def verify_tool(tool_path, test_args):
         startupinfo.wShowWindow = subprocess.SW_HIDE
 
         # Run tool with test arguments
-        result = subprocess.run(
-            [tool_path] + test_args,
-            capture_output=True,
-            startupinfo=startupinfo,
-            timeout=5
-        )
+        result = subprocess.run([tool_path] + test_args, capture_output=True, startupinfo=startupinfo, timeout=5)
 
         success = result.returncode == 0
         if success:
@@ -106,6 +104,7 @@ def verify_tool(tool_path, test_args):
     except Exception as e:
         log(f"Tool verification error for {tool_path}: {e}")
         return False
+
 
 def download_ytdlp(tools_dir):
     """Download yt-dlp executable for Windows."""
@@ -121,6 +120,7 @@ def download_ytdlp(tools_dir):
         return True
 
     return False
+
 
 def download_ffmpeg(tools_dir):
     """Download FFmpeg executable for Windows."""
@@ -145,6 +145,7 @@ def download_ffmpeg(tools_dir):
             return True
 
     return False
+
 
 def setup_tools():
     """Download and verify required tools."""
@@ -173,6 +174,7 @@ def setup_tools():
     log("All tools are ready and verified!")
     return True
 
+
 def tools_setup_worker():
     """Background thread for setting up tools."""
     while not should_stop_threads():
@@ -188,6 +190,7 @@ def tools_setup_worker():
                 log("Tools setup complete")
                 # Import here to avoid circular import
                 from .playlist import trigger_startup_sync
+
                 trigger_startup_sync()
                 break
 
@@ -206,9 +209,11 @@ def tools_setup_worker():
 
     log("Tools setup thread exiting")
 
+
 def start_tools_thread():
     """Start the tools setup thread."""
     global tools_thread
     from . import state
+
     state.tools_thread = threading.Thread(target=tools_setup_worker, daemon=True)
     state.tools_thread.start()

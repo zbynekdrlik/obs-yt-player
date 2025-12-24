@@ -16,15 +16,15 @@ SCRIPT_NAME = None
 
 # Find the main script file dynamically
 for file in os.listdir(SCRIPT_DIR):
-    if file.endswith('.py') and not file.startswith('_'):
+    if file.endswith(".py") and not file.startswith("_"):
         SCRIPT_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, file))
         SCRIPT_NAME = os.path.splitext(file)[0]
         break
 
 # Fallback if no script found (shouldn't happen)
 if not SCRIPT_PATH:
-    SCRIPT_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, 'ytplay.py'))
-    SCRIPT_NAME = 'ytplay'
+    SCRIPT_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "ytplay.py"))
+    SCRIPT_NAME = "ytplay"
 
 # Default settings
 DEFAULT_PLAYLIST_URL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
@@ -49,8 +49,8 @@ OPACITY_FILTER_NAME = "Title Opacity"
 
 # Tool settings
 TOOLS_SUBDIR = "tools"
-YTDLP_FILENAME = "yt-dlp.exe" if os.name == 'nt' else "yt-dlp"
-FFMPEG_FILENAME = "ffmpeg.exe" if os.name == 'nt' else "ffmpeg"
+YTDLP_FILENAME = "yt-dlp.exe" if os.name == "nt" else "yt-dlp"
+FFMPEG_FILENAME = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
 
 # Timing intervals (milliseconds)
 PLAYBACK_CHECK_INTERVAL = 1000  # 1 second
@@ -77,7 +77,7 @@ FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffm
 FFMPEG_URLS = {
     "win32": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
     "darwin": "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
-    "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+    "linux": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
 }
 
 # Title opacity transition settings

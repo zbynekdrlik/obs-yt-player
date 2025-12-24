@@ -10,7 +10,7 @@ import subprocess
 from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
-if not hasattr(subprocess, 'STARTUPINFO'):
+if not hasattr(subprocess, "STARTUPINFO"):
     subprocess.STARTUPINFO = MagicMock
     subprocess.STARTF_USESHOWWINDOW = 0x00000001
     subprocess.SW_HIDE = 0
@@ -67,7 +67,7 @@ class TestExtractFfmpeg:
 
         # Create a test zip file with ffmpeg.exe
         archive_path = tmp_path / "ffmpeg.zip"
-        with zipfile.ZipFile(archive_path, 'w') as zf:
+        with zipfile.ZipFile(archive_path, "w") as zf:
             # Use path that ends with ffmpeg.exe to match the check
             zf.writestr("ffmpeg-release/bin/ffmpeg.exe", b"fake ffmpeg content")
 
@@ -85,7 +85,7 @@ class TestExtractFfmpeg:
 
         # Create a zip without ffmpeg.exe
         archive_path = tmp_path / "other.zip"
-        with zipfile.ZipFile(archive_path, 'w') as zf:
+        with zipfile.ZipFile(archive_path, "w") as zf:
             zf.writestr("other_file.txt", b"some content")
 
         result = extract_ffmpeg(str(archive_path), str(tmp_path))
@@ -205,9 +205,7 @@ class TestDownloadFfmpeg:
     @patch("ytplay_modules.tools.download_file")
     @patch("ytplay_modules.tools.verify_tool")
     @patch("os.path.exists")
-    def test_downloads_and_extracts_when_missing(
-        self, mock_exists, mock_verify, mock_download, mock_extract
-    ):
+    def test_downloads_and_extracts_when_missing(self, mock_exists, mock_verify, mock_download, mock_extract):
         """Should download and extract FFmpeg when missing."""
         from ytplay_modules.tools import download_ffmpeg
 
@@ -227,9 +225,7 @@ class TestSetupTools:
     @patch("ytplay_modules.tools.download_ytdlp")
     @patch("ytplay_modules.tools.get_tools_path")
     @patch("os.makedirs")
-    def test_successful_setup(
-        self, mock_makedirs, mock_tools_path, mock_ytdlp, mock_ffmpeg
-    ):
+    def test_successful_setup(self, mock_makedirs, mock_tools_path, mock_ytdlp, mock_ffmpeg):
         """Should set tools ready when all downloads succeed."""
         from ytplay_modules.state import is_tools_ready, set_tools_ready
         from ytplay_modules.tools import setup_tools
@@ -262,9 +258,7 @@ class TestSetupTools:
     @patch("ytplay_modules.tools.download_ytdlp")
     @patch("ytplay_modules.tools.get_tools_path")
     @patch("os.makedirs")
-    def test_fails_when_ffmpeg_fails(
-        self, mock_makedirs, mock_tools_path, mock_ytdlp, mock_ffmpeg
-    ):
+    def test_fails_when_ffmpeg_fails(self, mock_makedirs, mock_tools_path, mock_ytdlp, mock_ffmpeg):
         """Should return False when FFmpeg download fails."""
         from ytplay_modules.tools import setup_tools
 

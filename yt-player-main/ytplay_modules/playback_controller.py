@@ -3,7 +3,6 @@ Main playback controller.
 Coordinates playback operations and manages the controller timer.
 """
 
-
 import obspython as obs
 
 from .config import (
@@ -220,6 +219,7 @@ def playback_controller():
                 # Check if we need to fade out the title for pre-loaded video
                 from .media_control import get_media_time
                 from .title_manager import TITLE_CLEAR_BEFORE_END, schedule_title_clear_from_current
+
                 current_time = get_media_time(MEDIA_SOURCE_NAME)
                 if duration > 0 and current_time > 0:
                     remaining_ms = duration - current_time
@@ -264,6 +264,7 @@ def playback_controller():
     except Exception as e:
         log(f"ERROR in playback controller: {e}")
         import traceback
+
         log(f"Traceback: {traceback.format_exc()}")
 
 
@@ -291,13 +292,13 @@ def start_specific_video(video_id):
         return
 
     # Update media source with force reload for loop mode
-    if update_media_source(video_info['path'], force_reload=True):
+    if update_media_source(video_info["path"], force_reload=True):
         # Schedule title display
         schedule_title_show(video_info)
 
         # Update playback state
         set_playing(True)
-        set_current_video_path(video_info['path'])
+        set_current_video_path(video_info["path"])
         set_current_playback_video_id(video_id)
 
         # Get display info
@@ -356,13 +357,13 @@ def start_next_video():
     display_info = get_video_display_info(video_id)
 
     # Update media source first
-    if update_media_source(video_info['path']):
+    if update_media_source(video_info["path"]):
         # Schedule title display (will clear immediately and show after delay)
         schedule_title_show(video_info)
 
         # Update playback state
         set_playing(True)
-        set_current_video_path(video_info['path'])
+        set_current_video_path(video_info["path"])
         set_current_playback_video_id(video_id)
 
         # Mark first video as played for single/loop modes
@@ -383,6 +384,7 @@ def start_next_video():
         # Failed to update media source, try another video
         log("Failed to start video, trying another...")
         from .state_handlers import _max_retry_attempts, _playback_retry_count
+
         if _playback_retry_count < _max_retry_attempts:
             _playback_retry_count += 1
             start_next_video()
@@ -467,6 +469,7 @@ def stop_playback_controller():
         cancel_opacity_timer()
         cancel_loop_restart_timer()
         from .media_control import cancel_media_reload_timer
+
         cancel_media_reload_timer()
 
         if _playback_timer:

@@ -23,15 +23,13 @@ def get_video_metadata(filepath, title, video_id=None):
     gemini_api_key = state.get_gemini_api_key()
     if gemini_api_key and video_id:
         log(f"Attempting Gemini metadata extraction for '{title}'")
-        gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(
-            video_id, title, gemini_api_key
-        )
+        gemini_artist, gemini_song = gemini_metadata.extract_metadata_with_gemini(video_id, title, gemini_api_key)
         if gemini_artist and gemini_song:
             # Apply universal cleaning to Gemini results
             song = clean_featuring_from_song(gemini_song)
             artist = gemini_artist
             log(f"Metadata from Gemini: {artist} - {song}")
-            return song, artist, 'Gemini', False
+            return song, artist, "Gemini", False
         else:
             # Gemini failed
             gemini_failed = True
@@ -41,6 +39,7 @@ def get_video_metadata(filepath, title, video_id=None):
     song, artist, metadata_source = extract_metadata_from_title(title)
 
     return song, artist, metadata_source, gemini_failed
+
 
 def extract_metadata_from_title(title):
     """
@@ -60,6 +59,7 @@ def extract_metadata_from_title(title):
     log("No reliable artist/song could be parsed - using conservative fallback")
     return title, "Unknown Artist", "title_parsing"
 
+
 def parse_title_smart(title):
     """Smart title parser that handles various YouTube title formats."""
     if not title:
@@ -73,9 +73,9 @@ def parse_title_smart(title):
     # Try various patterns to extract artist and song
     patterns = [
         # Pattern: "Song | Artist"
-        (r'^([^|]+)\s*\|\s*([^|]+?)(?:\s*(?:Official|Music|Video|Live|feat\.|ft\.)|$)', False),
+        (r"^([^|]+)\s*\|\s*([^|]+?)(?:\s*(?:Official|Music|Video|Live|feat\.|ft\.)|$)", False),
         # Pattern: "Artist - Song"
-        (r'^([^-]+?)\s*-\s*([^-]+?)(?:\s*\(|\s*\[|$)', True),
+        (r"^([^-]+?)\s*-\s*([^-]+?)(?:\s*\(|\s*\[|$)", True),
     ]
 
     for pattern, artist_first in patterns:
@@ -100,6 +100,7 @@ def parse_title_smart(title):
     log("Title parser - Unable to parse title reliably")
     return None, None
 
+
 def clean_featuring_from_song(song):
     """Remove ALL bracket phrases from song title."""
     if not song:
@@ -110,40 +111,41 @@ def clean_featuring_from_song(song):
 
     # Remove bracket content
     bracket_patterns = [
-        r'\([^)]*\)',  # Parentheses
-        r'\[[^\]]*\]', # Square brackets
-        r'\{[^}]*\}',  # Curly brackets
+        r"\([^)]*\)",  # Parentheses
+        r"\[[^\]]*\]",  # Square brackets
+        r"\{[^}]*\}",  # Curly brackets
     ]
 
     cleaned = song
     for pattern in bracket_patterns:
-        cleaned = re.sub(pattern, '', cleaned)
+        cleaned = re.sub(pattern, "", cleaned)
 
     # Remove trailing annotations
     trailing_patterns = [
-        r'\s+feat\.?\s+.*$',
-        r'\s+ft\.?\s+.*$',
-        r'\s+featuring\s+.*$',
-        r'\s+official\s*(?:music\s*)?video\s*$',
-        r'\s+official\s*audio\s*$',
-        r'\s+music\s*video\s*$',
-        r'\s+live\s*$',
-        r'\s+acoustic\s*$',
-        r'\s+hd\s*$',
-        r'\s+4k\s*$',
+        r"\s+feat\.?\s+.*$",
+        r"\s+ft\.?\s+.*$",
+        r"\s+featuring\s+.*$",
+        r"\s+official\s*(?:music\s*)?video\s*$",
+        r"\s+official\s*audio\s*$",
+        r"\s+music\s*video\s*$",
+        r"\s+live\s*$",
+        r"\s+acoustic\s*$",
+        r"\s+hd\s*$",
+        r"\s+4k\s*$",
     ]
 
     for pattern in trailing_patterns:
-        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
 
     # Final cleanup
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    cleaned = re.sub(r'[,\-\|\s]+$', '', cleaned).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"[,\-\|\s]+$", "", cleaned).strip()
 
     if cleaned != original_song:
         log(f"Song title cleaned: '{original_song}' → '{cleaned}'")
 
     return cleaned or original_song
+
 
 def apply_universal_song_cleaning(song, artist, source):
     """Apply universal song title cleaning to metadata from ANY source."""
@@ -160,6 +162,7 @@ def apply_universal_song_cleaning(song, artist, source):
         log(f"Universal cleaning applied to {source} result: '{original_song}' → '{cleaned_song}'")
 
     return cleaned_song, artist
+
 
 def clear_gemini_failures():
     """Legacy function kept for compatibility."""

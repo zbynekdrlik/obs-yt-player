@@ -22,6 +22,7 @@ from .utils import sanitize_filename
 
 _reprocess_thread = None
 
+
 def get_video_title_from_youtube(video_id):
     """Fetch video title from YouTube for a specific video ID."""
     try:
@@ -30,27 +31,16 @@ def get_video_title_from_youtube(video_id):
         ytdlp_path = get_ytdlp_path()
 
         # Prepare command to get video info
-        cmd = [
-            ytdlp_path,
-            '--get-title',
-            '--no-warnings',
-            f'https://www.youtube.com/watch?v={video_id}'
-        ]
+        cmd = [ytdlp_path, "--get-title", "--no-warnings", f"https://www.youtube.com/watch?v={video_id}"]
 
         # Run command with hidden window on Windows
         startupinfo = None
-        if os.name == 'nt':
+        if os.name == "nt":
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = subprocess.SW_HIDE
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            startupinfo=startupinfo,
-            timeout=10
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, startupinfo=startupinfo, timeout=10)
 
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -62,18 +52,19 @@ def get_video_title_from_youtube(video_id):
         log(f"Error fetching video title: {e}")
         return None
 
+
 def find_videos_to_reprocess():
     """Find all videos with _gf marker that need Gemini retry."""
     videos_to_reprocess = []
     cached_videos = get_cached_videos()
 
     for video_id, video_info in cached_videos.items():
-        if video_info.get('gemini_failed', False):
+        if video_info.get("gemini_failed", False):
             # We need to get the title - either from cache or fetch it
             title = None
 
             # First try to use the song title we have (it might be from title parsing)
-            if video_info.get('song') and video_info.get('song') != 'Unknown Song':
+            if video_info.get("song") and video_info.get("song") != "Unknown Song":
                 # Reconstruct a reasonable title from what we have
                 title = f"{video_info['song']} - {video_info['artist']}"
             else:
@@ -81,30 +72,31 @@ def find_videos_to_reprocess():
                 title = get_video_title_from_youtube(video_id)
 
             if title:
-                videos_to_reprocess.append({
-                    'id': video_id,
-                    'title': title,
-                    'current_path': video_info['path'],
-                    'song': video_info['song'],
-                    'artist': video_info['artist']
-                })
+                videos_to_reprocess.append(
+                    {
+                        "id": video_id,
+                        "title": title,
+                        "current_path": video_info["path"],
+                        "song": video_info["song"],
+                        "artist": video_info["artist"],
+                    }
+                )
 
     return videos_to_reprocess
 
+
 def reprocess_video(video_info):
     """Attempt to reprocess a single video with Gemini."""
-    video_id = video_info['id']
-    title = video_info['title']
-    current_path = video_info['current_path']
+    video_id = video_info["id"]
+    title = video_info["title"]
+    current_path = video_info["current_path"]
 
     log(f"Retrying Gemini extraction for: {title}")
 
     # Try to get metadata again (will use Gemini if API key is available)
-    song, artist, metadata_source, gemini_failed = get_video_metadata(
-        current_path, title, video_id
-    )
+    song, artist, metadata_source, gemini_failed = get_video_metadata(current_path, title, video_id)
 
-    if not gemini_failed and metadata_source == 'Gemini':
+    if not gemini_failed and metadata_source == "Gemini":
         # Gemini succeeded! Need to rename the file
         log(f"Gemini extraction succeeded on retry: {artist} - {song}")
 
@@ -127,13 +119,10 @@ def reprocess_video(video_info):
                 log(f"Renamed file: {os.path.basename(current_path)} -> {os.path.basename(new_path)}")
 
                 # Update cached video info
-                add_cached_video(video_id, {
-                    'path': new_path,
-                    'song': song,
-                    'artist': artist,
-                    'normalized': True,
-                    'gemini_failed': False
-                })
+                add_cached_video(
+                    video_id,
+                    {"path": new_path, "song": song, "artist": artist, "normalized": True, "gemini_failed": False},
+                )
 
                 return True
             except Exception as e:
@@ -146,6 +135,7 @@ def reprocess_video(video_info):
         else:
             log(f"Gemini extraction failed again for: {title}")
         return False
+
 
 def reprocess_worker():
     """Background worker to reprocess videos with failed Gemini extraction."""
@@ -189,6 +179,7 @@ def reprocess_worker():
         log(f"Successfully reprocessed {success_count} videos with Gemini")
 
     log("Gemini reprocessing complete")
+
 
 def start_reprocess_thread():
     """Start the reprocess thread if needed."""

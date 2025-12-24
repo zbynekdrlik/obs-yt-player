@@ -49,43 +49,38 @@ from .video_selector import select_next_video
 # Make sure all the original functions are available for import
 __all__ = [
     # Controller functions
-    'start_playback_controller',
-    'stop_playback_controller',
-    'start_next_video',
-    'start_specific_video',
-    'stop_current_playback',
-    'playback_controller',
-    'verify_sources',
-
+    "start_playback_controller",
+    "stop_playback_controller",
+    "start_next_video",
+    "start_specific_video",
+    "stop_current_playback",
+    "playback_controller",
+    "verify_sources",
     # Media control functions
-    'get_current_video_from_media_source',
-    'force_disable_media_loop',
-    'get_media_state',
-    'get_media_duration',
-    'get_media_time',
-    'update_media_source',
-    'update_text_source_content',
-    'is_video_near_end',
-
+    "get_current_video_from_media_source",
+    "force_disable_media_loop",
+    "get_media_state",
+    "get_media_duration",
+    "get_media_time",
+    "update_media_source",
+    "update_text_source_content",
+    "is_video_near_end",
     # Opacity control functions
-    'ensure_opacity_filter',
-    'update_text_opacity',
-    'fade_in_text',
-    'fade_out_text',
-
+    "ensure_opacity_filter",
+    "update_text_opacity",
+    "fade_in_text",
+    "fade_out_text",
     # Title manager functions
-    'schedule_title_clear',
-    'schedule_title_show',
-    'cancel_title_timers',
-    'update_text_source',
-
+    "schedule_title_clear",
+    "schedule_title_show",
+    "cancel_title_timers",
+    "update_text_source",
     # Video selector functions
-    'select_next_video',
-
+    "select_next_video",
     # State handler functions
-    'handle_playing_state',
-    'handle_ended_state',
-    'handle_stopped_state',
-    'handle_none_state',
-    'log_playback_progress'
+    "handle_playing_state",
+    "handle_ended_state",
+    "handle_stopped_state",
+    "handle_none_state",
+    "log_playback_progress",
 ]

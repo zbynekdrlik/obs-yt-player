@@ -42,11 +42,7 @@ def ensure_opacity_filter():
     filter_settings = obs.obs_data_create()
     obs.obs_data_set_int(filter_settings, "opacity", 100)
 
-    opacity_filter = obs.obs_source_create_private(
-        "color_filter",
-        OPACITY_FILTER_NAME,
-        filter_settings
-    )
+    opacity_filter = obs.obs_source_create_private("color_filter", OPACITY_FILTER_NAME, filter_settings)
 
     if opacity_filter:
         obs.obs_source_filter_add(text_source, opacity_filter)
@@ -103,7 +99,7 @@ def opacity_transition_callback():
     _current_opacity += _opacity_step
 
     # Clamp opacity to valid range
-    if _fade_direction == 'in':
+    if _fade_direction == "in":
         _current_opacity = min(_current_opacity, _target_opacity)
     else:
         _current_opacity = max(_current_opacity, _target_opacity)
@@ -122,10 +118,13 @@ def opacity_transition_callback():
         update_text_opacity(_current_opacity)
 
         # If fading out and reached 0, update the text
-        if _fade_direction == 'out' and _current_opacity == 0 and _pending_text is not None:
+        if _fade_direction == "out" and _current_opacity == 0 and _pending_text is not None:
             # Import here to avoid circular dependency
             from .media_control import update_text_source_content
-            update_text_source_content(_pending_text['song'], _pending_text['artist'], _pending_text.get('gemini_failed', False))
+
+            update_text_source_content(
+                _pending_text["song"], _pending_text["artist"], _pending_text.get("gemini_failed", False)
+            )
             _pending_text = None
             # Now fade in
             fade_in_text()
@@ -149,7 +148,7 @@ def start_opacity_transition(target, direction):
     opacity_range = abs(_target_opacity - _current_opacity)
     if opacity_range > 0:
         _opacity_step = opacity_range / TITLE_FADE_STEPS
-        if direction == 'out':
+        if direction == "out":
             _opacity_step = -_opacity_step
 
         # Start the timer
@@ -160,16 +159,16 @@ def start_opacity_transition(target, direction):
 
 def fade_in_text():
     """Fade in the text source."""
-    start_opacity_transition(100.0, 'in')
+    start_opacity_transition(100.0, "in")
 
 
 def fade_out_text():
     """Fade out the text source."""
     global _current_opacity
     # Don't start a new fade if we're already at 0 or fading out
-    if _current_opacity <= 0 or (_fade_direction == 'out' and _opacity_timer is not None):
+    if _current_opacity <= 0 or (_fade_direction == "out" and _opacity_timer is not None):
         return
-    start_opacity_transition(0.0, 'out')
+    start_opacity_transition(0.0, "out")
 
 
 def cancel_opacity_timer():

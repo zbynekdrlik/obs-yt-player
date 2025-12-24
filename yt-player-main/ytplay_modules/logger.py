@@ -18,6 +18,7 @@ _log_lock = threading.Lock()
 _first_log_time = None
 _log_buffer = []  # Buffer for messages before file is ready
 
+
 def _initialize_file_logging():
     """Initialize file logging for this run."""
     global _log_file_handle, _log_file_path, _log_initialized, _log_buffer
@@ -28,6 +29,7 @@ def _initialize_file_logging():
     try:
         # Use cache dir from state if available, otherwise use default
         from .state import get_cache_dir
+
         cache_dir = get_cache_dir() or DEFAULT_CACHE_DIR
 
         # Create logs directory
@@ -40,7 +42,7 @@ def _initialize_file_logging():
         _log_file_path = logs_dir / log_filename
 
         # Open log file for writing
-        _log_file_handle = open(_log_file_path, 'w', encoding='utf-8')
+        _log_file_handle = open(_log_file_path, "w", encoding="utf-8")
         _log_initialized = True
 
         # Write header
@@ -63,6 +65,7 @@ def _initialize_file_logging():
         print(f"[WARNING] Failed to initialize file logging: {e}")
         _log_initialized = True  # Prevent repeated attempts
 
+
 def _write_to_file(formatted_message):
     """Write message to log file if available."""
     with _log_lock:
@@ -76,6 +79,7 @@ def _write_to_file(formatted_message):
         elif not _log_initialized:
             # Buffer messages until file is ready
             _log_buffer.append(formatted_message)
+
 
 def log(message):
     """
@@ -112,6 +116,7 @@ def log(message):
     # Output to file (or buffer if not ready)
     _write_to_file(file_msg)
 
+
 def cleanup_logging():
     """Clean up logging resources. Call when script unloads."""
     global _log_file_handle, _log_initialized, _first_log_time, _log_buffer
@@ -134,6 +139,7 @@ def cleanup_logging():
         _log_initialized = False
         _first_log_time = None
         _log_buffer.clear()
+
 
 def get_current_log_path():
     """Get the path of the current log file."""

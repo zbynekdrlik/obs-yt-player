@@ -5,7 +5,6 @@ Tests for scene management, nested scene detection, and frontend events.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-
 # The conftest.py injects mock obspython before any imports
 import obspython as obs
 
