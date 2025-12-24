@@ -532,13 +532,20 @@ function Request-CustomPath {
 }
 
 function Request-PlaylistURL {
+    $defaultURL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
+
     Write-Host ""
     Write-Host "Enter your YouTube playlist URL" -ForegroundColor White
-    Write-Host "(e.g., https://www.youtube.com/playlist?list=PLxxxxx):" -ForegroundColor Gray
-    Write-Host "(Press Enter to skip and configure later)" -ForegroundColor DarkGray
+    Write-Host "Default (press Enter): " -NoNewline -ForegroundColor Gray
+    Write-Host $defaultURL -ForegroundColor DarkCyan
     Write-Host ""
 
     $url = Read-Host "Playlist URL"
+
+    if ([string]::IsNullOrWhiteSpace($url)) {
+        Write-Info "Using default playlist"
+        return $defaultURL
+    }
     return $url
 }
 
