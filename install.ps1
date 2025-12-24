@@ -718,6 +718,47 @@ function Install-OBSYouTubePlayer {
     Write-Host ""
     Write-Step "Checking if OBS is running..."
 
+    if (-not (Test-OBSRunning)) {
+        Write-Info "OBS is not running"
+        Write-Host ""
+        $startOBS = Read-Host "Start OBS now to auto-configure scene/sources? (Y/n)"
+
+        if ($startOBS -eq "" -or $startOBS -ieq "y" -or $startOBS -ieq "yes") {
+            Write-Step "Starting OBS Studio..."
+
+            # Find OBS executable
+            $obsExe = Join-Path $obsPath "bin\64bit\obs64.exe"
+            if (-not (Test-Path $obsExe)) {
+                $obsExe = Join-Path $obsPath "bin\32bit\obs32.exe"
+            }
+
+            if (Test-Path $obsExe) {
+                Start-Process -FilePath $obsExe
+                Write-Info "Waiting for OBS to start..."
+
+                # Wait for OBS to start (up to 30 seconds)
+                $waitTime = 0
+                while (-not (Test-OBSRunning) -and $waitTime -lt 30) {
+                    Start-Sleep -Seconds 2
+                    $waitTime += 2
+                    Write-Host "." -NoNewline
+                }
+                Write-Host ""
+
+                if (Test-OBSRunning) {
+                    Write-Success "OBS is running"
+                    # Give OBS a few more seconds to fully initialize WebSocket
+                    Write-Info "Waiting for OBS to initialize..."
+                    Start-Sleep -Seconds 5
+                } else {
+                    Write-Warning "OBS did not start in time"
+                }
+            } else {
+                Write-Warning "Could not find OBS executable"
+            }
+        }
+    }
+
     if (Test-OBSRunning) {
         Write-Success "OBS is running"
         Write-Step "Connecting to OBS WebSocket..."
