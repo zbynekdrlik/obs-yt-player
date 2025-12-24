@@ -5,11 +5,9 @@ Tests for tool download, extraction, and verification.
 Uses mocked subprocess and urllib for testing.
 """
 
-import pytest
 import os
 import subprocess
-from unittest.mock import patch, MagicMock, mock_open
-import tempfile
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
 if not hasattr(subprocess, 'STARTUPINFO'):
@@ -62,9 +60,10 @@ class TestExtractFfmpeg:
 
     def test_extracts_ffmpeg_from_archive(self, tmp_path):
         """Should extract ffmpeg.exe from zip archive."""
-        from ytplay_modules.tools import extract_ffmpeg
-        from ytplay_modules.config import FFMPEG_FILENAME
         import zipfile
+
+        from ytplay_modules.config import FFMPEG_FILENAME
+        from ytplay_modules.tools import extract_ffmpeg
 
         # Create a test zip file with ffmpeg.exe
         archive_path = tmp_path / "ffmpeg.zip"
@@ -80,8 +79,9 @@ class TestExtractFfmpeg:
 
     def test_returns_false_when_ffmpeg_not_found(self, tmp_path):
         """Should return False when ffmpeg.exe not in archive."""
-        from ytplay_modules.tools import extract_ffmpeg
         import zipfile
+
+        from ytplay_modules.tools import extract_ffmpeg
 
         # Create a zip without ffmpeg.exe
         archive_path = tmp_path / "other.zip"
@@ -231,8 +231,8 @@ class TestSetupTools:
         self, mock_makedirs, mock_tools_path, mock_ytdlp, mock_ffmpeg
     ):
         """Should set tools ready when all downloads succeed."""
-        from ytplay_modules.tools import setup_tools
         from ytplay_modules.state import is_tools_ready, set_tools_ready
+        from ytplay_modules.tools import setup_tools
 
         mock_tools_path.return_value = "/path/to/tools"
         mock_ytdlp.return_value = True

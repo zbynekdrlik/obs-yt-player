@@ -5,11 +5,9 @@ Tests for playlist synchronization with mocked subprocess calls.
 Target: 80%+ coverage
 """
 
-import pytest
 import json
-import sys
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
 if not hasattr(subprocess, 'STARTUPINFO'):
@@ -164,7 +162,7 @@ class TestTriggerStartupSync:
     def test_only_triggers_once(self):
         """Should only trigger sync once."""
         from ytplay_modules.playlist import trigger_startup_sync
-        from ytplay_modules.state import sync_event, set_sync_on_startup_done
+        from ytplay_modules.state import set_sync_on_startup_done, sync_event
 
         set_sync_on_startup_done(False)
         sync_event.clear()
@@ -206,8 +204,12 @@ class TestPlaylistSyncWorker:
     ):
         """Should queue videos that are not in cache."""
         from ytplay_modules.state import (
-            sync_event, video_queue, set_tools_ready, set_stop_threads,
-            set_playlist_url, is_video_cached, add_cached_video
+            add_cached_video,
+            is_video_cached,
+            set_playlist_url,
+            set_stop_threads,
+            set_tools_ready,
+            video_queue,
         )
 
         # Set up state
@@ -230,7 +232,6 @@ class TestPlaylistSyncWorker:
             video_queue.get_nowait()
 
         # Import and call the internal sync logic
-        from ytplay_modules.playlist import fetch_playlist_with_ytdlp
         from ytplay_modules.state import set_playlist_video_ids
 
         videos = mock_fetch.return_value

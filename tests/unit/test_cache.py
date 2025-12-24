@@ -5,10 +5,7 @@ Tests for cache management and video file validation.
 Target: 100% coverage
 """
 
-import pytest
-import os
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestValidateVideoFile:
@@ -107,7 +104,7 @@ class TestScanExistingCache:
     def test_scans_normalized_mp4_files(self, tmp_path):
         """Should find and parse normalized .mp4 files."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -123,7 +120,7 @@ class TestScanExistingCache:
     def test_extracts_metadata_from_filename(self, tmp_path):
         """Should extract song and artist from filename."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -142,7 +139,7 @@ class TestScanExistingCache:
     def test_detects_gemini_failed_files(self, tmp_path):
         """Should detect _gf suffix for Gemini failed files."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -160,7 +157,7 @@ class TestScanExistingCache:
     def test_skips_invalid_video_files(self, tmp_path):
         """Should skip files that fail validation."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -176,7 +173,7 @@ class TestScanExistingCache:
     def test_skips_files_without_valid_video_id(self, tmp_path):
         """Should skip files without valid YouTube ID."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -192,7 +189,7 @@ class TestScanExistingCache:
     def test_handles_multiple_files(self, tmp_path):
         """Should scan multiple video files."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -227,10 +224,7 @@ class TestCleanupRemovedVideos:
     def test_removes_videos_not_in_playlist(self, tmp_path):
         """Should remove cached videos not in current playlist."""
         from ytplay_modules.cache import cleanup_removed_videos
-        from ytplay_modules.state import (
-            add_cached_video, set_playlist_video_ids,
-            get_cached_videos, set_cache_dir
-        )
+        from ytplay_modules.state import add_cached_video, get_cached_videos, set_cache_dir, set_playlist_video_ids
 
         set_cache_dir(str(tmp_path))
 
@@ -262,9 +256,11 @@ class TestCleanupRemovedVideos:
         """Should not remove video that is currently playing."""
         from ytplay_modules.cache import cleanup_removed_videos
         from ytplay_modules.state import (
-            add_cached_video, set_playlist_video_ids,
-            set_current_playback_video_id, get_cached_videos,
-            set_cache_dir
+            add_cached_video,
+            get_cached_videos,
+            set_cache_dir,
+            set_current_playback_video_id,
+            set_playlist_video_ids,
         )
 
         set_cache_dir(str(tmp_path))
@@ -287,9 +283,7 @@ class TestCleanupRemovedVideos:
     def test_deletes_video_file(self, tmp_path):
         """Should delete actual video file from disk."""
         from ytplay_modules.cache import cleanup_removed_videos
-        from ytplay_modules.state import (
-            add_cached_video, set_playlist_video_ids, set_cache_dir
-        )
+        from ytplay_modules.state import add_cached_video, set_cache_dir, set_playlist_video_ids
 
         set_cache_dir(str(tmp_path))
 
@@ -312,10 +306,7 @@ class TestCleanupRemovedVideos:
     def test_handles_missing_file_gracefully(self, tmp_path):
         """Should handle missing video file without crashing."""
         from ytplay_modules.cache import cleanup_removed_videos
-        from ytplay_modules.state import (
-            add_cached_video, set_playlist_video_ids,
-            get_cached_videos, set_cache_dir
-        )
+        from ytplay_modules.state import add_cached_video, get_cached_videos, set_cache_dir, set_playlist_video_ids
 
         set_cache_dir(str(tmp_path))
 
@@ -336,10 +327,7 @@ class TestCleanupRemovedVideos:
     def test_no_action_when_all_in_playlist(self, tmp_path):
         """Should do nothing when all cached videos are in playlist."""
         from ytplay_modules.cache import cleanup_removed_videos
-        from ytplay_modules.state import (
-            add_cached_video, set_playlist_video_ids,
-            get_cached_videos, set_cache_dir
-        )
+        from ytplay_modules.state import add_cached_video, get_cached_videos, set_cache_dir, set_playlist_video_ids
 
         set_cache_dir(str(tmp_path))
 
@@ -455,7 +443,7 @@ class TestFilenameParsingEdgeCases:
     def test_handles_underscores_in_song_name(self, tmp_path):
         """Should handle underscores in song name."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -471,7 +459,7 @@ class TestFilenameParsingEdgeCases:
     def test_handles_video_id_with_underscore(self, tmp_path):
         """Should handle video IDs containing underscores."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -488,7 +476,7 @@ class TestFilenameParsingEdgeCases:
     def test_handles_video_id_with_hyphen(self, tmp_path):
         """Should handle video IDs containing hyphens."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -504,7 +492,7 @@ class TestFilenameParsingEdgeCases:
     def test_skips_files_not_ending_with_normalized(self, tmp_path):
         """Should skip files not ending with _normalized."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 
@@ -521,7 +509,7 @@ class TestFilenameParsingEdgeCases:
     def test_handles_exception_during_file_processing(self, tmp_path):
         """Should continue processing after exception on one file."""
         from ytplay_modules.cache import scan_existing_cache
-        from ytplay_modules.state import set_cache_dir, get_cached_videos
+        from ytplay_modules.state import get_cached_videos, set_cache_dir
 
         set_cache_dir(str(tmp_path))
 

@@ -5,8 +5,6 @@ Tests for text fade effects and opacity management.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 
 import obspython as obs
 
@@ -41,8 +39,8 @@ class TestEnsureOpacityFilter:
     def test_creates_filter_if_not_exists(self):
         """Should create filter if it doesn't exist."""
         from ytplay_modules import opacity_control
-        from ytplay_modules.opacity_control import ensure_opacity_filter
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.opacity_control import ensure_opacity_filter
 
         obs.reset()
         opacity_control._opacity_filter_created = False
@@ -68,9 +66,8 @@ class TestUpdateTextOpacity:
 
     def test_updates_opacity_value(self):
         """Should update opacity in filter settings."""
-        from ytplay_modules import opacity_control
+        from ytplay_modules.config import OPACITY_FILTER_NAME, TEXT_SOURCE_NAME
         from ytplay_modules.opacity_control import update_text_opacity
-        from ytplay_modules.config import TEXT_SOURCE_NAME, OPACITY_FILTER_NAME
 
         obs.reset()
         # Create source with filter
@@ -195,8 +192,8 @@ class TestSetCurrentOpacity:
     def test_sets_opacity_value(self):
         """Should set current opacity value."""
         from ytplay_modules import opacity_control
+        from ytplay_modules.config import OPACITY_FILTER_NAME, TEXT_SOURCE_NAME
         from ytplay_modules.opacity_control import set_current_opacity
-        from ytplay_modules.config import TEXT_SOURCE_NAME, OPACITY_FILTER_NAME
 
         obs.reset()
         # Create source with filter for update_text_opacity
@@ -284,8 +281,8 @@ class TestOpacityTransitionCallback:
     def test_updates_opacity_during_fade_in(self):
         """Should update opacity during fade in."""
         from ytplay_modules import opacity_control
+        from ytplay_modules.config import OPACITY_FILTER_NAME, TEXT_SOURCE_NAME
         from ytplay_modules.opacity_control import opacity_transition_callback
-        from ytplay_modules.config import TEXT_SOURCE_NAME, OPACITY_FILTER_NAME
 
         obs.reset()
         source = obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -306,8 +303,8 @@ class TestOpacityTransitionCallback:
     def test_clamps_opacity_at_target(self):
         """Should clamp opacity when reaching target."""
         from ytplay_modules import opacity_control
+        from ytplay_modules.config import OPACITY_FILTER_NAME, TEXT_SOURCE_NAME
         from ytplay_modules.opacity_control import opacity_transition_callback
-        from ytplay_modules.config import TEXT_SOURCE_NAME, OPACITY_FILTER_NAME
 
         obs.reset()
         source = obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")

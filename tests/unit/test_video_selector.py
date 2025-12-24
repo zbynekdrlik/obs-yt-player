@@ -5,9 +5,6 @@ Tests for video selection logic and playback modes.
 Target: 100% coverage
 """
 
-import pytest
-import os
-from unittest.mock import patch, MagicMock
 
 
 class TestSelectNextVideo:
@@ -15,8 +12,8 @@ class TestSelectNextVideo:
 
     def test_returns_none_when_no_videos(self):
         """Should return None when no cached videos."""
-        from ytplay_modules.video_selector import select_next_video
         from ytplay_modules.state import get_cached_videos
+        from ytplay_modules.video_selector import select_next_video
 
         # Ensure cache is empty (reset happens in conftest)
         assert len(get_cached_videos()) == 0
@@ -26,8 +23,8 @@ class TestSelectNextVideo:
 
     def test_selects_video_when_available(self):
         """Should select a video when cache has videos."""
-        from ytplay_modules.video_selector import select_next_video
         from ytplay_modules.state import add_cached_video
+        from ytplay_modules.video_selector import select_next_video
 
         add_cached_video("test_vid1", {
             "path": "/cache/test1.mp4",
@@ -40,8 +37,8 @@ class TestSelectNextVideo:
 
     def test_single_video_always_selected(self):
         """When only one video, always return it."""
-        from ytplay_modules.video_selector import select_next_video
         from ytplay_modules.state import add_cached_video, clear_played_videos
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         add_cached_video("only_video", {
@@ -57,8 +54,8 @@ class TestSelectNextVideo:
 
     def test_random_selection_from_multiple(self):
         """Should select from multiple available videos."""
-        from ytplay_modules.video_selector import select_next_video
         from ytplay_modules.state import add_cached_video, clear_played_videos
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         video_ids = ["vid_a", "vid_b", "vid_c"]
@@ -74,8 +71,8 @@ class TestSelectNextVideo:
 
     def test_no_repeat_until_all_played(self):
         """Should not repeat videos until all have been played."""
+        from ytplay_modules.state import add_cached_video, clear_played_videos
         from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import add_cached_video, clear_played_videos, get_played_videos
 
         clear_played_videos()
         video_ids = ["no_repeat_a", "no_repeat_b", "no_repeat_c"]
@@ -96,8 +93,8 @@ class TestSelectNextVideo:
 
     def test_reset_played_list_when_all_played(self):
         """Should reset played list after all videos played."""
+        from ytplay_modules.state import add_cached_video, clear_played_videos
         from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import add_cached_video, clear_played_videos, get_played_videos
 
         clear_played_videos()
         video_ids = ["reset_a", "reset_b"]
@@ -118,12 +115,9 @@ class TestSelectNextVideo:
 
     def test_loop_mode_returns_loop_video(self):
         """In loop mode, should return the loop video if set."""
-        from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import (
-            add_cached_video, set_playback_mode, set_loop_video_id,
-            clear_played_videos
-        )
         from ytplay_modules.config import PLAYBACK_MODE_LOOP
+        from ytplay_modules.state import add_cached_video, clear_played_videos, set_loop_video_id, set_playback_mode
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         add_cached_video("loop_vid", {
@@ -147,12 +141,15 @@ class TestSelectNextVideo:
 
     def test_loop_mode_sets_loop_video_if_not_set(self):
         """In loop mode, should set loop video on first selection."""
-        from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import (
-            add_cached_video, set_playback_mode, set_loop_video_id,
-            get_loop_video_id, clear_played_videos
-        )
         from ytplay_modules.config import PLAYBACK_MODE_LOOP
+        from ytplay_modules.state import (
+            add_cached_video,
+            clear_played_videos,
+            get_loop_video_id,
+            set_loop_video_id,
+            set_playback_mode,
+        )
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         set_loop_video_id(None)  # Clear any existing loop video
@@ -171,12 +168,9 @@ class TestSelectNextVideo:
 
     def test_loop_mode_with_missing_loop_video(self):
         """Loop mode should handle missing loop video gracefully."""
-        from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import (
-            add_cached_video, set_playback_mode, set_loop_video_id,
-            clear_played_videos
-        )
         from ytplay_modules.config import PLAYBACK_MODE_LOOP
+        from ytplay_modules.state import add_cached_video, clear_played_videos, set_loop_video_id, set_playback_mode
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         set_loop_video_id("missing_video")  # Set loop to non-existent video
@@ -195,11 +189,9 @@ class TestSelectNextVideo:
 
     def test_continuous_mode(self):
         """Continuous mode should cycle through videos."""
-        from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import (
-            add_cached_video, set_playback_mode, clear_played_videos
-        )
         from ytplay_modules.config import PLAYBACK_MODE_CONTINUOUS
+        from ytplay_modules.state import add_cached_video, clear_played_videos, set_playback_mode
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         set_playback_mode(PLAYBACK_MODE_CONTINUOUS)
@@ -224,8 +216,8 @@ class TestValidateVideoFile:
 
     def test_returns_false_for_missing_file(self):
         """Should return False if video file doesn't exist."""
-        from ytplay_modules.video_selector import validate_video_file
         from ytplay_modules.state import add_cached_video
+        from ytplay_modules.video_selector import validate_video_file
 
         add_cached_video("missing_file_vid", {
             "path": "/nonexistent/path/video.mp4",
@@ -238,8 +230,8 @@ class TestValidateVideoFile:
 
     def test_returns_true_for_existing_file(self, tmp_path):
         """Should return True if video file exists."""
-        from ytplay_modules.video_selector import validate_video_file
         from ytplay_modules.state import add_cached_video
+        from ytplay_modules.video_selector import validate_video_file
 
         # Create a temporary file
         video_file = tmp_path / "test_video.mp4"
@@ -270,8 +262,8 @@ class TestGetVideoDisplayInfo:
 
     def test_returns_video_metadata(self):
         """Should return video metadata from cache."""
-        from ytplay_modules.video_selector import get_video_display_info
         from ytplay_modules.state import add_cached_video
+        from ytplay_modules.video_selector import get_video_display_info
 
         add_cached_video("display_info_vid", {
             "path": "/cache/test.mp4",
@@ -288,8 +280,8 @@ class TestGetVideoDisplayInfo:
 
     def test_handles_missing_metadata_fields(self):
         """Should handle missing metadata with defaults."""
-        from ytplay_modules.video_selector import get_video_display_info
         from ytplay_modules.state import add_cached_video
+        from ytplay_modules.video_selector import get_video_display_info
 
         # Video with minimal info
         add_cached_video("minimal_info_vid", {
@@ -304,8 +296,8 @@ class TestGetVideoDisplayInfo:
 
     def test_handles_partial_metadata(self):
         """Should handle partially filled metadata."""
-        from ytplay_modules.video_selector import get_video_display_info
         from ytplay_modules.state import add_cached_video
+        from ytplay_modules.video_selector import get_video_display_info
 
         add_cached_video("partial_info_vid", {
             "path": "/cache/test.mp4",
@@ -325,11 +317,9 @@ class TestPlaybackModeIntegration:
 
     def test_single_mode_behavior(self):
         """Single mode should be handled by playback controller, not selector."""
-        from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import (
-            add_cached_video, set_playback_mode, clear_played_videos
-        )
         from ytplay_modules.config import PLAYBACK_MODE_SINGLE
+        from ytplay_modules.state import add_cached_video, clear_played_videos, set_playback_mode
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         set_playback_mode(PLAYBACK_MODE_SINGLE)
@@ -346,14 +336,14 @@ class TestPlaybackModeIntegration:
 
     def test_mode_switching(self):
         """Should handle switching between modes."""
-        from ytplay_modules.video_selector import select_next_video
+        from ytplay_modules.config import PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_LOOP
         from ytplay_modules.state import (
-            add_cached_video, set_playback_mode, set_loop_video_id,
-            get_loop_video_id, clear_played_videos
+            add_cached_video,
+            clear_played_videos,
+            set_loop_video_id,
+            set_playback_mode,
         )
-        from ytplay_modules.config import (
-            PLAYBACK_MODE_CONTINUOUS, PLAYBACK_MODE_LOOP
-        )
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         set_loop_video_id(None)
@@ -383,9 +373,9 @@ class TestRandomnessAndDistribution:
 
     def test_selection_covers_all_videos(self):
         """All videos should eventually be selected over many iterations."""
-        from ytplay_modules.video_selector import select_next_video
-        from ytplay_modules.state import add_cached_video, clear_played_videos, set_playback_mode
         from ytplay_modules.config import PLAYBACK_MODE_CONTINUOUS
+        from ytplay_modules.state import add_cached_video, clear_played_videos, set_playback_mode
+        from ytplay_modules.video_selector import select_next_video
 
         clear_played_videos()
         set_playback_mode(PLAYBACK_MODE_CONTINUOUS)
@@ -395,7 +385,7 @@ class TestRandomnessAndDistribution:
             add_cached_video(vid_id, {
                 "path": f"/cache/{vid_id}.mp4",
                 "song": f"Song {vid_id}",
-                "artist": f"Artist"
+                "artist": "Artist"
             })
 
         selected_set = set()

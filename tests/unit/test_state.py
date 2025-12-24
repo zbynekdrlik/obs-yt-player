@@ -5,10 +5,8 @@ Tests for thread-safe state management functions.
 Target: 100% coverage
 """
 
-import pytest
-import threading
 import queue
-from unittest.mock import patch, MagicMock
+import threading
 
 
 class TestPlaylistUrlState:
@@ -16,15 +14,15 @@ class TestPlaylistUrlState:
 
     def test_get_default_playlist_url(self):
         """Should return default playlist URL initially."""
-        from ytplay_modules.state import get_playlist_url
         from ytplay_modules.config import DEFAULT_PLAYLIST_URL
+        from ytplay_modules.state import get_playlist_url
 
         result = get_playlist_url()
         assert result == DEFAULT_PLAYLIST_URL
 
     def test_set_and_get_playlist_url(self):
         """Should store and retrieve playlist URL."""
-        from ytplay_modules.state import set_playlist_url, get_playlist_url
+        from ytplay_modules.state import get_playlist_url, set_playlist_url
 
         test_url = "https://www.youtube.com/playlist?list=TEST123"
         set_playlist_url(test_url)
@@ -33,7 +31,7 @@ class TestPlaylistUrlState:
 
     def test_set_empty_playlist_url(self):
         """Should handle empty URL."""
-        from ytplay_modules.state import set_playlist_url, get_playlist_url
+        from ytplay_modules.state import get_playlist_url, set_playlist_url
 
         set_playlist_url("")
         assert get_playlist_url() == ""
@@ -54,7 +52,7 @@ class TestCacheDirState:
 
     def test_set_and_get_cache_dir(self):
         """Should store and retrieve cache directory."""
-        from ytplay_modules.state import set_cache_dir, get_cache_dir
+        from ytplay_modules.state import get_cache_dir, set_cache_dir
 
         test_dir = "/test/cache/dir"
         set_cache_dir(test_dir)
@@ -75,7 +73,7 @@ class TestGeminiApiKeyState:
 
     def test_set_and_get_gemini_api_key(self):
         """Should store and retrieve Gemini API key."""
-        from ytplay_modules.state import set_gemini_api_key, get_gemini_api_key
+        from ytplay_modules.state import get_gemini_api_key, set_gemini_api_key
 
         test_key = "test_api_key_12345"
         set_gemini_api_key(test_key)
@@ -84,7 +82,7 @@ class TestGeminiApiKeyState:
 
     def test_set_none_gemini_api_key(self):
         """Should handle None API key."""
-        from ytplay_modules.state import set_gemini_api_key, get_gemini_api_key
+        from ytplay_modules.state import get_gemini_api_key, set_gemini_api_key
 
         set_gemini_api_key(None)
         assert get_gemini_api_key() is None
@@ -95,16 +93,16 @@ class TestPlaybackModeState:
 
     def test_get_default_playback_mode(self):
         """Should return default playback mode initially."""
-        from ytplay_modules.state import get_playback_mode
         from ytplay_modules.config import DEFAULT_PLAYBACK_MODE
+        from ytplay_modules.state import get_playback_mode
 
         result = get_playback_mode()
         assert result == DEFAULT_PLAYBACK_MODE
 
     def test_set_and_get_playback_mode(self):
         """Should store and retrieve playback mode."""
-        from ytplay_modules.state import set_playback_mode, get_playback_mode
         from ytplay_modules.config import PLAYBACK_MODE_LOOP
+        from ytplay_modules.state import get_playback_mode, set_playback_mode
 
         set_playback_mode(PLAYBACK_MODE_LOOP)
 
@@ -116,15 +114,15 @@ class TestAudioOnlyModeState:
 
     def test_get_default_audio_only_mode(self):
         """Should return False initially."""
-        from ytplay_modules.state import is_audio_only_mode
         from ytplay_modules.config import DEFAULT_AUDIO_ONLY_MODE
+        from ytplay_modules.state import is_audio_only_mode
 
         result = is_audio_only_mode()
         assert result == DEFAULT_AUDIO_ONLY_MODE
 
     def test_set_and_get_audio_only_mode(self):
         """Should store and retrieve audio-only mode."""
-        from ytplay_modules.state import set_audio_only_mode, is_audio_only_mode
+        from ytplay_modules.state import is_audio_only_mode, set_audio_only_mode
 
         set_audio_only_mode(True)
         assert is_audio_only_mode() is True
@@ -145,7 +143,7 @@ class TestToolsReadyState:
 
     def test_set_tools_ready(self):
         """Should set tools ready flag."""
-        from ytplay_modules.state import set_tools_ready, is_tools_ready
+        from ytplay_modules.state import is_tools_ready, set_tools_ready
 
         set_tools_ready(True)
         assert is_tools_ready() is True
@@ -166,7 +164,7 @@ class TestToolsLoggedWaitingState:
 
     def test_set_tools_logged_waiting(self):
         """Should set tools logged waiting flag."""
-        from ytplay_modules.state import set_tools_logged_waiting, is_tools_logged_waiting
+        from ytplay_modules.state import is_tools_logged_waiting, set_tools_logged_waiting
 
         set_tools_logged_waiting(True)
         assert is_tools_logged_waiting() is True
@@ -184,7 +182,7 @@ class TestSceneActiveState:
 
     def test_set_scene_active(self):
         """Should set scene active flag."""
-        from ytplay_modules.state import set_scene_active, is_scene_active
+        from ytplay_modules.state import is_scene_active, set_scene_active
 
         set_scene_active(True)
         assert is_scene_active() is True
@@ -202,7 +200,7 @@ class TestIsPlayingState:
 
     def test_set_playing(self):
         """Should set playing flag."""
-        from ytplay_modules.state import set_playing, is_playing
+        from ytplay_modules.state import is_playing, set_playing
 
         set_playing(True)
         assert is_playing() is True
@@ -238,7 +236,7 @@ class TestSyncOnStartupDoneState:
 
     def test_set_sync_on_startup_done(self):
         """Should set sync on startup done flag."""
-        from ytplay_modules.state import set_sync_on_startup_done, is_sync_on_startup_done
+        from ytplay_modules.state import is_sync_on_startup_done, set_sync_on_startup_done
 
         set_sync_on_startup_done(True)
         assert is_sync_on_startup_done() is True
@@ -256,14 +254,14 @@ class TestStopRequestedState:
 
     def test_set_stop_requested(self):
         """Should set stop requested flag."""
-        from ytplay_modules.state import set_stop_requested, is_stop_requested
+        from ytplay_modules.state import is_stop_requested, set_stop_requested
 
         set_stop_requested(True)
         assert is_stop_requested() is True
 
     def test_clear_stop_request(self):
         """Should clear stop request flag."""
-        from ytplay_modules.state import set_stop_requested, clear_stop_request, is_stop_requested
+        from ytplay_modules.state import clear_stop_request, is_stop_requested, set_stop_requested
 
         set_stop_requested(True)
         assert is_stop_requested() is True
@@ -284,7 +282,7 @@ class TestFirstVideoPlayedState:
 
     def test_set_first_video_played(self):
         """Should set first video played flag."""
-        from ytplay_modules.state import set_first_video_played, is_first_video_played
+        from ytplay_modules.state import is_first_video_played, set_first_video_played
 
         set_first_video_played(True)
         assert is_first_video_played() is True
@@ -302,7 +300,7 @@ class TestCurrentVideoPathState:
 
     def test_set_and_get_current_video_path(self):
         """Should store and retrieve current video path."""
-        from ytplay_modules.state import set_current_video_path, get_current_video_path
+        from ytplay_modules.state import get_current_video_path, set_current_video_path
 
         test_path = "/cache/test_video.mp4"
         set_current_video_path(test_path)
@@ -322,7 +320,7 @@ class TestCurrentPlaybackVideoIdState:
 
     def test_set_and_get_current_playback_video_id(self):
         """Should store and retrieve current playback video ID."""
-        from ytplay_modules.state import set_current_playback_video_id, get_current_playback_video_id
+        from ytplay_modules.state import get_current_playback_video_id, set_current_playback_video_id
 
         test_id = "dQw4w9WgXcQ"
         set_current_playback_video_id(test_id)
@@ -342,7 +340,7 @@ class TestLoopVideoIdState:
 
     def test_set_and_get_loop_video_id(self):
         """Should store and retrieve loop video ID."""
-        from ytplay_modules.state import set_loop_video_id, get_loop_video_id
+        from ytplay_modules.state import get_loop_video_id, set_loop_video_id
 
         test_id = "dQw4w9WgXcQ"
         set_loop_video_id(test_id)
@@ -381,7 +379,7 @@ class TestCachedVideosState:
 
     def test_remove_cached_video(self):
         """Should remove video from cache."""
-        from ytplay_modules.state import add_cached_video, remove_cached_video, get_cached_videos
+        from ytplay_modules.state import add_cached_video, get_cached_videos, remove_cached_video
 
         video_id = "test456"
         add_cached_video(video_id, {"path": "/test.mp4", "song": "Test", "artist": "Test"})
@@ -452,7 +450,7 @@ class TestPlaylistVideoIdsState:
 
     def test_set_playlist_video_ids(self):
         """Should set playlist video IDs."""
-        from ytplay_modules.state import set_playlist_video_ids, get_playlist_video_ids
+        from ytplay_modules.state import get_playlist_video_ids, set_playlist_video_ids
 
         test_ids = {"id1", "id2", "id3"}
         set_playlist_video_ids(test_ids)
@@ -462,7 +460,7 @@ class TestPlaylistVideoIdsState:
 
     def test_get_playlist_video_ids_returns_copy(self):
         """Should return a copy, not the original set."""
-        from ytplay_modules.state import set_playlist_video_ids, get_playlist_video_ids
+        from ytplay_modules.state import get_playlist_video_ids, set_playlist_video_ids
 
         set_playlist_video_ids({"id1", "id2"})
 
@@ -497,7 +495,7 @@ class TestPlayedVideosState:
 
     def test_add_played_video_no_duplicates(self):
         """Should not add duplicate videos."""
-        from ytplay_modules.state import add_played_video, get_played_videos, clear_played_videos
+        from ytplay_modules.state import add_played_video, clear_played_videos, get_played_videos
 
         clear_played_videos()
         add_played_video("same_id")
@@ -518,7 +516,7 @@ class TestPlayedVideosState:
 
     def test_get_played_videos_returns_copy(self):
         """Should return a copy, not the original list."""
-        from ytplay_modules.state import add_played_video, get_played_videos, clear_played_videos
+        from ytplay_modules.state import add_played_video, clear_played_videos, get_played_videos
 
         clear_played_videos()
         add_played_video("copy_test")
@@ -535,10 +533,7 @@ class TestIsVideoBeingProcessed:
 
     def test_video_being_processed_when_current(self):
         """Should return True when video is current playback."""
-        from ytplay_modules.state import (
-            set_current_playback_video_id,
-            is_video_being_processed
-        )
+        from ytplay_modules.state import is_video_being_processed, set_current_playback_video_id
 
         video_id = "processing_test"
         set_current_playback_video_id(video_id)
@@ -547,10 +542,7 @@ class TestIsVideoBeingProcessed:
 
     def test_video_not_being_processed(self):
         """Should return False when video is not current."""
-        from ytplay_modules.state import (
-            set_current_playback_video_id,
-            is_video_being_processed
-        )
+        from ytplay_modules.state import is_video_being_processed, set_current_playback_video_id
 
         set_current_playback_video_id("other_id")
 
@@ -562,7 +554,7 @@ class TestThreadSafety:
 
     def test_concurrent_cache_access(self):
         """Multiple threads should safely access cached videos."""
-        from ytplay_modules.state import add_cached_video, get_cached_videos, remove_cached_video
+        from ytplay_modules.state import add_cached_video, get_cached_videos
 
         errors = []
 
@@ -600,7 +592,7 @@ class TestThreadSafety:
 
     def test_concurrent_flag_access(self):
         """Multiple threads should safely access boolean flags."""
-        from ytplay_modules.state import set_playing, is_playing
+        from ytplay_modules.state import is_playing, set_playing
 
         errors = []
 

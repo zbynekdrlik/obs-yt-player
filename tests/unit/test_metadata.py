@@ -5,15 +5,16 @@ Tests for title parsing and metadata cleaning functions.
 Target: 85%+ coverage (Gemini integration tested separately)
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from ytplay_modules.metadata import (
-    parse_title_smart,
+    apply_universal_song_cleaning,
     clean_featuring_from_song,
     extract_metadata_from_title,
-    apply_universal_song_cleaning,
     get_video_metadata,
+    parse_title_smart,
 )
 
 

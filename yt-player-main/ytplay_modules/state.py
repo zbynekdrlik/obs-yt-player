@@ -4,7 +4,8 @@ Thread-safe state variables and accessors.
 """
 
 import threading
-from .config import DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR, DEFAULT_PLAYBACK_MODE, DEFAULT_AUDIO_ONLY_MODE
+
+from .config import DEFAULT_AUDIO_ONLY_MODE, DEFAULT_CACHE_DIR, DEFAULT_PLAYBACK_MODE, DEFAULT_PLAYLIST_URL
 
 # Threading synchronization
 _state_lock = threading.Lock()
@@ -50,6 +51,7 @@ download_progress_milestones = {}  # Track logged milestones per video
 
 # Initialize queue
 import queue
+
 video_queue = queue.Queue()
 
 # ===== CONFIGURATION ACCESSORS =====
@@ -231,8 +233,7 @@ def add_cached_video(video_id, info):
 def remove_cached_video(video_id):
     """Remove a cached video."""
     with _state_lock:
-        if video_id in _cached_videos:
-            del _cached_videos[video_id]
+        _cached_videos.pop(video_id, None)
 
 def is_video_cached(video_id):
     """Check if video is in cache."""
@@ -258,19 +259,19 @@ def set_playlist_video_ids(video_ids):
 
 def add_played_video(video_id):
     """Add video to played list and persist to disk."""
+    from typing import Optional
+
     from .play_history import save_play_history
 
-    should_save = False
-    videos_copy = None
+    videos_to_save: Optional[list] = None
     with _state_lock:
         if video_id not in _played_videos:
             _played_videos.append(video_id)
-            videos_copy = _played_videos.copy()
-            should_save = True
+            videos_to_save = _played_videos.copy()
 
     # Save outside the lock to avoid deadlock
-    if should_save:
-        save_play_history(videos_copy)
+    if videos_to_save is not None:
+        save_play_history(videos_to_save)
 
 def clear_played_videos():
     """Clear played videos list and persist to disk."""
@@ -294,8 +295,8 @@ def initialize_played_videos():
     Should be called once during script initialization.
     """
     global _played_videos
-    from .play_history import load_play_history
     from .logger import log
+    from .play_history import load_play_history
 
     # Load outside the lock to avoid deadlock (load_play_history calls get_cache_dir)
     loaded_videos = load_play_history()

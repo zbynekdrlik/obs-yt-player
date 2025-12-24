@@ -4,7 +4,6 @@ Central location for all script settings and constants.
 """
 
 import os
-from pathlib import Path
 
 # Version - INCREMENT WITH EVERY CODE CHANGE
 SCRIPT_VERSION = "4.1.1"  # Fixed pre-loaded video tracking in played videos list

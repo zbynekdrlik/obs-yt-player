@@ -5,10 +5,8 @@ Tests for reprocessing videos with failed Gemini extraction.
 Uses mocked subprocess and state for testing.
 """
 
-import pytest
-import os
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
 if not hasattr(subprocess, 'STARTUPINFO'):
@@ -176,7 +174,7 @@ class TestReprocessVideo:
     def test_renames_file_on_success(self, tmp_path):
         """Should rename file when Gemini succeeds on retry."""
         from ytplay_modules.reprocess import reprocess_video
-        from ytplay_modules.state import set_gemini_api_key, set_cache_dir
+        from ytplay_modules.state import set_cache_dir, set_gemini_api_key
 
         # Create actual temp file
         old_file = tmp_path / "old_file_gf.mp4"

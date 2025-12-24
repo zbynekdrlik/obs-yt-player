@@ -5,33 +5,31 @@ Tests for configuration constants and dynamic script detection.
 Target: 100% coverage
 """
 
-import pytest
 import re
-import os
 
 from ytplay_modules.config import (
-    SCRIPT_VERSION,
-    SCRIPT_NAME,
-    SCENE_NAME,
-    MEDIA_SOURCE_NAME,
-    TEXT_SOURCE_NAME,
-    PLAYBACK_MODE_CONTINUOUS,
-    PLAYBACK_MODE_SINGLE,
-    PLAYBACK_MODE_LOOP,
-    DEFAULT_PLAYBACK_MODE,
     DEFAULT_AUDIO_ONLY_MODE,
     DEFAULT_CACHE_DIR,
+    DEFAULT_PLAYBACK_MODE,
     DEFAULT_PLAYLIST_URL,
-    PLAYBACK_CHECK_INTERVAL,
-    TITLE_FADE_DURATION,
-    TITLE_FADE_STEPS,
-    TITLE_FADE_INTERVAL,
     DOWNLOAD_TIMEOUT,
-    NORMALIZE_TIMEOUT,
-    TOOLS_SUBDIR,
     MAX_RESOLUTION,
-    SCENE_CHECK_DELAY,
+    MEDIA_SOURCE_NAME,
+    NORMALIZE_TIMEOUT,
     OPACITY_FILTER_NAME,
+    PLAYBACK_CHECK_INTERVAL,
+    PLAYBACK_MODE_CONTINUOUS,
+    PLAYBACK_MODE_LOOP,
+    PLAYBACK_MODE_SINGLE,
+    SCENE_CHECK_DELAY,
+    SCENE_NAME,
+    SCRIPT_NAME,
+    SCRIPT_VERSION,
+    TEXT_SOURCE_NAME,
+    TITLE_FADE_DURATION,
+    TITLE_FADE_INTERVAL,
+    TITLE_FADE_STEPS,
+    TOOLS_SUBDIR,
 )
 
 
@@ -115,7 +113,7 @@ class TestTimingConstants:
     def test_title_fade_interval_calculated_correctly(self):
         """Title fade interval should be duration / steps."""
         expected = TITLE_FADE_DURATION // TITLE_FADE_STEPS
-        assert TITLE_FADE_INTERVAL == expected or TITLE_FADE_INTERVAL > 0
+        assert expected == TITLE_FADE_INTERVAL or TITLE_FADE_INTERVAL > 0
 
     def test_download_timeout_positive(self):
         """Download timeout should be positive."""
@@ -231,6 +229,6 @@ class TestConfigurationConsistency:
 
     def test_playback_modes_are_lowercase(self):
         """Playback modes should be lowercase for consistency."""
-        assert PLAYBACK_MODE_CONTINUOUS == PLAYBACK_MODE_CONTINUOUS.lower()
-        assert PLAYBACK_MODE_SINGLE == PLAYBACK_MODE_SINGLE.lower()
-        assert PLAYBACK_MODE_LOOP == PLAYBACK_MODE_LOOP.lower()
+        assert PLAYBACK_MODE_CONTINUOUS.lower() == PLAYBACK_MODE_CONTINUOUS
+        assert PLAYBACK_MODE_SINGLE.lower() == PLAYBACK_MODE_SINGLE
+        assert PLAYBACK_MODE_LOOP.lower() == PLAYBACK_MODE_LOOP

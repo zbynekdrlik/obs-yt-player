@@ -5,12 +5,8 @@ Tests for audio normalization with mocked subprocess calls.
 Target: 80%+ coverage
 """
 
-import pytest
-import json
-import os
-import sys
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
 if not hasattr(subprocess, 'STARTUPINFO'):

@@ -5,19 +5,17 @@ Tests for utility functions that have no OBS dependencies.
 Target: 100% coverage
 """
 
-import pytest
 import os
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from ytplay_modules.utils import (
-    sanitize_filename,
-    validate_youtube_id,
+    ensure_cache_directory,
     format_duration,
+    get_ffmpeg_path,
     get_tools_path,
     get_ytdlp_path,
-    get_ffmpeg_path,
-    ensure_cache_directory,
+    sanitize_filename,
+    validate_youtube_id,
 )
 
 

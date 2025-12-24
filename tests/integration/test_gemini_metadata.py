@@ -5,10 +5,9 @@ Tests for Gemini API integration with mocked HTTP responses.
 Target: 80%+ coverage
 """
 
-import pytest
 import json
-from unittest.mock import patch, MagicMock
 import urllib.error
+from unittest.mock import MagicMock, patch
 
 
 class TestExtractMetadataWithGemini:
@@ -307,9 +306,7 @@ class TestGeminiFailureTracking:
 
     def test_clear_gemini_failures(self):
         """Should clear the failure set."""
-        from ytplay_modules.gemini_metadata import (
-            clear_gemini_failures, is_gemini_failed, _gemini_failures
-        )
+        from ytplay_modules.gemini_metadata import _gemini_failures, clear_gemini_failures, is_gemini_failed
 
         # Add a failure manually
         _gemini_failures.add("test_video")
@@ -321,8 +318,10 @@ class TestGeminiFailureTracking:
     def test_remove_gemini_failure(self):
         """Should remove specific video from failures."""
         from ytplay_modules.gemini_metadata import (
-            remove_gemini_failure, is_gemini_failed, _gemini_failures,
-            clear_gemini_failures
+            _gemini_failures,
+            clear_gemini_failures,
+            is_gemini_failed,
+            remove_gemini_failure,
         )
 
         clear_gemini_failures()
@@ -343,9 +342,7 @@ class TestGeminiFailureTracking:
 
     def test_is_gemini_failed(self):
         """Should check if video has failed."""
-        from ytplay_modules.gemini_metadata import (
-            is_gemini_failed, _gemini_failures, clear_gemini_failures
-        )
+        from ytplay_modules.gemini_metadata import _gemini_failures, clear_gemini_failures, is_gemini_failed
 
         clear_gemini_failures()
         _gemini_failures.add("failed_video")

@@ -5,12 +5,8 @@ Tests for video downloading with mocked subprocess calls.
 Target: 80%+ coverage
 """
 
-import pytest
-import json
-import os
-import sys
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
 if not hasattr(subprocess, 'STARTUPINFO'):
@@ -193,7 +189,7 @@ class TestParseProgress:
 
     def test_parses_50_percent_milestone(self):
         """Should log at 50% milestone."""
-        from ytplay_modules.download import parse_progress, download_progress_milestones
+        from ytplay_modules.download import download_progress_milestones, parse_progress
 
         video_id = "test_progress"
         download_progress_milestones[video_id] = set()
@@ -204,7 +200,7 @@ class TestParseProgress:
 
     def test_ignores_progress_after_50_percent(self):
         """Should stop logging after 50% milestone."""
-        from ytplay_modules.download import parse_progress, download_progress_milestones
+        from ytplay_modules.download import download_progress_milestones, parse_progress
 
         video_id = "test_ignore"
         download_progress_milestones[video_id] = {50}  # Already logged 50%
@@ -218,7 +214,7 @@ class TestParseProgress:
 
     def test_handles_invalid_progress_line(self):
         """Should handle lines without progress info."""
-        from ytplay_modules.download import parse_progress, download_progress_milestones
+        from ytplay_modules.download import download_progress_milestones, parse_progress
 
         video_id = "test_invalid"
         download_progress_milestones[video_id] = set()
@@ -240,9 +236,7 @@ class TestProcessVideosWorker:
         self, mock_normalize, mock_metadata, mock_download
     ):
         """Should skip videos that are already cached."""
-        from ytplay_modules.state import (
-            video_queue, add_cached_video, should_stop_threads
-        )
+        from ytplay_modules.state import add_cached_video, video_queue
 
         # Pre-cache the video
         add_cached_video("already_cached", {
@@ -270,7 +264,7 @@ class TestProcessVideosWorker:
         self, mock_normalize, mock_metadata, mock_download
     ):
         """Should process video through all stages."""
-        from ytplay_modules.state import video_queue, is_video_cached
+        from ytplay_modules.state import is_video_cached
 
         video_id = "new_video_123"
         title = "New Video Title"

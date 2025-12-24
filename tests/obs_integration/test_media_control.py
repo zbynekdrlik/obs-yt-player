@@ -5,9 +5,6 @@ Tests for media source operations and text source updates.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-import pytest
-import os
-from unittest.mock import patch, MagicMock
 
 import obspython as obs
 
@@ -27,8 +24,8 @@ class TestGetCurrentVideoFromMediaSource:
 
     def test_returns_none_when_no_file_path(self):
         """Should return None when no file path in source."""
-        from ytplay_modules.media_control import get_current_video_from_media_source
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import get_current_video_from_media_source
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {"local_file": ""})
@@ -39,8 +36,8 @@ class TestGetCurrentVideoFromMediaSource:
 
     def test_extracts_video_id_from_filename(self):
         """Should extract video ID from normalized filename."""
-        from ytplay_modules.media_control import get_current_video_from_media_source
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import get_current_video_from_media_source
         from ytplay_modules.state import add_cached_video
 
         obs.reset()
@@ -61,8 +58,8 @@ class TestGetCurrentVideoFromMediaSource:
 
     def test_returns_none_for_invalid_filename_format(self):
         """Should return None for non-normalized filename."""
-        from ytplay_modules.media_control import get_current_video_from_media_source
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import get_current_video_from_media_source
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {
@@ -79,8 +76,8 @@ class TestForceDisableMediaLoop:
 
     def test_disables_loop_when_enabled(self):
         """Should disable loop setting when it's enabled."""
-        from ytplay_modules.media_control import force_disable_media_loop
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import force_disable_media_loop
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {"looping": True})
@@ -93,8 +90,8 @@ class TestForceDisableMediaLoop:
 
     def test_does_nothing_when_loop_disabled(self):
         """Should not update source when loop already disabled."""
-        from ytplay_modules.media_control import force_disable_media_loop
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import force_disable_media_loop
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {"looping": False})
@@ -120,8 +117,8 @@ class TestGetMediaState:
 
     def test_returns_state_for_existing_source(self):
         """Should return media state for existing source."""
-        from ytplay_modules.media_control import get_media_state
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import get_media_state
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
@@ -147,8 +144,8 @@ class TestGetMediaDuration:
 
     def test_returns_duration_for_existing_source(self):
         """Should return duration for existing source."""
-        from ytplay_modules.media_control import get_media_duration
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import get_media_duration
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
@@ -174,8 +171,8 @@ class TestGetMediaTime:
 
     def test_returns_time_for_existing_source(self):
         """Should return playback time for existing source."""
-        from ytplay_modules.media_control import get_media_time
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import get_media_time
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
@@ -211,8 +208,8 @@ class TestUpdateMediaSource:
 
     def test_updates_source_with_new_file(self, tmp_path):
         """Should update source with new video file."""
-        from ytplay_modules.media_control import update_media_source
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import update_media_source
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {"local_file": ""})
@@ -242,8 +239,8 @@ class TestUpdateMediaSource:
 
     def test_forces_reload_for_same_file(self, tmp_path):
         """Should use multi-step reload for same file."""
-        from ytplay_modules.media_control import update_media_source
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import update_media_source
 
         obs.reset()
         video_file = tmp_path / "test_video.mp4"
@@ -265,8 +262,8 @@ class TestUpdateTextSourceContent:
 
     def test_updates_text_with_song_and_artist(self):
         """Should update text source with song and artist."""
-        from ytplay_modules.media_control import update_text_source_content
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.media_control import update_text_source_content
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -279,8 +276,8 @@ class TestUpdateTextSourceContent:
 
     def test_updates_text_with_song_only(self):
         """Should update with just song when artist is empty."""
-        from ytplay_modules.media_control import update_text_source_content
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.media_control import update_text_source_content
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -293,8 +290,8 @@ class TestUpdateTextSourceContent:
 
     def test_adds_warning_when_gemini_failed(self):
         """Should add warning symbol when Gemini failed."""
-        from ytplay_modules.media_control import update_text_source_content
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.media_control import update_text_source_content
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -321,8 +318,8 @@ class TestStopMediaSource:
 
     def test_stops_and_clears_media_source(self):
         """Should stop playback and clear file path."""
-        from ytplay_modules.media_control import stop_media_source
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.media_control import stop_media_source
 
         obs.reset()
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source", {

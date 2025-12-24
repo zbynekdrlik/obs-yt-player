@@ -8,7 +8,6 @@ from pathlib import Path
 
 from .logger import log
 
-
 HISTORY_FILENAME = "play_history.json"
 
 
@@ -31,12 +30,13 @@ def load_play_history() -> list[str]:
         return []
 
     try:
-        with open(path, encoding="utf-8") as f:
+        with path.open(encoding="utf-8") as f:
             data = json.load(f)
             # Handle both legacy list format and new dict format
             if isinstance(data, list):
-                return data
-            return data.get("played_videos", [])
+                return [str(item) for item in data]
+            result = data.get("played_videos", [])
+            return [str(item) for item in result] if result else []
     except (json.JSONDecodeError, OSError) as e:
         log(f"WARNING: Could not load play history: {e}")
         return []
@@ -52,7 +52,7 @@ def save_play_history(video_ids: list[str]) -> bool:
     path = get_history_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        with path.open("w", encoding="utf-8") as f:
             json.dump({"played_videos": video_ids}, f, indent=2)
         return True
     except OSError as e:

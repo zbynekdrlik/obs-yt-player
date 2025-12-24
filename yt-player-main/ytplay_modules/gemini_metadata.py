@@ -3,16 +3,14 @@ Google Gemini API metadata extraction for YouTube videos.
 Uses Gemini 2.5 Flash with Google Search grounding to intelligently extract artist and song information.
 """
 import json
+import re
 import time
-import urllib.request
 import urllib.error
 import urllib.parse
-import re
+import urllib.request
 from typing import Optional, Tuple
 
-from . import state
 from .logger import log
-from .config import SCRIPT_NAME
 
 # Gemini API configuration
 GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
@@ -35,9 +33,9 @@ def extract_metadata_with_gemini(video_id: str, video_title: str, api_key: Optio
     """
     if not api_key:
         return None, None
-    
+
     video_url = f"https://www.youtube.com/watch?v={video_id}"
-    
+
     # Enhanced prompt with STRICT JSON requirements
     prompt = f"""Look up information about this YouTube video and extract the artist and song title:
 URL: {video_url}
@@ -92,7 +90,7 @@ REMEMBER: Return ONLY valid JSON, nothing else. The song field should contain ON
             # Removed responseMimeType as it's not supported with tool use
         }
     }
-    
+
     for attempt in range(MAX_RETRIES):
         try:
             request = urllib.request.Request(
@@ -102,14 +100,14 @@ REMEMBER: Return ONLY valid JSON, nothing else. The song field should contain ON
                     'Content-Type': 'application/json'
                 }
             )
-            
+
             with urllib.request.urlopen(request, timeout=GEMINI_TIMEOUT) as response:
                 result = json.loads(response.read().decode('utf-8'))
-                
+
                 # Extract the generated text
-                if 'candidates' in result and result['candidates']:
+                if result.get('candidates'):
                     candidate = result['candidates'][0]
-                    
+
                     if 'content' in candidate and 'parts' in candidate['content']:
                         parts = candidate['content']['parts']
                         if parts and 'text' in parts[0]:
@@ -121,34 +119,34 @@ REMEMBER: Return ONLY valid JSON, nothing else. The song field should contain ON
                     else:
                         log(f"No content in candidate: {json.dumps(candidate, indent=2)[:500]}")
                         continue
-                    
+
                     try:
                         # Clean up the response - remove markdown code blocks if present
                         cleaned_text = text.strip()
-                        
+
                         # Remove markdown code block markers
                         if cleaned_text.startswith('```json'):
                             cleaned_text = cleaned_text[7:]  # Remove ```json
                         elif cleaned_text.startswith('```'):
                             cleaned_text = cleaned_text[3:]  # Remove ```
-                        
+
                         if cleaned_text.endswith('```'):
                             cleaned_text = cleaned_text[:-3]  # Remove trailing ```
-                        
+
                         cleaned_text = cleaned_text.strip()
-                        
+
                         # Try to extract JSON even if there's extra text (fallback)
                         # Look for JSON object pattern
                         json_match = re.search(r'\{[^{}]*"artist"[^{}]*"song"[^{}]*\}', cleaned_text)
                         if json_match and not cleaned_text.startswith('{'):
-                            log(f"Extracting JSON from mixed response")
+                            log("Extracting JSON from mixed response")
                             cleaned_text = json_match.group(0)
-                        
+
                         # Parse the JSON response
                         metadata = json.loads(cleaned_text)
                         artist = metadata.get('artist', '').strip()
                         song = metadata.get('song', '').strip()
-                        
+
                         # Accept response if we have at least a song title
                         if song:
                             if artist:
@@ -162,7 +160,7 @@ REMEMBER: Return ONLY valid JSON, nothing else. The song field should contain ON
                         log(f"Failed to parse Gemini JSON response: {text} (Error: {e})")
                 else:
                     log(f"No candidates in Gemini response: {json.dumps(result, indent=2)[:500]}")
-                        
+
         except urllib.error.HTTPError as e:
             error_body = None
             try:
@@ -177,13 +175,13 @@ REMEMBER: Return ONLY valid JSON, nothing else. The song field should contain ON
             if e.code == 429:  # Rate limit
                 time.sleep(2 ** attempt)  # Exponential backoff
         except urllib.error.URLError as e:
-            log(f"Gemini API URL error (attempt {attempt + 1}): {str(e)}")
+            log(f"Gemini API URL error (attempt {attempt + 1}): {e!s}")
         except Exception as e:
-            log(f"Gemini API error (attempt {attempt + 1}): {str(e)}")
-            
+            log(f"Gemini API error (attempt {attempt + 1}): {e!s}")
+
         if attempt < MAX_RETRIES - 1:
             time.sleep(1)  # Brief pause between retries
-            
+
     log(f"Gemini metadata extraction failed for '{video_title}'")
     return None, None
 

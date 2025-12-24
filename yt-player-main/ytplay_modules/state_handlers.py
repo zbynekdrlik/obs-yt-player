@@ -4,24 +4,30 @@ Handles different media states: playing, ended, stopped, none.
 """
 
 import obspython as obs
+
+from .config import MEDIA_SOURCE_NAME, PLAYBACK_MODE_LOOP, PLAYBACK_MODE_SINGLE
 from .logger import log
-from .utils import format_duration
-from .config import PLAYBACK_MODE_SINGLE, PLAYBACK_MODE_LOOP, MEDIA_SOURCE_NAME
+from .media_control import get_current_video_from_media_source, get_media_duration, get_media_time
 from .state import (
-    is_playing, set_playing, get_current_playback_video_id,
-    set_current_playback_video_id, get_cached_video_info,
-    get_playback_mode, is_first_video_played, set_first_video_played,
-    get_loop_video_id, set_loop_video_id, get_cached_videos,
-    is_scene_active
-)
-from .media_control import (
-    get_media_duration, get_media_time, get_current_video_from_media_source
+    get_cached_video_info,
+    get_cached_videos,
+    get_current_playback_video_id,
+    get_loop_video_id,
+    get_playback_mode,
+    is_first_video_played,
+    is_playing,
+    is_scene_active,
+    set_current_playback_video_id,
+    set_first_video_played,
+    set_loop_video_id,
+    set_playing,
 )
 from .title_manager import (
-    SEEK_THRESHOLD, schedule_title_clear_from_current,
-    is_title_clear_scheduled, get_title_clear_timer,
-    cancel_title_timers
+    SEEK_THRESHOLD,
+    is_title_clear_scheduled,
+    schedule_title_clear_from_current,
 )
+from .utils import format_duration
 
 # Module-level variables
 _last_playback_time = 0  # Track last playback position for seek detection
@@ -49,20 +55,20 @@ def reset_playback_tracking():
 def log_playback_progress(video_id, current_time, duration):
     """Log playback progress at intervals without spamming."""
     global _last_progress_log
-    
+
     # Log every 30 seconds
     progress_key = f"{video_id}_{int(current_time/30000)}"
     if progress_key not in _last_progress_log:
         _last_progress_log[progress_key] = True
         percent = int((current_time/duration) * 100)
-        
+
         # Get video info for better logging
         video_info = get_cached_video_info(video_id)
         if video_info:
             # Convert milliseconds to seconds and format
             current_time_formatted = format_duration(current_time / 1000)
             duration_formatted = format_duration(duration / 1000)
-            
+
             log(f"Playing: {video_info['song']} - {video_info['artist']} "
                 f"[{percent}% - {current_time_formatted} / {duration_formatted}]")
 
@@ -71,10 +77,10 @@ def handle_playing_state():
     """Handle currently playing video state."""
     global _is_preloaded_video, _last_playback_time, _manual_stop_detected
     global _loop_restart_pending, _loop_restart_video_id, _title_clear_rescheduled
-    
+
     # Clear manual stop flag when playing
     _manual_stop_detected = False
-    
+
     # Check if we were waiting for a loop restart
     if _loop_restart_pending and _loop_restart_video_id:
         current_video_id = get_current_playback_video_id()
@@ -83,7 +89,7 @@ def handle_playing_state():
             log("Loop restart completed successfully")
             _loop_restart_pending = False
             _loop_restart_video_id = None
-    
+
     # If media is playing but we don't think we're playing, sync the state
     if not is_playing():
         log("Media playing but state out of sync - updating state")
@@ -98,24 +104,24 @@ def handle_playing_state():
             return
         # Valid media is playing, sync the state
         set_playing(True)
-        
+
         # Try to identify the current video if not already set
         if not get_current_playback_video_id():
             current_video_id = get_current_video_from_media_source()
             if current_video_id:
                 set_current_playback_video_id(current_video_id)
                 log(f"Identified current video: {current_video_id}")
-                
+
                 # If we're in loop mode and no loop video set, set this one
                 if get_playback_mode() == PLAYBACK_MODE_LOOP and not get_loop_video_id():
                     set_loop_video_id(current_video_id)
                     log(f"Loop mode - Set current video as loop video: {current_video_id}")
-        
+
         return
-    
+
     duration = get_media_duration(MEDIA_SOURCE_NAME)
     current_time = get_media_time(MEDIA_SOURCE_NAME)
-    
+
     if duration > 0 and current_time > 0:
         # Check for seek (large jump in playback position)
         if _last_playback_time > 0:
@@ -125,20 +131,20 @@ def handle_playing_state():
                 log(f"Seek detected: jumped from {_last_playback_time/1000:.1f}s to {current_time/1000:.1f}s")
                 # Reset the rescheduled flag to allow rescheduling
                 _title_clear_rescheduled = False
-        
+
         _last_playback_time = current_time
-        
+
         # Log progress without spamming
         video_id = get_current_playback_video_id()
         if video_id:
             log_playback_progress(video_id, current_time, duration)
-        
+
         # Check if we need to schedule or reschedule title clear
         remaining_ms = duration - current_time
-        
+
         # Import here to avoid circular dependency
         from .title_manager import TITLE_CLEAR_BEFORE_END
-        
+
         # Schedule fade out when we're close to the end
         # We check for (TITLE_CLEAR_BEFORE_END + 5) seconds to give enough time for scheduling
         if remaining_ms > 0 and remaining_ms < ((TITLE_CLEAR_BEFORE_END + 5) * 1000):
@@ -154,17 +160,17 @@ def handle_playing_state():
 def handle_ended_state():
     """Handle video ended state."""
     global _preloaded_video_handled, _is_preloaded_video, _loop_restart_pending
-    
+
     # Reset playback tracking
     reset_playback_tracking()
-    
+
     playback_mode = get_playback_mode()
-    
+
     if is_playing():
         # Prevent loop mode from firing multiple times
         if playback_mode == PLAYBACK_MODE_LOOP and _loop_restart_pending:
             return  # Already scheduled a restart
-        
+
         # Check if we need to loop
         if playback_mode == PLAYBACK_MODE_LOOP:
             # Get the video that just ended
@@ -172,13 +178,13 @@ def handle_ended_state():
             if not current_video_id and _is_preloaded_video:
                 # Try to identify the pre-loaded video
                 current_video_id = get_current_video_from_media_source()
-            
+
             if current_video_id:
                 # Make sure it's set as the loop video
                 if not get_loop_video_id():
                     set_loop_video_id(current_video_id)
                     log(f"Loop mode - Set ended video as loop video: {current_video_id}")
-                
+
                 log("Loop mode: Replaying the same video")
                 _loop_restart_pending = True
                 # Mark pre-loaded video as handled if it was one
@@ -190,13 +196,13 @@ def handle_ended_state():
                 return
             else:
                 log("Loop mode: Could not identify video to loop, selecting next")
-        
+
         # Handle non-loop modes
         if not _preloaded_video_handled and _is_preloaded_video:
             log("Pre-loaded video ended")
             _preloaded_video_handled = True
             _is_preloaded_video = False
-            
+
             # Check if we're in single mode
             if playback_mode == PLAYBACK_MODE_SINGLE:
                 log("Single mode: Pre-loaded video counted as first video, stopping playback")
@@ -220,7 +226,7 @@ def handle_ended_state():
             else:
                 # Continuous mode or first video not played yet
                 log("Playback ended, starting next video")
-        
+
         # Import here to avoid circular dependency
         from .playback_controller import start_next_video
         start_next_video()
@@ -239,15 +245,15 @@ def handle_ended_state():
 def schedule_loop_restart(video_id):
     """Schedule a single restart of the loop video."""
     global _loop_restart_timer, _loop_restart_video_id
-    
+
     # Store the video ID we're restarting
     _loop_restart_video_id = video_id
-    
+
     # Cancel any existing timer
     if _loop_restart_timer:
         obs.timer_remove(_loop_restart_timer)
         _loop_restart_timer = None
-    
+
     # Create a closure that captures the video_id
     def restart_callback():
         global _loop_restart_timer
@@ -259,7 +265,7 @@ def schedule_loop_restart(video_id):
         # Import here to avoid circular dependency
         from .playback_controller import start_specific_video
         start_specific_video(video_id)
-    
+
     # Schedule the restart with a longer delay to ensure media source is ready
     _loop_restart_timer = restart_callback
     obs.timer_add(_loop_restart_timer, 1000)  # Increased to 1 second for better stability
@@ -268,24 +274,24 @@ def schedule_loop_restart(video_id):
 def handle_stopped_state():
     """Handle video stopped state."""
     global _manual_stop_detected, _playback_retry_count
-    
+
     if is_playing():
         # Check if this was a manual stop (we didn't initiate it)
         if not _manual_stop_detected:
             _manual_stop_detected = True
             log("Manual stop detected - user clicked stop button")
-            
+
             # Clear loop video if in loop mode
             if get_playback_mode() == PLAYBACK_MODE_LOOP:
                 log("Clearing loop video due to manual stop")
                 set_loop_video_id(None)
-            
+
             # Stop playback cleanly
             # Import here to avoid circular dependency
             from .playback_controller import stop_current_playback
             stop_current_playback()
             return
-        
+
         log("Playback stopped, attempting to resume or skip")
         # Try to resume or skip to next
         if _playback_retry_count < _max_retry_attempts:
@@ -307,7 +313,7 @@ def handle_none_state():
         # Only start if we have videos available
         if get_cached_videos():
             playback_mode = get_playback_mode()
-            
+
             # Check restrictions based on mode
             if playback_mode == PLAYBACK_MODE_SINGLE and is_first_video_played():
                 # Don't start new playback in single mode after first video
@@ -318,7 +324,7 @@ def handle_none_state():
                 if get_loop_video_id():
                     log("Loop mode: Clearing previous loop video to select new random video")
                     set_loop_video_id(None)
-                
+
             log("Scene active and videos available, starting playback")
             # Import here to avoid circular dependency
             from .playback_controller import start_next_video

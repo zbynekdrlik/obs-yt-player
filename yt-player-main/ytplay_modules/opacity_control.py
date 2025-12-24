@@ -4,7 +4,8 @@ Manages smooth fade in/out transitions for title display.
 """
 
 import obspython as obs
-from .config import TITLE_FADE_DURATION, TITLE_FADE_STEPS, TITLE_FADE_INTERVAL, OPACITY_FILTER_NAME, TEXT_SOURCE_NAME
+
+from .config import OPACITY_FILTER_NAME, TEXT_SOURCE_NAME, TITLE_FADE_INTERVAL, TITLE_FADE_STEPS
 from .logger import log
 
 # Module-level variables
@@ -20,15 +21,15 @@ _opacity_filter_created = False
 def ensure_opacity_filter():
     """Ensure the opacity filter exists on the text source."""
     global _opacity_filter_created
-    
+
     if _opacity_filter_created:
         return True
-    
+
     # Get the text source
     text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
     if not text_source:
         return False
-    
+
     # Check if filter already exists
     existing_filter = obs.obs_source_get_filter_by_name(text_source, OPACITY_FILTER_NAME)
     if existing_filter:
@@ -36,26 +37,26 @@ def ensure_opacity_filter():
         obs.obs_source_release(text_source)
         _opacity_filter_created = True
         return True
-    
+
     # Create color correction filter for opacity control
     filter_settings = obs.obs_data_create()
     obs.obs_data_set_int(filter_settings, "opacity", 100)
-    
+
     opacity_filter = obs.obs_source_create_private(
-        "color_filter", 
-        OPACITY_FILTER_NAME, 
+        "color_filter",
+        OPACITY_FILTER_NAME,
         filter_settings
     )
-    
+
     if opacity_filter:
         obs.obs_source_filter_add(text_source, opacity_filter)
         obs.obs_source_release(opacity_filter)
         _opacity_filter_created = True
-        log(f"Created opacity filter for text source")
-    
+        log("Created opacity filter for text source")
+
     obs.obs_data_release(filter_settings)
     obs.obs_source_release(text_source)
-    
+
     return _opacity_filter_created
 
 
@@ -66,7 +67,7 @@ def update_text_opacity(opacity):
         text_source = obs.obs_get_source_by_name(TEXT_SOURCE_NAME)
         if not text_source:
             return
-        
+
         # Get the opacity filter
         opacity_filter = obs.obs_source_get_filter_by_name(text_source, OPACITY_FILTER_NAME)
         if not opacity_filter:
@@ -79,17 +80,17 @@ def update_text_opacity(opacity):
                     return
             else:
                 return
-        
+
         # Update the opacity value
         filter_settings = obs.obs_source_get_settings(opacity_filter)
         obs.obs_data_set_int(filter_settings, "opacity", int(opacity))
         obs.obs_source_update(opacity_filter, filter_settings)
-        
+
         # Clean up
         obs.obs_data_release(filter_settings)
         obs.obs_source_release(opacity_filter)
         obs.obs_source_release(text_source)
-        
+
     except Exception as e:
         log(f"ERROR updating text opacity: {e}")
 
@@ -97,29 +98,29 @@ def update_text_opacity(opacity):
 def opacity_transition_callback():
     """Callback for opacity transition timer."""
     global _opacity_timer, _current_opacity, _target_opacity, _opacity_step, _fade_direction, _pending_text
-    
+
     # Update current opacity
     _current_opacity += _opacity_step
-    
+
     # Clamp opacity to valid range
     if _fade_direction == 'in':
         _current_opacity = min(_current_opacity, _target_opacity)
     else:
         _current_opacity = max(_current_opacity, _target_opacity)
-    
+
     # Update the actual opacity
     update_text_opacity(_current_opacity)
-    
+
     # Check if we've reached the target
     if abs(_current_opacity - _target_opacity) < 0.1:
         # Remove timer
         if _opacity_timer:
             obs.timer_remove(_opacity_timer)
             _opacity_timer = None
-        
+
         _current_opacity = _target_opacity
         update_text_opacity(_current_opacity)
-        
+
         # If fading out and reached 0, update the text
         if _fade_direction == 'out' and _current_opacity == 0 and _pending_text is not None:
             # Import here to avoid circular dependency
@@ -128,29 +129,29 @@ def opacity_transition_callback():
             _pending_text = None
             # Now fade in
             fade_in_text()
-        
+
         log(f"Title fade {_fade_direction} complete (opacity: {_current_opacity}%)")
 
 
 def start_opacity_transition(target, direction):
     """Start an opacity transition."""
     global _opacity_timer, _target_opacity, _opacity_step, _fade_direction, _current_opacity
-    
+
     # Cancel any existing transition
     if _opacity_timer:
         obs.timer_remove(_opacity_timer)
         _opacity_timer = None
-    
+
     _target_opacity = target
     _fade_direction = direction
-    
+
     # Calculate step size
     opacity_range = abs(_target_opacity - _current_opacity)
     if opacity_range > 0:
         _opacity_step = opacity_range / TITLE_FADE_STEPS
         if direction == 'out':
             _opacity_step = -_opacity_step
-        
+
         # Start the timer
         _opacity_timer = opacity_transition_callback
         obs.timer_add(_opacity_timer, TITLE_FADE_INTERVAL)
