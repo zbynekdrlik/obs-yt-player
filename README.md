@@ -51,7 +51,23 @@ This creates a new instance in seconds - no questions asked! See [Multi-Instance
 
 ## Installation
 
-### 1. Download and Setup
+### Quick Install (Windows PowerShell)
+
+Run this command in PowerShell (works for both system and portable OBS):
+
+```powershell
+irm https://raw.githubusercontent.com/zbynekdrlik/obs-yt-player/main/install.ps1 | iex
+```
+
+The installer will:
+- Auto-detect your OBS installation (portable or system)
+- Ask for confirmation before installing
+- Download and extract to the correct location
+- Show setup instructions
+
+**Tip**: For portable OBS, run the command from your OBS folder.
+
+### Manual Installation
 
 1. Download the latest release or clone the repository
 2. Copy the `yt-player-main/` folder to your OBS scripts directory
