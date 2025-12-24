@@ -5,20 +5,21 @@ CRITICAL: This file injects the mock obspython module into sys.modules
 BEFORE any ytplay_modules are imported. This must happen first!
 """
 
-import sys
-import os
 import subprocess
+import sys
 from pathlib import Path
 
 # =============================================================================
 # MOCK WINDOWS-SPECIFIC SUBPROCESS ATTRIBUTES FOR LINUX TESTING
 # =============================================================================
 # These are Windows-only but the code uses them. Mock them on Linux.
-if not hasattr(subprocess, 'STARTUPINFO'):
+if not hasattr(subprocess, "STARTUPINFO"):
+
     class MockSTARTUPINFO:
         def __init__(self):
             self.dwFlags = 0
             self.wShowWindow = 0
+
     subprocess.STARTUPINFO = MockSTARTUPINFO
     subprocess.STARTF_USESHOWWINDOW = 0x00000001
     subprocess.SW_HIDE = 0
@@ -34,6 +35,7 @@ sys.path.insert(0, str(TESTS_DIR))
 
 # Import and inject mock obspython BEFORE any other imports
 from mocks import obspython as mock_obs
+
 sys.modules["obspython"] = mock_obs
 
 # Now add the main source directory to path
@@ -44,16 +46,16 @@ sys.path.insert(0, str(YTPLAY_DIR))
 # STANDARD IMPORTS (after mock injection)
 # =============================================================================
 
-import pytest
 import json
-import tempfile
-import threading
-from unittest.mock import MagicMock, patch
-from typing import Generator, Any
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
 
 # =============================================================================
 # AUTOUSE FIXTURES
 # =============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_obs_mock():
@@ -75,8 +77,10 @@ def reset_state_module():
     try:
         from ytplay_modules import state
         from ytplay_modules.config import (
-            DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR,
-            DEFAULT_PLAYBACK_MODE, DEFAULT_AUDIO_ONLY_MODE
+            DEFAULT_PLAYLIST_URL,
+            DEFAULT_CACHE_DIR,
+            DEFAULT_PLAYBACK_MODE,
+            DEFAULT_AUDIO_ONLY_MODE,
         )
 
         # Reset all module-level state variables directly
@@ -117,8 +121,10 @@ def reset_state_module():
     try:
         from ytplay_modules import state
         from ytplay_modules.config import (
-            DEFAULT_PLAYLIST_URL, DEFAULT_CACHE_DIR,
-            DEFAULT_PLAYBACK_MODE, DEFAULT_AUDIO_ONLY_MODE
+            DEFAULT_PLAYLIST_URL,
+            DEFAULT_CACHE_DIR,
+            DEFAULT_PLAYBACK_MODE,
+            DEFAULT_AUDIO_ONLY_MODE,
         )
 
         with state._state_lock:
@@ -150,6 +156,7 @@ def reset_state_module():
 # DIRECTORY FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
 def temp_cache_dir(tmp_path: Path) -> Path:
     """Provide a temporary cache directory for testing."""
@@ -178,6 +185,7 @@ def temp_logs_dir(temp_cache_dir: Path) -> Path:
 # SAMPLE DATA FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
 def sample_video_info() -> dict[str, Any]:
     """Provide sample video info for testing."""
@@ -204,13 +212,9 @@ def sample_playlist_data() -> list[dict[str, Any]]:
 def sample_gemini_response() -> dict[str, Any]:
     """Provide sample Gemini API response."""
     return {
-        "candidates": [{
-            "content": {
-                "parts": [{
-                    "text": '{"artist": "Rick Astley", "song": "Never Gonna Give You Up"}'
-                }]
-            }
-        }]
+        "candidates": [
+            {"content": {"parts": [{"text": '{"artist": "Rick Astley", "song": "Never Gonna Give You Up"}'}]}}
+        ]
     }
 
 
@@ -238,6 +242,7 @@ def sample_cached_videos() -> dict[str, dict]:
 # =============================================================================
 # OBS MOCK CONFIGURATION FIXTURES
 # =============================================================================
+
 
 @pytest.fixture
 def obs_with_scene():
@@ -277,6 +282,7 @@ def obs_playing():
 # SUBPROCESS MOCK FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
 def mock_subprocess_success(mocker):
     """Mock subprocess.run to return success."""
@@ -307,6 +313,7 @@ def mock_subprocess_popen(mocker):
 # NETWORK MOCK FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
 def mock_urlopen(mocker):
     """Mock urllib.request.urlopen."""
@@ -329,20 +336,24 @@ def mock_urlopen_json(mock_urlopen, sample_gemini_response):
 # FILE SYSTEM MOCK FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
 def create_temp_video_file(temp_cache_dir: Path):
     """Factory fixture to create temporary video files."""
+
     def _create_video(filename: str, size_mb: int = 2) -> Path:
         video_path = temp_cache_dir / filename
         # Create a file of specified size (at least 1MB for valid video check)
         video_path.write_bytes(b"x" * (size_mb * 1024 * 1024))
         return video_path
+
     return _create_video
 
 
 # =============================================================================
 # STATE CONFIGURATION FIXTURES
 # =============================================================================
+
 
 @pytest.fixture
 def configured_state(temp_cache_dir: Path):
@@ -370,6 +381,7 @@ def state_with_videos(configured_state, sample_cached_videos):
 # MARKER-BASED SKIPPING
 # =============================================================================
 
+
 def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line("markers", "unit: Unit tests (fast, no external dependencies)")
@@ -381,6 +393,7 @@ def pytest_configure(config):
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
 
 def assert_no_resource_leaks():
     """Helper to check for unreleased OBS resources."""

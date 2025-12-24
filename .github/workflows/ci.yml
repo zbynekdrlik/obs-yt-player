@@ -52,7 +52,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run Mypy
-        run: uv run mypy yt-player-main/ytplay_modules --ignore-missing-imports
+        run: uv run mypy yt-player-main/ytplay_modules
 
   security:
     name: Security Scan
@@ -72,7 +72,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run Bandit security scan
-        run: uv run bandit -r yt-player-main/ytplay_modules -ll
+        run: uv run bandit -c pyproject.toml -r yt-player-main/ytplay_modules -ll
 
   test:
     name: Test (Python ${{ matrix.python-version }} / ${{ matrix.os }})

@@ -84,6 +84,11 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["ytplay_modules"]
 
+[tool.ruff.lint.per-file-ignores]
+# Tests need special import ordering for mock injection
+"tests/conftest.py" = ["E402", "I001"]
+"tests/**/*.py" = ["E402"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
@@ -109,6 +114,28 @@ exclude = [
 [[tool.mypy.overrides]]
 module = "obspython.*"
 ignore_missing_imports = true
+
+# Modules with Windows-specific subprocess attributes
+[[tool.mypy.overrides]]
+module = [
+    "ytplay_modules.normalize",
+    "ytplay_modules.download",
+    "ytplay_modules.playlist",
+    "ytplay_modules.tools",
+    "ytplay_modules.reprocess",
+]
+disable_error_code = ["attr-defined", "union-attr", "assignment"]
+
+# Modules with dynamic state variables
+[[tool.mypy.overrides]]
+module = [
+    "ytplay_modules.state",
+    "ytplay_modules.state_handlers",
+    "ytplay_modules.gemini_metadata",
+    "ytplay_modules.logger",
+    "ytplay_modules.scene",
+]
+disable_error_code = ["var-annotated", "assignment"]
 
 # Pytest configuration
 [tool.pytest.ini_options]
@@ -177,4 +204,7 @@ directory = "htmlcov"
 # Bandit - Security linter
 [tool.bandit]
 exclude_dirs = ["tests", "cache"]
-skips = ["B101"]  # Skip assert warnings (used in tests)
+skips = [
+    "B101",  # Skip assert warnings (used in tests)
+    "B310",  # Skip urllib.urlopen audit - we control all URLs (Gemini API, GitHub releases)
+]

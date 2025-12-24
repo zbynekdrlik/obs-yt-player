@@ -6,9 +6,10 @@ used by the ytplay_modules package. The mock is configurable and tracks all call
 verification in tests.
 """
 
+import contextlib
+import threading
 from typing import Any, Callable, Optional
 from unittest.mock import MagicMock
-import threading
 
 # ============================================================================
 # OBS CONSTANTS
@@ -71,6 +72,7 @@ OBS_COMBO_FORMAT_STRING = 2
 # MOCK STATE MANAGEMENT
 # ============================================================================
 
+
 class MockState:
     """Global state container for mock OBS environment."""
 
@@ -82,7 +84,7 @@ class MockState:
         self._lock = threading.Lock()
 
         # Sources registry: name -> MockSource
-        self._sources: dict[str, "MockSource"] = {}
+        self._sources: dict[str, MockSource] = {}
 
         # Current scene configuration
         self._current_scene_name: str = ""
@@ -108,6 +110,7 @@ class MockState:
 
         # Nested scenes: parent_scene_name -> list of (source_name, source_type)
         self._nested_scenes: dict[str, list[tuple[str, str]]] = {}
+
 
 # Global mock state instance
 _state = MockState()
@@ -142,6 +145,7 @@ def clear_call_log():
 # MOCK OBJECTS
 # ============================================================================
 
+
 class MockSource:
     """Mock OBS source object."""
 
@@ -149,7 +153,7 @@ class MockSource:
         self.name = name
         self.source_type = source_type
         self.settings: dict[str, Any] = {}
-        self.filters: dict[str, "MockSource"] = {}
+        self.filters: dict[str, MockSource] = {}
         self._released = False
 
     def __repr__(self):
@@ -161,7 +165,7 @@ class MockScene:
 
     def __init__(self, name: str):
         self.name = name
-        self.items: list["MockSceneItem"] = []
+        self.items: list[MockSceneItem] = []
 
     def __repr__(self):
         return f"MockScene(name={self.name!r})"
@@ -218,6 +222,7 @@ class MockPropertyList:
 # ============================================================================
 # STATE CONFIGURATION HELPERS
 # ============================================================================
+
 
 def set_current_scene_name(name: str):
     """Configure the current scene name for testing."""
@@ -287,6 +292,7 @@ def fire_frontend_event(event: int):
 # OBS SOURCE FUNCTIONS
 # ============================================================================
 
+
 def obs_get_source_by_name(name: str) -> Optional[MockSource]:
     """Get a source by name."""
     log_call("obs_get_source_by_name", name)
@@ -355,6 +361,7 @@ def obs_source_filter_add(source: Optional[MockSource], filter_source: Optional[
 # OBS MEDIA SOURCE FUNCTIONS
 # ============================================================================
 
+
 def obs_source_media_get_state(source: Optional[MockSource]) -> int:
     """Get media playback state."""
     log_call("obs_source_media_get_state", source)
@@ -389,6 +396,7 @@ def obs_source_media_stop(source: Optional[MockSource]):
 # ============================================================================
 # OBS SCENE FUNCTIONS
 # ============================================================================
+
 
 def obs_scene_from_source(source: Optional[MockSource]) -> Optional[MockScene]:
     """Get a scene from a source."""
@@ -431,6 +439,7 @@ def sceneitem_list_release(items: list):
 # OBS FRONTEND FUNCTIONS
 # ============================================================================
 
+
 def obs_frontend_get_current_scene() -> Optional[MockSource]:
     """Get the current scene source."""
     log_call("obs_frontend_get_current_scene")
@@ -470,6 +479,7 @@ def obs_frontend_add_event_callback(callback: Callable):
 # ============================================================================
 # OBS DATA FUNCTIONS
 # ============================================================================
+
 
 def obs_data_create() -> MockData:
     """Create a new data/settings object."""
@@ -547,6 +557,7 @@ def obs_data_set_default_bool(data: Optional[MockData], name: str, value: bool):
 # OBS PROPERTIES FUNCTIONS
 # ============================================================================
 
+
 def obs_properties_create() -> MockProperties:
     """Create a new properties object."""
     log_call("obs_properties_create")
@@ -569,7 +580,9 @@ def obs_properties_add_bool(props: MockProperties, name: str, description: str) 
     return MagicMock()
 
 
-def obs_properties_add_list(props: MockProperties, name: str, description: str, combo_type: int, combo_format: int) -> MockPropertyList:
+def obs_properties_add_list(
+    props: MockProperties, name: str, description: str, combo_type: int, combo_format: int
+) -> MockPropertyList:
     """Add a list property."""
     log_call("obs_properties_add_list", props, name, description, combo_type, combo_format)
     prop_list = MockPropertyList()
@@ -596,6 +609,7 @@ def obs_property_list_add_string(prop_list: MockPropertyList, name: str, value: 
 # ============================================================================
 # OBS TIMER FUNCTIONS
 # ============================================================================
+
 
 def timer_add(callback: Callable, interval_ms: int):
     """Add a timer callback."""
@@ -631,15 +645,14 @@ def execute_timer(callback: Callable):
 def execute_all_timers():
     """Execute all registered timer callbacks once."""
     for callback, _ in _state._timers.copy():
-        try:
+        with contextlib.suppress(Exception):
             callback()
-        except Exception:
-            pass
 
 
 # ============================================================================
 # UTILITY FUNCTIONS FOR TESTING
 # ============================================================================
+
 
 def assert_source_exists(name: str) -> bool:
     """Assert that a source exists."""
