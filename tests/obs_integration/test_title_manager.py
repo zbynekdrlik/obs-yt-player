@@ -5,8 +5,7 @@ Tests for title display timing and scheduling.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import obspython as obs
 
@@ -16,11 +15,7 @@ class TestTitleTimingConstants:
 
     def test_constants_are_defined(self):
         """Should have title timing constants defined."""
-        from ytplay_modules.title_manager import (
-            TITLE_CLEAR_BEFORE_END,
-            TITLE_SHOW_AFTER_START,
-            SEEK_THRESHOLD
-        )
+        from ytplay_modules.title_manager import SEEK_THRESHOLD, TITLE_CLEAR_BEFORE_END, TITLE_SHOW_AFTER_START
 
         assert TITLE_CLEAR_BEFORE_END == 3.5
         assert TITLE_SHOW_AFTER_START == 1.5
@@ -86,17 +81,13 @@ class TestScheduleTitleShow:
 
     def test_schedules_timer_for_show(self):
         """Should schedule timer for title show."""
-        from ytplay_modules.title_manager import schedule_title_show
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.title_manager import schedule_title_show
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
 
-        video_info = {
-            "song": "Test Song",
-            "artist": "Test Artist",
-            "gemini_failed": False
-        }
+        video_info = {"song": "Test Song", "artist": "Test Artist", "gemini_failed": False}
 
         schedule_title_show(video_info)
 
@@ -105,16 +96,13 @@ class TestScheduleTitleShow:
     def test_stores_pending_title_info(self):
         """Should store pending title info."""
         from ytplay_modules import title_manager
-        from ytplay_modules.title_manager import schedule_title_show
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.title_manager import schedule_title_show
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
 
-        video_info = {
-            "song": "Test Song",
-            "artist": "Test Artist"
-        }
+        video_info = {"song": "Test Song", "artist": "Test Artist"}
 
         schedule_title_show(video_info)
 
@@ -137,8 +125,8 @@ class TestScheduleTitleClearFromCurrent:
 
     def test_fades_immediately_when_time_passed(self):
         """Should fade immediately when clear time has passed."""
-        from ytplay_modules.title_manager import schedule_title_clear_from_current
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.title_manager import schedule_title_clear_from_current
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -212,8 +200,8 @@ class TestUpdateTextSource:
 
     def test_fades_out_first_if_visible(self):
         """Should fade out first if text is visible."""
-        from ytplay_modules.title_manager import update_text_source
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.title_manager import update_text_source
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -227,8 +215,8 @@ class TestUpdateTextSource:
 
     def test_updates_and_fades_in_if_not_visible(self):
         """Should update and fade in if text is not visible."""
-        from ytplay_modules.title_manager import update_text_source
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.title_manager import update_text_source
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -247,8 +235,8 @@ class TestClearTitleBeforeEndCallback:
     def test_clears_timer_and_fades_out(self):
         """Should clear timer and fade out text."""
         from ytplay_modules import title_manager
-        from ytplay_modules.title_manager import clear_title_before_end_callback
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.title_manager import clear_title_before_end_callback
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -268,17 +256,13 @@ class TestShowTitleAfterStartCallback:
     def test_shows_pending_title(self):
         """Should show pending title info."""
         from ytplay_modules import title_manager
-        from ytplay_modules.title_manager import show_title_after_start_callback
         from ytplay_modules.config import TEXT_SOURCE_NAME
+        from ytplay_modules.title_manager import show_title_after_start_callback
 
         obs.reset()
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
         title_manager._title_show_timer = lambda: None
-        title_manager._pending_title_info = {
-            "song": "Test Song",
-            "artist": "Test Artist",
-            "gemini_failed": False
-        }
+        title_manager._pending_title_info = {"song": "Test Song", "artist": "Test Artist", "gemini_failed": False}
 
         with patch("ytplay_modules.media_control.update_text_source_content") as mock_update:
             with patch("ytplay_modules.opacity_control.fade_in_text") as mock_fade:

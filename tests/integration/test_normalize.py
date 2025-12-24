@@ -5,15 +5,11 @@ Tests for audio normalization with mocked subprocess calls.
 Target: 80%+ coverage
 """
 
-import pytest
-import json
-import os
-import sys
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
-if not hasattr(subprocess, 'STARTUPINFO'):
+if not hasattr(subprocess, "STARTUPINFO"):
     subprocess.STARTUPINFO = MagicMock
     subprocess.STARTF_USESHOWWINDOW = 0x00000001
     subprocess.SW_HIDE = 0
@@ -90,9 +86,7 @@ class TestNormalizeAudio:
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("subprocess.run")
     @patch("subprocess.Popen")
-    def test_successful_normalization(
-        self, mock_popen, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_successful_normalization(self, mock_popen, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should normalize audio successfully."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -113,10 +107,7 @@ class TestNormalizeAudio:
     "target_offset" : "0.00"
 }
         """
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stderr=analysis_stats
-        )
+        mock_run.return_value = MagicMock(returncode=0, stderr=analysis_stats)
 
         output_file = tmp_path / "Test Song_Test Artist_video123_normalized.mp4"
 
@@ -155,9 +146,7 @@ class TestNormalizeAudio:
     @patch("ytplay_modules.normalize.get_ffmpeg_path")
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("subprocess.run")
-    def test_returns_existing_normalized_file(
-        self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_returns_existing_normalized_file(self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should return existing normalized file without re-processing."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -179,9 +168,7 @@ class TestNormalizeAudio:
     @patch("ytplay_modules.normalize.get_ffmpeg_path")
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("subprocess.run")
-    def test_handles_analysis_failure(
-        self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_handles_analysis_failure(self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should return None when analysis fails."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -193,10 +180,7 @@ class TestNormalizeAudio:
         input_file.write_bytes(b"x" * 1024)
 
         # Mock analysis failure
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stderr="FFmpeg error: invalid input"
-        )
+        mock_run.return_value = MagicMock(returncode=1, stderr="FFmpeg error: invalid input")
 
         metadata = {"song": "Test", "artist": "Artist"}
 
@@ -207,9 +191,7 @@ class TestNormalizeAudio:
     @patch("ytplay_modules.normalize.get_ffmpeg_path")
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("subprocess.run")
-    def test_handles_timeout(
-        self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_handles_timeout(self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should return None on timeout."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -229,9 +211,7 @@ class TestNormalizeAudio:
 
     @patch("ytplay_modules.normalize.get_ffmpeg_path")
     @patch("ytplay_modules.normalize.get_cache_dir")
-    def test_gemini_failed_marker_in_filename(
-        self, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_gemini_failed_marker_in_filename(self, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should add _gf marker when gemini_failed is True."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -252,9 +232,7 @@ class TestNormalizeAudio:
     @patch("ytplay_modules.normalize.get_ffmpeg_path")
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("os.rename")
-    def test_renames_existing_file_for_gemini_failure(
-        self, mock_rename, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_renames_existing_file_for_gemini_failure(self, mock_rename, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should rename non-gf file to gf version when gemini_failed."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -267,9 +245,7 @@ class TestNormalizeAudio:
 
         metadata = {"song": "Song", "artist": "Artist"}
 
-        result = normalize_audio(
-            "/path/to/input.mp4", "video_rename", metadata, gemini_failed=True
-        )
+        result = normalize_audio("/path/to/input.mp4", "video_rename", metadata, gemini_failed=True)
 
         # Should have renamed the file
         mock_rename.assert_called_once()
@@ -281,9 +257,7 @@ class TestNormalizeAudioEdgeCases:
     @patch("ytplay_modules.normalize.get_ffmpeg_path")
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("subprocess.run")
-    def test_handles_exception(
-        self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_handles_exception(self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should return None on general exception."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -304,9 +278,7 @@ class TestNormalizeAudioEdgeCases:
     @patch("ytplay_modules.normalize.get_ffmpeg_path")
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("subprocess.run")
-    def test_handles_failed_stats_extraction(
-        self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_handles_failed_stats_extraction(self, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should return None when stats extraction fails."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -317,10 +289,7 @@ class TestNormalizeAudioEdgeCases:
         input_file.write_bytes(b"x" * 1024)
 
         # Return success but with no valid JSON stats
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stderr="Some output without JSON stats"
-        )
+        mock_run.return_value = MagicMock(returncode=0, stderr="Some output without JSON stats")
 
         metadata = {"song": "Test", "artist": "Artist"}
 
@@ -332,9 +301,7 @@ class TestNormalizeAudioEdgeCases:
     @patch("ytplay_modules.normalize.get_cache_dir")
     @patch("subprocess.run")
     @patch("subprocess.Popen")
-    def test_handles_normalization_pass_failure(
-        self, mock_popen, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path
-    ):
+    def test_handles_normalization_pass_failure(self, mock_popen, mock_run, mock_cache_dir, mock_ffmpeg_path, tmp_path):
         """Should return None when second pass fails."""
         from ytplay_modules.normalize import normalize_audio
 
@@ -346,10 +313,7 @@ class TestNormalizeAudioEdgeCases:
 
         # Mock successful first pass
         analysis_stats = '{"input_i":"-20","input_tp":"-5","input_lra":"8","input_thresh":"-30","target_offset":"0"}'
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stderr=analysis_stats
-        )
+        mock_run.return_value = MagicMock(returncode=0, stderr=analysis_stats)
 
         # Mock failed second pass
         mock_process = MagicMock()

@@ -5,10 +5,6 @@ Tests for scene management, nested scene detection, and frontend events.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-import pytest
-import time
-from unittest.mock import patch, MagicMock
-
 # The conftest.py injects mock obspython before any imports
 import obspython as obs
 
@@ -31,8 +27,8 @@ class TestVerifySceneSetup:
 
     def test_checks_media_and_text_sources(self, capfd):
         """Should check for media and text sources."""
+        from ytplay_modules.config import SCENE_NAME
         from ytplay_modules.scene import verify_scene_setup
-        from ytplay_modules.config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
 
         obs.reset()
         # Create scene source
@@ -46,8 +42,8 @@ class TestVerifySceneSetup:
 
     def test_releases_sources_after_check(self):
         """Should properly release sources after checking."""
+        from ytplay_modules.config import MEDIA_SOURCE_NAME, SCENE_NAME, TEXT_SOURCE_NAME
         from ytplay_modules.scene import verify_scene_setup
-        from ytplay_modules.config import SCENE_NAME, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
 
         obs.reset()
         obs.create_source(SCENE_NAME, "scene")
@@ -89,8 +85,8 @@ class TestIsSceneVisibleNested:
 
     def test_finds_visible_nested_scene(self):
         """Should find scene when it's nested and visible."""
-        from ytplay_modules.scene import is_scene_visible_nested
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import is_scene_visible_nested
 
         obs.reset()
         # Create parent scene with nested scene
@@ -104,8 +100,8 @@ class TestIsSceneVisibleNested:
 
     def test_ignores_hidden_nested_scene(self):
         """Should ignore nested scene if it's not visible."""
-        from ytplay_modules.scene import is_scene_visible_nested
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import is_scene_visible_nested
 
         obs.reset()
         obs.create_source("ParentScene", "scene")
@@ -123,8 +119,8 @@ class TestIsSceneActiveOrNested:
 
     def test_returns_true_when_scene_is_direct(self):
         """Should return True when scene is directly active."""
-        from ytplay_modules.scene import is_scene_active_or_nested
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import is_scene_active_or_nested
 
         obs.reset()
         obs.create_source(SCENE_NAME, "scene")
@@ -136,8 +132,8 @@ class TestIsSceneActiveOrNested:
 
     def test_returns_true_when_scene_is_nested(self):
         """Should return True when scene is nested in current scene."""
-        from ytplay_modules.scene import is_scene_active_or_nested
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import is_scene_active_or_nested
 
         obs.reset()
         obs.create_source("OtherScene", "scene")
@@ -151,7 +147,6 @@ class TestIsSceneActiveOrNested:
     def test_returns_false_when_scene_not_active(self):
         """Should return False when scene is not active or nested."""
         from ytplay_modules.scene import is_scene_active_or_nested
-        from ytplay_modules.config import SCENE_NAME
 
         obs.reset()
         obs.create_source("DifferentScene", "scene")
@@ -167,8 +162,8 @@ class TestVerifyInitialState:
 
     def test_sets_scene_active_when_active(self):
         """Should set scene active when it is active."""
-        from ytplay_modules.scene import verify_initial_state
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import verify_initial_state
         from ytplay_modules.state import is_scene_active
 
         obs.reset()
@@ -182,7 +177,6 @@ class TestVerifyInitialState:
     def test_sets_scene_inactive_when_not_active(self):
         """Should set scene inactive when it's not active."""
         from ytplay_modules.scene import verify_initial_state
-        from ytplay_modules.config import SCENE_NAME
         from ytplay_modules.state import is_scene_active, set_scene_active
 
         obs.reset()
@@ -252,8 +246,8 @@ class TestOnFrontendEvent:
 
     def test_handles_scene_changed_event(self):
         """Should handle scene change event."""
-        from ytplay_modules.scene import on_frontend_event
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import on_frontend_event
         from ytplay_modules.state import is_scene_active
 
         obs.reset()
@@ -267,8 +261,8 @@ class TestOnFrontendEvent:
 
     def test_handles_preview_change_event_in_studio_mode(self):
         """Should handle preview change in studio mode."""
-        from ytplay_modules.scene import on_frontend_event
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import on_frontend_event
 
         obs.reset()
         obs.set_preview_program_mode(True)
@@ -303,8 +297,8 @@ class TestOnFrontendEvent:
 
     def test_handles_finished_loading_event(self):
         """Should handle finished loading event."""
-        from ytplay_modules.scene import on_frontend_event
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import on_frontend_event
         from ytplay_modules.state import is_scene_active
 
         obs.reset()
@@ -332,8 +326,8 @@ class TestHandleSceneChange:
 
     def test_activates_scene_when_becoming_active(self):
         """Should activate scene when it becomes active."""
-        from ytplay_modules.scene import handle_scene_change
         from ytplay_modules.config import SCENE_NAME
+        from ytplay_modules.scene import handle_scene_change
         from ytplay_modules.state import is_scene_active, set_scene_active
 
         obs.reset()
@@ -348,7 +342,6 @@ class TestHandleSceneChange:
     def test_deactivates_scene_when_becoming_inactive(self):
         """Should deactivate scene when it becomes inactive."""
         from ytplay_modules.scene import handle_scene_change
-        from ytplay_modules.config import SCENE_NAME
         from ytplay_modules.state import is_scene_active, set_scene_active
 
         obs.reset()
@@ -362,11 +355,13 @@ class TestHandleSceneChange:
 
     def test_resets_first_video_in_single_mode(self):
         """Should reset first video flag in single mode when scene activates."""
+        from ytplay_modules.config import PLAYBACK_MODE_SINGLE, SCENE_NAME
         from ytplay_modules.scene import handle_scene_change
-        from ytplay_modules.config import SCENE_NAME, PLAYBACK_MODE_SINGLE
         from ytplay_modules.state import (
-            set_scene_active, is_first_video_played,
-            set_first_video_played, set_playback_mode
+            is_first_video_played,
+            set_first_video_played,
+            set_playback_mode,
+            set_scene_active,
         )
 
         obs.reset()

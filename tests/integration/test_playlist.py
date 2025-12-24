@@ -5,14 +5,12 @@ Tests for playlist synchronization with mocked subprocess calls.
 Target: 80%+ coverage
 """
 
-import pytest
 import json
-import sys
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
-if not hasattr(subprocess, 'STARTUPINFO'):
+if not hasattr(subprocess, "STARTUPINFO"):
     subprocess.STARTUPINFO = MagicMock
     subprocess.STARTF_USESHOWWINDOW = 0x00000001
     subprocess.SW_HIDE = 0
@@ -30,17 +28,15 @@ class TestFetchPlaylistWithYtdlp:
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
 
         # Simulate yt-dlp output (one JSON object per line)
-        mock_output = "\n".join([
-            json.dumps({"id": "dQw4w9WgXcQ", "title": "Rick Astley - Never Gonna Give You Up", "duration": 213}),
-            json.dumps({"id": "9bZkp7q19f0", "title": "PSY - Gangnam Style", "duration": 252}),
-            json.dumps({"id": "kJQP7kiw5Fk", "title": "Luis Fonsi - Despacito", "duration": 282}),
-        ])
-
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=mock_output,
-            stderr=""
+        mock_output = "\n".join(
+            [
+                json.dumps({"id": "dQw4w9WgXcQ", "title": "Rick Astley - Never Gonna Give You Up", "duration": 213}),
+                json.dumps({"id": "9bZkp7q19f0", "title": "PSY - Gangnam Style", "duration": 252}),
+                json.dumps({"id": "kJQP7kiw5Fk", "title": "Luis Fonsi - Despacito", "duration": 282}),
+            ]
         )
+
+        mock_run.return_value = MagicMock(returncode=0, stdout=mock_output, stderr="")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=TEST")
 
@@ -58,11 +54,7 @@ class TestFetchPlaylistWithYtdlp:
         from ytplay_modules.playlist import fetch_playlist_with_ytdlp
 
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout="",
-            stderr="ERROR: Unable to download playlist"
-        )
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="ERROR: Unable to download playlist")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=INVALID")
 
@@ -77,18 +69,16 @@ class TestFetchPlaylistWithYtdlp:
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
 
         # Mix of valid and invalid lines
-        mock_output = "\n".join([
-            json.dumps({"id": "valid1", "title": "Valid Video 1", "duration": 100}),
-            "Not valid JSON",
-            json.dumps({"id": "valid2", "title": "Valid Video 2", "duration": 200}),
-            "",  # Empty line
-        ])
-
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=mock_output,
-            stderr=""
+        mock_output = "\n".join(
+            [
+                json.dumps({"id": "valid1", "title": "Valid Video 1", "duration": 100}),
+                "Not valid JSON",
+                json.dumps({"id": "valid2", "title": "Valid Video 2", "duration": 200}),
+                "",  # Empty line
+            ]
         )
+
+        mock_run.return_value = MagicMock(returncode=0, stdout=mock_output, stderr="")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=TEST")
 
@@ -133,11 +123,7 @@ class TestFetchPlaylistWithYtdlp:
         # Video with minimal data
         mock_output = json.dumps({"id": "minimal123"})
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=mock_output,
-            stderr=""
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout=mock_output, stderr="")
 
         videos = fetch_playlist_with_ytdlp("https://youtube.com/playlist?list=TEST")
 
@@ -164,7 +150,7 @@ class TestTriggerStartupSync:
     def test_only_triggers_once(self):
         """Should only trigger sync once."""
         from ytplay_modules.playlist import trigger_startup_sync
-        from ytplay_modules.state import sync_event, set_sync_on_startup_done
+        from ytplay_modules.state import set_sync_on_startup_done, sync_event
 
         set_sync_on_startup_done(False)
         sync_event.clear()
@@ -201,13 +187,15 @@ class TestPlaylistSyncWorker:
     @patch("ytplay_modules.playlist.scan_existing_cache")
     @patch("ytplay_modules.playlist.fetch_playlist_with_ytdlp")
     @patch("ytplay_modules.playlist.cleanup_removed_videos")
-    def test_queues_uncached_videos(
-        self, mock_cleanup, mock_fetch, mock_scan
-    ):
+    def test_queues_uncached_videos(self, mock_cleanup, mock_fetch, mock_scan):
         """Should queue videos that are not in cache."""
         from ytplay_modules.state import (
-            sync_event, video_queue, set_tools_ready, set_stop_threads,
-            set_playlist_url, is_video_cached, add_cached_video
+            add_cached_video,
+            is_video_cached,
+            set_playlist_url,
+            set_stop_threads,
+            set_tools_ready,
+            video_queue,
         )
 
         # Set up state
@@ -230,7 +218,6 @@ class TestPlaylistSyncWorker:
             video_queue.get_nowait()
 
         # Import and call the internal sync logic
-        from ytplay_modules.playlist import fetch_playlist_with_ytdlp
         from ytplay_modules.state import set_playlist_video_ids
 
         videos = mock_fetch.return_value

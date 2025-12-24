@@ -5,15 +5,11 @@ Tests for video downloading with mocked subprocess calls.
 Target: 80%+ coverage
 """
 
-import pytest
-import json
-import os
-import sys
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
-if not hasattr(subprocess, 'STARTUPINFO'):
+if not hasattr(subprocess, "STARTUPINFO"):
     subprocess.STARTUPINFO = MagicMock
     subprocess.STARTF_USESHOWWINDOW = 0x00000001
     subprocess.SW_HIDE = 0
@@ -29,8 +25,7 @@ class TestDownloadVideo:
     @patch("subprocess.run")
     @patch("subprocess.Popen")
     def test_successful_download(
-        self, mock_popen, mock_run, mock_audio_mode, mock_cache_dir,
-        mock_ffmpeg_path, mock_ytdlp_path, tmp_path
+        self, mock_popen, mock_run, mock_audio_mode, mock_cache_dir, mock_ffmpeg_path, mock_ytdlp_path, tmp_path
     ):
         """Should download video successfully."""
         from ytplay_modules.download import download_video
@@ -41,10 +36,7 @@ class TestDownloadVideo:
         mock_audio_mode.return_value = False
 
         # Mock info command (for quality logging)
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="1920,1080,30,h264,aac"
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="1920,1080,30,h264,aac")
 
         output_file = tmp_path / "dQw4w9WgXcQ_temp.mp4"
 
@@ -55,10 +47,9 @@ class TestDownloadVideo:
 
         # Mock download process
         mock_process = MagicMock()
-        mock_process.stdout = iter([
-            "[download] Destination: /path/to/video.mp4",
-            "[download]  50.0% of ~100.00MiB at 5.00MiB/s ETA 00:10"
-        ])
+        mock_process.stdout = iter(
+            ["[download] Destination: /path/to/video.mp4", "[download]  50.0% of ~100.00MiB at 5.00MiB/s ETA 00:10"]
+        )
         mock_process.returncode = 0
         mock_process.wait.side_effect = create_file_on_wait
         mock_popen.return_value = mock_process
@@ -75,8 +66,7 @@ class TestDownloadVideo:
     @patch("subprocess.run")
     @patch("subprocess.Popen")
     def test_download_failure(
-        self, mock_popen, mock_run, mock_audio_mode, mock_cache_dir,
-        mock_ffmpeg_path, mock_ytdlp_path, tmp_path
+        self, mock_popen, mock_run, mock_audio_mode, mock_cache_dir, mock_ffmpeg_path, mock_ytdlp_path, tmp_path
     ):
         """Should return None on download failure."""
         from ytplay_modules.download import download_video
@@ -86,10 +76,7 @@ class TestDownloadVideo:
         mock_cache_dir.return_value = str(tmp_path)
         mock_audio_mode.return_value = False
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="1920,1080,30,h264,aac"
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="1920,1080,30,h264,aac")
 
         # Mock failed download
         mock_process = MagicMock()
@@ -109,8 +96,7 @@ class TestDownloadVideo:
     @patch("subprocess.run")
     @patch("subprocess.Popen")
     def test_audio_only_mode(
-        self, mock_popen, mock_run, mock_audio_mode, mock_cache_dir,
-        mock_ffmpeg_path, mock_ytdlp_path, tmp_path
+        self, mock_popen, mock_run, mock_audio_mode, mock_cache_dir, mock_ffmpeg_path, mock_ytdlp_path, tmp_path
     ):
         """Should use minimal video quality in audio-only mode."""
         from ytplay_modules.download import download_video
@@ -122,7 +108,7 @@ class TestDownloadVideo:
 
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout="256,144,15,h264,aac"  # Minimal quality
+            stdout="256,144,15,h264,aac",  # Minimal quality
         )
 
         mock_process = MagicMock()
@@ -146,8 +132,7 @@ class TestDownloadVideo:
     @patch("ytplay_modules.download.is_audio_only_mode")
     @patch("subprocess.Popen")
     def test_handles_timeout(
-        self, mock_popen, mock_audio_mode, mock_cache_dir,
-        mock_ffmpeg_path, mock_ytdlp_path, tmp_path
+        self, mock_popen, mock_audio_mode, mock_cache_dir, mock_ffmpeg_path, mock_ytdlp_path, tmp_path
     ):
         """Should return None on timeout."""
         from ytplay_modules.download import download_video
@@ -172,9 +157,7 @@ class TestDownloadVideo:
     @patch("ytplay_modules.download.get_ffmpeg_path")
     @patch("ytplay_modules.download.get_cache_dir")
     @patch("ytplay_modules.download.is_audio_only_mode")
-    def test_handles_exception(
-        self, mock_audio_mode, mock_cache_dir, mock_ffmpeg_path, mock_ytdlp_path, tmp_path
-    ):
+    def test_handles_exception(self, mock_audio_mode, mock_cache_dir, mock_ffmpeg_path, mock_ytdlp_path, tmp_path):
         """Should return None on general exception."""
         from ytplay_modules.download import download_video
 
@@ -193,7 +176,7 @@ class TestParseProgress:
 
     def test_parses_50_percent_milestone(self):
         """Should log at 50% milestone."""
-        from ytplay_modules.download import parse_progress, download_progress_milestones
+        from ytplay_modules.download import download_progress_milestones, parse_progress
 
         video_id = "test_progress"
         download_progress_milestones[video_id] = set()
@@ -204,7 +187,7 @@ class TestParseProgress:
 
     def test_ignores_progress_after_50_percent(self):
         """Should stop logging after 50% milestone."""
-        from ytplay_modules.download import parse_progress, download_progress_milestones
+        from ytplay_modules.download import download_progress_milestones, parse_progress
 
         video_id = "test_ignore"
         download_progress_milestones[video_id] = {50}  # Already logged 50%
@@ -218,7 +201,7 @@ class TestParseProgress:
 
     def test_handles_invalid_progress_line(self):
         """Should handle lines without progress info."""
-        from ytplay_modules.download import parse_progress, download_progress_milestones
+        from ytplay_modules.download import download_progress_milestones, parse_progress
 
         video_id = "test_invalid"
         download_progress_milestones[video_id] = set()
@@ -236,20 +219,12 @@ class TestProcessVideosWorker:
     @patch("ytplay_modules.download.download_video")
     @patch("ytplay_modules.download.get_video_metadata")
     @patch("ytplay_modules.download.normalize_audio")
-    def test_skips_cached_videos(
-        self, mock_normalize, mock_metadata, mock_download
-    ):
+    def test_skips_cached_videos(self, mock_normalize, mock_metadata, mock_download):
         """Should skip videos that are already cached."""
-        from ytplay_modules.state import (
-            video_queue, add_cached_video, should_stop_threads
-        )
+        from ytplay_modules.state import add_cached_video, video_queue
 
         # Pre-cache the video
-        add_cached_video("already_cached", {
-            "path": "/cache/cached.mp4",
-            "song": "Cached",
-            "artist": "Artist"
-        })
+        add_cached_video("already_cached", {"path": "/cache/cached.mp4", "song": "Cached", "artist": "Artist"})
 
         # Add to queue
         video_queue.put({"id": "already_cached", "title": "Cached Video"})
@@ -266,11 +241,9 @@ class TestProcessVideosWorker:
     @patch("ytplay_modules.download.download_video")
     @patch("ytplay_modules.download.get_video_metadata")
     @patch("ytplay_modules.download.normalize_audio")
-    def test_full_processing_pipeline(
-        self, mock_normalize, mock_metadata, mock_download
-    ):
+    def test_full_processing_pipeline(self, mock_normalize, mock_metadata, mock_download):
         """Should process video through all stages."""
-        from ytplay_modules.state import video_queue, is_video_cached
+        from ytplay_modules.state import is_video_cached
 
         video_id = "new_video_123"
         title = "New Video Title"

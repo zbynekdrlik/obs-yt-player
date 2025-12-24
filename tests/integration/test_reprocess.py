@@ -5,13 +5,11 @@ Tests for reprocessing videos with failed Gemini extraction.
 Uses mocked subprocess and state for testing.
 """
 
-import pytest
-import os
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 # Mock Windows-specific subprocess attributes for Linux testing
-if not hasattr(subprocess, 'STARTUPINFO'):
+if not hasattr(subprocess, "STARTUPINFO"):
     subprocess.STARTUPINFO = MagicMock
     subprocess.STARTF_USESHOWWINDOW = 0x00000001
     subprocess.SW_HIDE = 0
@@ -27,10 +25,7 @@ class TestGetVideoTitleFromYoutube:
         from ytplay_modules.reprocess import get_video_title_from_youtube
 
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="Test Video Title\n"
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="Test Video Title\n")
 
         result = get_video_title_from_youtube("abc123")
 
@@ -43,10 +38,7 @@ class TestGetVideoTitleFromYoutube:
         from ytplay_modules.reprocess import get_video_title_from_youtube
 
         mock_ytdlp_path.return_value = "/path/to/yt-dlp"
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout=""
-        )
+        mock_run.return_value = MagicMock(returncode=1, stdout="")
 
         result = get_video_title_from_youtube("abc123")
 
@@ -75,17 +67,20 @@ class TestFindVideosToReprocess:
         from ytplay_modules.state import add_cached_video
 
         # Add a video with gemini_failed
-        add_cached_video("video1", {
-            "path": "/path/to/video1_normalized_gf.mp4",
-            "song": "Test Song",
-            "artist": "Test Artist",
-            "gemini_failed": True
-        })
+        add_cached_video(
+            "video1",
+            {
+                "path": "/path/to/video1_normalized_gf.mp4",
+                "song": "Test Song",
+                "artist": "Test Artist",
+                "gemini_failed": True,
+            },
+        )
 
         result = find_videos_to_reprocess()
 
         assert len(result) == 1
-        assert result[0]['id'] == "video1"
+        assert result[0]["id"] == "video1"
 
     def test_skips_successful_videos(self):
         """Should skip videos without gemini_failed flag."""
@@ -93,17 +88,20 @@ class TestFindVideosToReprocess:
         from ytplay_modules.state import add_cached_video
 
         # Add successful video
-        add_cached_video("video2", {
-            "path": "/path/to/video2_normalized.mp4",
-            "song": "Good Song",
-            "artist": "Good Artist",
-            "gemini_failed": False
-        })
+        add_cached_video(
+            "video2",
+            {
+                "path": "/path/to/video2_normalized.mp4",
+                "song": "Good Song",
+                "artist": "Good Artist",
+                "gemini_failed": False,
+            },
+        )
 
         result = find_videos_to_reprocess()
 
         # Should not include video2
-        video_ids = [v['id'] for v in result]
+        video_ids = [v["id"] for v in result]
         assert "video2" not in video_ids
 
     @patch("ytplay_modules.reprocess.get_video_title_from_youtube")
@@ -114,12 +112,10 @@ class TestFindVideosToReprocess:
 
         mock_get_title.return_value = "Fetched Title"
 
-        add_cached_video("video3", {
-            "path": "/path/to/video3.mp4",
-            "song": "Unknown Song",
-            "artist": "Unknown Artist",
-            "gemini_failed": True
-        })
+        add_cached_video(
+            "video3",
+            {"path": "/path/to/video3.mp4", "song": "Unknown Song", "artist": "Unknown Artist", "gemini_failed": True},
+        )
 
         result = find_videos_to_reprocess()
 
@@ -141,11 +137,11 @@ class TestReprocessVideo:
         mock_metadata.return_value = ("Song", "Artist", "title", True)
 
         video_info = {
-            'id': 'video1',
-            'title': 'Test Title',
-            'current_path': '/path/to/video.mp4',
-            'song': 'Old Song',
-            'artist': 'Old Artist'
+            "id": "video1",
+            "title": "Test Title",
+            "current_path": "/path/to/video.mp4",
+            "song": "Old Song",
+            "artist": "Old Artist",
         }
 
         result = reprocess_video(video_info)
@@ -162,11 +158,11 @@ class TestReprocessVideo:
         mock_metadata.return_value = ("Song", "Artist", "title", True)  # gemini_failed=True
 
         video_info = {
-            'id': 'video1',
-            'title': 'Test Title',
-            'current_path': '/path/to/video.mp4',
-            'song': 'Old Song',
-            'artist': 'Old Artist'
+            "id": "video1",
+            "title": "Test Title",
+            "current_path": "/path/to/video.mp4",
+            "song": "Old Song",
+            "artist": "Old Artist",
         }
 
         result = reprocess_video(video_info)
@@ -176,18 +172,18 @@ class TestReprocessVideo:
     def test_renames_file_on_success(self, tmp_path):
         """Should rename file when Gemini succeeds on retry."""
         from ytplay_modules.reprocess import reprocess_video
-        from ytplay_modules.state import set_gemini_api_key, set_cache_dir
+        from ytplay_modules.state import set_cache_dir, set_gemini_api_key
 
         # Create actual temp file
         old_file = tmp_path / "old_file_gf.mp4"
         old_file.write_bytes(b"video content")
 
         video_info = {
-            'id': 'video1',
-            'title': 'Test Title',
-            'current_path': str(old_file),
-            'song': 'Old Song',
-            'artist': 'Old Artist'
+            "id": "video1",
+            "title": "Test Title",
+            "current_path": str(old_file),
+            "song": "Old Song",
+            "artist": "Old Artist",
         }
 
         # Without a valid API key, Gemini will fail
@@ -208,9 +204,7 @@ class TestReprocessWorker:
     @patch("ytplay_modules.reprocess.is_tools_ready")
     @patch("ytplay_modules.reprocess.should_stop_threads")
     @patch("time.sleep")
-    def test_skips_when_no_api_key(
-        self, mock_sleep, mock_stop, mock_tools_ready, mock_api_key, mock_find
-    ):
+    def test_skips_when_no_api_key(self, mock_sleep, mock_stop, mock_tools_ready, mock_api_key, mock_find):
         """Should skip reprocessing when no API key."""
         from ytplay_modules.reprocess import reprocess_worker
 

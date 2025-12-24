@@ -5,8 +5,7 @@ Tests for media state handling: playing, ended, stopped, none.
 Uses mock obspython module for testing outside of OBS runtime.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import obspython as obs
 
@@ -37,16 +36,12 @@ class TestLogPlaybackProgress:
 
     def test_logs_progress_at_intervals(self):
         """Should log progress at 30-second intervals."""
-        from ytplay_modules.state_handlers import log_playback_progress
         from ytplay_modules.state import add_cached_video
+        from ytplay_modules.state_handlers import log_playback_progress
 
         obs.reset()
         video_id = "test123"
-        add_cached_video(video_id, {
-            "path": "/path/to/video.mp4",
-            "song": "Test Song",
-            "artist": "Test Artist"
-        })
+        add_cached_video(video_id, {"path": "/path/to/video.mp4", "song": "Test Song", "artist": "Test Artist"})
 
         # First log at 0 seconds
         log_playback_progress(video_id, 0, 180000)
@@ -56,6 +51,7 @@ class TestLogPlaybackProgress:
 
         # Third log at 31 seconds - should NOT log (same 30s bucket)
         from ytplay_modules import state_handlers
+
         initial_count = len(state_handlers._last_progress_log)
         log_playback_progress(video_id, 31000, 180000)
         assert len(state_handlers._last_progress_log) == initial_count
@@ -68,6 +64,7 @@ class TestHandlePlayingState:
         """Reset state before each test."""
         obs.reset()
         from ytplay_modules import state_handlers
+
         state_handlers._is_preloaded_video = False
         state_handlers._last_playback_time = 0
         state_handlers._manual_stop_detected = False
@@ -77,9 +74,9 @@ class TestHandlePlayingState:
 
     def test_clears_manual_stop_flag(self):
         """Should clear manual stop flag when playing."""
-        from ytplay_modules.state_handlers import handle_playing_state
-        from ytplay_modules.state import set_playing
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.state import set_playing
+        from ytplay_modules.state_handlers import handle_playing_state
 
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
         obs.set_media_state(obs.OBS_MEDIA_STATE_PLAYING)
@@ -88,6 +85,7 @@ class TestHandlePlayingState:
         set_playing(True)
 
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = True
 
         handle_playing_state()
@@ -96,9 +94,9 @@ class TestHandlePlayingState:
 
     def test_syncs_state_when_out_of_sync(self):
         """Should sync state when media is playing but we don't think so."""
-        from ytplay_modules.state_handlers import handle_playing_state
-        from ytplay_modules.state import is_playing, set_playing
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.state import is_playing, set_playing
+        from ytplay_modules.state_handlers import handle_playing_state
 
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
         obs.set_media_state(obs.OBS_MEDIA_STATE_PLAYING)
@@ -111,9 +109,9 @@ class TestHandlePlayingState:
 
     def test_detects_seek_forward(self):
         """Should detect seek when playback time jumps forward."""
-        from ytplay_modules.state_handlers import handle_playing_state
-        from ytplay_modules.state import set_playing, set_current_playback_video_id, add_cached_video
         from ytplay_modules.config import MEDIA_SOURCE_NAME
+        from ytplay_modules.state import add_cached_video, set_current_playback_video_id, set_playing
+        from ytplay_modules.state_handlers import handle_playing_state
 
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
         obs.set_media_state(obs.OBS_MEDIA_STATE_PLAYING)
@@ -125,6 +123,7 @@ class TestHandlePlayingState:
         set_current_playback_video_id(video_id)
 
         from ytplay_modules import state_handlers
+
         state_handlers._last_playback_time = 10000  # Was at 10 seconds
 
         handle_playing_state()
@@ -140,20 +139,22 @@ class TestHandleEndedState:
         """Reset state before each test."""
         obs.reset()
         from ytplay_modules import state_handlers
+
         state_handlers._preloaded_video_handled = False
         state_handlers._is_preloaded_video = False
         state_handlers._loop_restart_pending = False
 
     def test_prevents_duplicate_loop_restart(self):
         """Should prevent duplicate loop restart in loop mode."""
-        from ytplay_modules.state_handlers import handle_ended_state
         from ytplay_modules.config import PLAYBACK_MODE_LOOP
-        from ytplay_modules.state import set_playing, set_playback_mode
+        from ytplay_modules.state import set_playback_mode, set_playing
+        from ytplay_modules.state_handlers import handle_ended_state
 
         set_playing(True)
         set_playback_mode(PLAYBACK_MODE_LOOP)
 
         from ytplay_modules import state_handlers
+
         state_handlers._loop_restart_pending = True
 
         handle_ended_state()
@@ -163,12 +164,9 @@ class TestHandleEndedState:
 
     def test_stops_in_single_mode_after_first_video(self):
         """Should stop playback in single mode after first video."""
+        from ytplay_modules.config import MEDIA_SOURCE_NAME, PLAYBACK_MODE_SINGLE, TEXT_SOURCE_NAME
+        from ytplay_modules.state import is_playing, set_first_video_played, set_playback_mode, set_playing
         from ytplay_modules.state_handlers import handle_ended_state
-        from ytplay_modules.config import PLAYBACK_MODE_SINGLE, MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
-        from ytplay_modules.state import (
-            set_playing, set_playback_mode, is_playing,
-            set_first_video_played
-        )
 
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -182,13 +180,9 @@ class TestHandleEndedState:
 
     def test_starts_next_when_scene_active_and_not_playing(self):
         """Should start next video when scene active but not playing."""
-        from ytplay_modules.state_handlers import handle_ended_state
         from ytplay_modules.config import PLAYBACK_MODE_CONTINUOUS
-        from ytplay_modules.state import (
-            set_playing, set_scene_active, add_cached_video,
-            set_playback_mode
-        )
-        from unittest.mock import patch
+        from ytplay_modules.state import add_cached_video, set_playback_mode, set_playing, set_scene_active
+        from ytplay_modules.state_handlers import handle_ended_state
 
         set_playing(False)
         set_scene_active(True)
@@ -208,14 +202,15 @@ class TestHandleStoppedState:
         """Reset state before each test."""
         obs.reset()
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = False
         state_handlers._playback_retry_count = 0
 
     def test_detects_manual_stop(self):
         """Should detect user manual stop."""
-        from ytplay_modules.state_handlers import handle_stopped_state
         from ytplay_modules.config import MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
-        from ytplay_modules.state import set_playing, is_playing
+        from ytplay_modules.state import set_playing
+        from ytplay_modules.state_handlers import handle_stopped_state
 
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
@@ -224,17 +219,18 @@ class TestHandleStoppedState:
         handle_stopped_state()
 
         from ytplay_modules import state_handlers
+
         assert state_handlers._manual_stop_detected is True
 
     def test_retries_when_playback_stops_unexpectedly(self):
         """Should retry playback when it stops unexpectedly."""
-        from ytplay_modules.state_handlers import handle_stopped_state
         from ytplay_modules.state import set_playing
-        from unittest.mock import patch
+        from ytplay_modules.state_handlers import handle_stopped_state
 
         set_playing(True)
 
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = True  # Already detected
         state_handlers._playback_retry_count = 0
 
@@ -249,15 +245,16 @@ class TestHandleStoppedState:
 
     def test_stops_after_max_retries(self):
         """Should stop completely after max retries."""
-        from ytplay_modules.state_handlers import handle_stopped_state
         from ytplay_modules.config import MEDIA_SOURCE_NAME, TEXT_SOURCE_NAME
         from ytplay_modules.state import set_playing
+        from ytplay_modules.state_handlers import handle_stopped_state
 
         obs.create_source(MEDIA_SOURCE_NAME, "ffmpeg_source")
         obs.create_source(TEXT_SOURCE_NAME, "text_gdiplus")
         set_playing(True)
 
         from ytplay_modules import state_handlers
+
         state_handlers._manual_stop_detected = True
         state_handlers._playback_retry_count = state_handlers._max_retry_attempts
 
@@ -271,9 +268,8 @@ class TestHandleNoneState:
 
     def test_starts_playback_when_scene_active(self):
         """Should start playback when scene active and videos available."""
+        from ytplay_modules.state import add_cached_video, set_playing, set_scene_active
         from ytplay_modules.state_handlers import handle_none_state
-        from ytplay_modules.state import set_scene_active, set_playing, add_cached_video
-        from unittest.mock import patch
 
         obs.reset()
         set_scene_active(True)
@@ -287,12 +283,16 @@ class TestHandleNoneState:
 
     def test_does_not_start_in_single_mode_after_first(self):
         """Should not start new playback in single mode after first video."""
-        from ytplay_modules.state_handlers import handle_none_state
         from ytplay_modules.config import PLAYBACK_MODE_SINGLE
         from ytplay_modules.state import (
-            set_scene_active, set_playing, add_cached_video,
-            set_playback_mode, set_first_video_played, is_playing
+            add_cached_video,
+            is_playing,
+            set_first_video_played,
+            set_playback_mode,
+            set_playing,
+            set_scene_active,
         )
+        from ytplay_modules.state_handlers import handle_none_state
 
         obs.reset()
         set_scene_active(True)
@@ -308,8 +308,8 @@ class TestHandleNoneState:
 
     def test_resets_playing_when_no_media_but_playing_state(self):
         """Should reset playing state when no media but state says playing."""
+        from ytplay_modules.state import is_playing, set_playing, set_scene_active
         from ytplay_modules.state_handlers import handle_none_state
-        from ytplay_modules.state import set_scene_active, set_playing, is_playing
 
         obs.reset()
         set_scene_active(True)

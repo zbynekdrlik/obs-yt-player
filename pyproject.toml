@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Video",
 ]
 
@@ -87,7 +88,10 @@ known-first-party = ["ytplay_modules"]
 [tool.ruff.lint.per-file-ignores]
 # Tests need special import ordering for mock injection
 "tests/conftest.py" = ["E402", "I001"]
-"tests/**/*.py" = ["E402"]
+# Tests can use simpler patterns and file operations
+"tests/**/*.py" = ["E402", "PTH", "F841", "RUF059", "SIM117", "E731"]
+# Main codebase uses os.path for OBS compatibility and has some legacy patterns
+"yt-player-main/**/*.py" = ["PTH", "SIM102", "SIM103", "SIM105", "SIM115", "E402", "E722", "W291", "W293", "UP006", "UP035", "RUF005", "RUF022"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -177,7 +181,7 @@ source = [
 ]
 
 [tool.coverage.report]
-fail_under = 40
+fail_under = 70
 show_missing = true
 skip_covered = false
 exclude_lines = [

@@ -69,25 +69,28 @@ def reset_obs_mock():
 
 
 @pytest.fixture(autouse=True)
-def reset_state_module():
+def reset_state_module(tmp_path):
     """
     Reset the ytplay_modules.state module between tests.
     This ensures no state leaks between tests.
+    Uses tmp_path to provide a valid cache directory for each test.
     """
     try:
         from ytplay_modules import state
         from ytplay_modules.config import (
             DEFAULT_PLAYLIST_URL,
-            DEFAULT_CACHE_DIR,
             DEFAULT_PLAYBACK_MODE,
             DEFAULT_AUDIO_ONLY_MODE,
         )
+
+        # Use tmp_path as cache dir so persistence works in tests
+        test_cache_dir = str(tmp_path / "test_cache")
 
         # Reset all module-level state variables directly
         with state._state_lock:
             # Configuration state
             state._playlist_url = DEFAULT_PLAYLIST_URL
-            state._cache_dir = DEFAULT_CACHE_DIR
+            state._cache_dir = test_cache_dir
             state._gemini_api_key = None
             state._playback_mode = DEFAULT_PLAYBACK_MODE
             state._audio_only_mode = DEFAULT_AUDIO_ONLY_MODE
@@ -122,14 +125,13 @@ def reset_state_module():
         from ytplay_modules import state
         from ytplay_modules.config import (
             DEFAULT_PLAYLIST_URL,
-            DEFAULT_CACHE_DIR,
             DEFAULT_PLAYBACK_MODE,
             DEFAULT_AUDIO_ONLY_MODE,
         )
 
         with state._state_lock:
             state._playlist_url = DEFAULT_PLAYLIST_URL
-            state._cache_dir = DEFAULT_CACHE_DIR
+            state._cache_dir = test_cache_dir  # Use same temp dir
             state._gemini_api_key = None
             state._playback_mode = DEFAULT_PLAYBACK_MODE
             state._audio_only_mode = DEFAULT_AUDIO_ONLY_MODE
@@ -391,6 +393,198 @@ def pytest_configure(config):
 
 
 # =============================================================================
+# TIMER TRACKING FIXTURES
+# =============================================================================
+
+
+class TimerTracker:
+    """Track OBS timer add/remove calls for verification."""
+
+    def __init__(self):
+        self.active_timers = {}
+        self.add_calls = []
+        self.remove_calls = []
+
+    def track_add(self, callback, interval):
+        """Track a timer_add call."""
+        timer_id = id(callback)
+        self.active_timers[timer_id] = {"callback": callback, "interval": interval}
+        self.add_calls.append((callback, interval))
+
+    def track_remove(self, callback):
+        """Track a timer_remove call."""
+        timer_id = id(callback)
+        self.active_timers.pop(timer_id, None)
+        self.remove_calls.append(callback)
+
+    def assert_no_leaks(self):
+        """Assert all timers have been removed."""
+        assert len(self.active_timers) == 0, f"Timer leaks detected: {list(self.active_timers.keys())}"
+
+    def get_active_count(self):
+        """Get count of active timers."""
+        return len(self.active_timers)
+
+    def reset(self):
+        """Reset tracker state."""
+        self.active_timers.clear()
+        self.add_calls.clear()
+        self.remove_calls.clear()
+
+
+@pytest.fixture
+def timer_tracker(mocker):
+    """Fixture to track OBS timer lifecycle."""
+    tracker = TimerTracker()
+
+    # Patch timer_add to track calls
+    original_timer_add = mock_obs.timer_add
+
+    def tracked_timer_add(callback, interval):
+        tracker.track_add(callback, interval)
+        return original_timer_add(callback, interval)
+
+    mocker.patch.object(mock_obs, "timer_add", side_effect=tracked_timer_add)
+
+    # Patch timer_remove to track calls
+    original_timer_remove = mock_obs.timer_remove
+
+    def tracked_timer_remove(callback):
+        tracker.track_remove(callback)
+        return original_timer_remove(callback)
+
+    mocker.patch.object(mock_obs, "timer_remove", side_effect=tracked_timer_remove)
+
+    return tracker
+
+
+# =============================================================================
+# SUBPROCESS SIMULATION FIXTURES
+# =============================================================================
+
+
+class SubprocessSimulator:
+    """Simulate subprocess behavior for testing."""
+
+    def __init__(self):
+        self.stdout_lines = []
+        self.stderr_lines = []
+        self.returncode = 0
+        self.should_timeout = False
+        self.timeout_after = None
+
+    def set_output(self, stdout_lines=None, stderr_lines=None, returncode=0):
+        """Set the simulated output."""
+        self.stdout_lines = stdout_lines or []
+        self.stderr_lines = stderr_lines or []
+        self.returncode = returncode
+
+    def simulate_progress(self, percentages):
+        """Simulate download progress output."""
+        self.stdout_lines = [f"[download] {p}% of ~100.00MiB at 1.00MiB/s" for p in percentages]
+
+    def simulate_timeout(self, after_lines=5):
+        """Simulate a timeout after N lines."""
+        self.should_timeout = True
+        self.timeout_after = after_lines
+
+
+@pytest.fixture
+def subprocess_simulator():
+    """Fixture for controlled subprocess simulation."""
+    return SubprocessSimulator()
+
+
+@pytest.fixture
+def mock_popen_with_simulator(mocker, subprocess_simulator):
+    """Mock Popen with simulator control."""
+    mock_popen = mocker.patch("subprocess.Popen")
+
+    class MockProcess:
+        def __init__(self):
+            self._line_count = 0
+
+        @property
+        def stdout(self):
+            for line in subprocess_simulator.stdout_lines:
+                self._line_count += 1
+                if subprocess_simulator.should_timeout and self._line_count > subprocess_simulator.timeout_after:
+                    import subprocess
+
+                    raise subprocess.TimeoutExpired("cmd", 60)
+                yield line
+
+        @property
+        def returncode(self):
+            return subprocess_simulator.returncode
+
+        def wait(self, timeout=None):
+            if subprocess_simulator.should_timeout:
+                import subprocess
+
+                raise subprocess.TimeoutExpired("cmd", timeout)
+            return self.returncode
+
+        def kill(self):
+            pass
+
+        def poll(self):
+            return self.returncode
+
+    mock_popen.return_value = MockProcess()
+    return mock_popen
+
+
+# =============================================================================
+# VIDEO FILE FIXTURES
+# =============================================================================
+
+
+@pytest.fixture
+def temp_normalized_video(temp_cache_dir):
+    """Create a temporary normalized video file."""
+    video_path = temp_cache_dir / "Test_Song_Test_Artist_dQw4w9WgXcQ_normalized.mp4"
+    video_path.write_bytes(b"x" * (2 * 1024 * 1024))  # 2MB file
+    return video_path
+
+
+@pytest.fixture
+def temp_gf_video(temp_cache_dir):
+    """Create a temporary Gemini-failed video file."""
+    video_path = temp_cache_dir / "Unknown_Unknown_9bZkp7q19f0_normalized_gf.mp4"
+    video_path.write_bytes(b"x" * (2 * 1024 * 1024))  # 2MB file
+    return video_path
+
+
+@pytest.fixture
+def multiple_cached_videos(temp_cache_dir):
+    """Create multiple cached video files for testing."""
+    videos = []
+    for i, video_id in enumerate(["vid001", "vid002", "vid003", "vid004", "vid005"]):
+        video_path = temp_cache_dir / f"Song{i}_Artist{i}_{video_id}_normalized.mp4"
+        video_path.write_bytes(b"x" * (1024 * 1024))  # 1MB each
+        videos.append(video_path)
+    return videos
+
+
+# =============================================================================
+# THREADING FIXTURES
+# =============================================================================
+
+
+@pytest.fixture
+def stop_threads_after_test():
+    """Ensure threads are stopped after test."""
+    yield
+    try:
+        from ytplay_modules import state
+
+        state.set_stop_threads(True)
+    except ImportError:
+        pass
+
+
+# =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
 
@@ -403,3 +597,31 @@ def assert_no_resource_leaks():
     release_count = sum(1 for name, _, _ in calls if "source_release" in name)
     # Note: In real usage there may be intentional holds, so this is informational
     return get_count, release_count
+
+
+def create_mock_ytdlp_output(video_id, title, duration=180):
+    """Create mock yt-dlp JSON output."""
+    return {
+        "id": video_id,
+        "title": title,
+        "duration": duration,
+        "formats": [{"format_id": "22", "ext": "mp4", "height": 720}],
+    }
+
+
+def create_mock_ffmpeg_loudnorm_output(input_i=-23.0, input_tp=-1.0, input_lra=7.0):
+    """Create mock FFmpeg loudnorm analysis output."""
+    return f"""
+[Parsed_loudnorm_0 @ 0x0] {{
+    "input_i": "{input_i:.2f}",
+    "input_tp": "{input_tp:.2f}",
+    "input_lra": "{input_lra:.2f}",
+    "input_thresh": "-33.00",
+    "output_i": "-14.00",
+    "output_tp": "-1.50",
+    "output_lra": "7.00",
+    "output_thresh": "-24.00",
+    "normalization_type": "dynamic",
+    "target_offset": "0.00"
+}}
+"""
