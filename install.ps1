@@ -905,7 +905,7 @@ function Show-SuccessMessage {
     Write-Host ""
 
     if ($AutoConfigured) {
-        Write-Success "Scene '$($script:InstanceName)' created with sources"
+        Write-Success "OBS auto-configuration completed"
         Write-Host ""
         Write-Host "Remaining step in OBS Studio:" -ForegroundColor White
         Write-Host ""
@@ -1164,28 +1164,33 @@ function Install-OBSYouTubePlayer {
 
             try {
                 $instName = $script:InstanceName
-                $maxRetries = 3
-                $retryDelay = 3
+                $maxRetries = 5
+                $retryDelay = 2
 
                 # Create scene (with retry)
                 $sceneCreated = $false
                 for ($i = 1; $i -le $maxRetries; $i++) {
-                    if (New-OBSScene -WebSocket $ws -SceneName $instName) {
+                    $result = New-OBSScene -WebSocket $ws -SceneName $instName
+                    if ($result) {
                         Write-Success "Scene '$instName' ready"
                         $sceneCreated = $true
                         break
                     }
                     if ($i -lt $maxRetries) {
-                        Write-Info "Waiting for OBS to be ready... (attempt $i/$maxRetries)"
+                        Write-Info "OBS not ready, retrying... ($i/$maxRetries)"
                         Start-Sleep -Seconds $retryDelay
                     }
                 }
+
+                $mediaCreated = $false
+                $textCreated = $false
 
                 if ($sceneCreated) {
                     # Create media source (with retry)
                     for ($i = 1; $i -le $maxRetries; $i++) {
                         if (New-OBSMediaSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_video") {
                             Write-Success "Media source '${instName}_video' ready"
+                            $mediaCreated = $true
                             break
                         }
                         if ($i -lt $maxRetries) {
@@ -1197,6 +1202,7 @@ function Install-OBSYouTubePlayer {
                     for ($i = 1; $i -le $maxRetries; $i++) {
                         if (New-OBSTextSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_title") {
                             Write-Success "Text source '${instName}_title' ready"
+                            $textCreated = $true
                             break
                         }
                         if ($i -lt $maxRetries) {
@@ -1205,7 +1211,16 @@ function Install-OBSYouTubePlayer {
                     }
                 }
 
-                $autoConfigured = $true
+                # Only mark as auto-configured if scene was created
+                if ($sceneCreated) {
+                    $autoConfigured = $true
+                    if (-not $mediaCreated -or -not $textCreated) {
+                        Write-Warning "Some sources could not be created automatically"
+                    }
+                } else {
+                    Write-Warning "Could not create scene - OBS may need more time to initialize"
+                    Write-Info "Please create the scene manually after OBS is fully loaded"
+                }
 
             } catch {
                 Write-Warning "Could not fully configure OBS: $_"
