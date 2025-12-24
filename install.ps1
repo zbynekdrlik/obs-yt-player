@@ -5,6 +5,7 @@
 .DESCRIPTION
     Downloads and installs OBS YouTube Player to your OBS Studio installation.
     Supports both system-installed and portable OBS.
+    Can automatically configure OBS via WebSocket if OBS is running.
 .EXAMPLE
     irm https://raw.githubusercontent.com/zbynekdrlik/obs-yt-player/main/install.ps1 | iex
 .NOTES
@@ -19,6 +20,12 @@ $ProgressPreference = "SilentlyContinue"  # Faster downloads
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $ScriptFolder = "yt-player-main"
+$InstanceName = "ytplay"
+$OBSWebSocketPort = 4455
+
+# Global WebSocket state
+$script:wsConnection = $null
+$script:wsMessageId = 0
 
 function Write-Header {
     Write-Host ""
@@ -38,7 +45,7 @@ function Write-Success {
     Write-Host "[+] $Message" -ForegroundColor Green
 }
 
-function Write-Error {
+function Write-ErrorMsg {
     param([string]$Message)
     Write-Host "[!] $Message" -ForegroundColor Red
 }
@@ -48,10 +55,16 @@ function Write-Info {
     Write-Host "    $Message" -ForegroundColor Gray
 }
 
+function Write-Warning {
+    param([string]$Message)
+    Write-Host "[~] $Message" -ForegroundColor DarkYellow
+}
+
+#region OBS Detection Functions
+
 function Test-PortableOBS {
     param([string]$Path)
 
-    # Check for OBS executable in common locations
     $obsExePaths = @(
         (Join-Path $Path "bin\64bit\obs64.exe"),
         (Join-Path $Path "bin\32bit\obs32.exe"),
@@ -60,31 +73,12 @@ function Test-PortableOBS {
 
     foreach ($exePath in $obsExePaths) {
         if (Test-Path $exePath) {
-            # Also verify it has the data folder structure
             $dataPath = Join-Path $Path "data"
             if (Test-Path $dataPath) {
                 return $true
             }
         }
     }
-    return $false
-}
-
-function Test-PortableModeEnabled {
-    param([string]$Path)
-
-    # Check for portable_mode.txt
-    $portableFile = Join-Path $Path "portable_mode.txt"
-    if (Test-Path $portableFile) {
-        return $true
-    }
-
-    # Check for config folder (indicates portable mode was used)
-    $configPath = Join-Path $Path "config\obs-studio"
-    if (Test-Path $configPath) {
-        return $true
-    }
-
     return $false
 }
 
@@ -113,13 +107,317 @@ function Get-ScriptsDirectory {
     )
 
     if ($IsPortable) {
-        # For portable, put scripts in a scripts folder within OBS directory
         return Join-Path $OBSPath "scripts"
     } else {
-        # For system install, use AppData location
         return Join-Path $env:APPDATA "obs-studio\scripts"
     }
 }
+
+function Get-OBSConfigDirectory {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    if ($IsPortable) {
+        return Join-Path $OBSPath "config\obs-studio"
+    } else {
+        return Join-Path $env:APPDATA "obs-studio"
+    }
+}
+
+#endregion
+
+#region OBS WebSocket Functions
+
+function Test-OBSRunning {
+    $obsProcess = Get-Process -Name "obs64", "obs32" -ErrorAction SilentlyContinue
+    return $null -ne $obsProcess
+}
+
+function Connect-OBSWebSocket {
+    param(
+        [string]$Password = ""
+    )
+
+    try {
+        $uri = "ws://127.0.0.1:$OBSWebSocketPort"
+
+        $clientWebSocket = New-Object System.Net.WebSockets.ClientWebSocket
+        $cts = New-Object System.Threading.CancellationTokenSource
+        $cts.CancelAfter(5000)  # 5 second timeout
+
+        $connectTask = $clientWebSocket.ConnectAsync($uri, $cts.Token)
+        $connectTask.Wait()
+
+        if ($clientWebSocket.State -ne [System.Net.WebSockets.WebSocketState]::Open) {
+            return $null
+        }
+
+        # Receive Hello message
+        $hello = Receive-WebSocketMessage -WebSocket $clientWebSocket -Timeout 5000
+        if (-not $hello -or $hello.op -ne 0) {
+            $clientWebSocket.Dispose()
+            return $null
+        }
+
+        # Prepare Identify message
+        $identifyData = @{
+            rpcVersion = 1
+        }
+
+        # Handle authentication if required
+        if ($hello.d.authentication) {
+            if ([string]::IsNullOrEmpty($Password)) {
+                Write-Warning "OBS WebSocket requires a password"
+                $Password = Read-Host "Enter OBS WebSocket password"
+            }
+
+            $challenge = $hello.d.authentication.challenge
+            $salt = $hello.d.authentication.salt
+
+            # Generate authentication string
+            $authString = Get-OBSAuthString -Password $Password -Salt $salt -Challenge $challenge
+            $identifyData.authentication = $authString
+        }
+
+        # Send Identify
+        $identifyMsg = @{
+            op = 1
+            d = $identifyData
+        } | ConvertTo-Json -Compress
+
+        Send-WebSocketMessage -WebSocket $clientWebSocket -Message $identifyMsg
+
+        # Receive Identified response
+        $identified = Receive-WebSocketMessage -WebSocket $clientWebSocket -Timeout 5000
+        if (-not $identified -or $identified.op -ne 2) {
+            Write-ErrorMsg "OBS WebSocket authentication failed"
+            $clientWebSocket.Dispose()
+            return $null
+        }
+
+        $script:wsConnection = $clientWebSocket
+        return $clientWebSocket
+
+    } catch {
+        return $null
+    }
+}
+
+function Get-OBSAuthString {
+    param(
+        [string]$Password,
+        [string]$Salt,
+        [string]$Challenge
+    )
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+
+    # base64(sha256(password + salt))
+    $passAndSalt = $Password + $Salt
+    $passSaltBytes = [System.Text.Encoding]::UTF8.GetBytes($passAndSalt)
+    $passSaltHash = $sha256.ComputeHash($passSaltBytes)
+    $passSaltBase64 = [Convert]::ToBase64String($passSaltHash)
+
+    # base64(sha256(base64_secret + challenge))
+    $secretAndChallenge = $passSaltBase64 + $Challenge
+    $secretChallengeBytes = [System.Text.Encoding]::UTF8.GetBytes($secretAndChallenge)
+    $finalHash = $sha256.ComputeHash($secretChallengeBytes)
+    $finalBase64 = [Convert]::ToBase64String($finalHash)
+
+    return $finalBase64
+}
+
+function Send-WebSocketMessage {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$Message
+    )
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Message)
+    $segment = New-Object System.ArraySegment[byte] -ArgumentList @(,$bytes)
+    $cts = New-Object System.Threading.CancellationTokenSource
+    $cts.CancelAfter(5000)
+
+    $sendTask = $WebSocket.SendAsync($segment, [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $cts.Token)
+    $sendTask.Wait()
+}
+
+function Receive-WebSocketMessage {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [int]$Timeout = 5000
+    )
+
+    try {
+        $buffer = New-Object byte[] 65536
+        $segment = New-Object System.ArraySegment[byte] -ArgumentList @(,$buffer)
+        $cts = New-Object System.Threading.CancellationTokenSource
+        $cts.CancelAfter($Timeout)
+
+        $result = $WebSocket.ReceiveAsync($segment, $cts.Token)
+        $result.Wait()
+
+        if ($result.Result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Text) {
+            $message = [System.Text.Encoding]::UTF8.GetString($buffer, 0, $result.Result.Count)
+            return $message | ConvertFrom-Json
+        }
+    } catch {
+        return $null
+    }
+    return $null
+}
+
+function Send-OBSRequest {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$RequestType,
+        [hashtable]$RequestData = @{}
+    )
+
+    $script:wsMessageId++
+    $requestId = "installer_$($script:wsMessageId)"
+
+    $request = @{
+        op = 6
+        d = @{
+            requestType = $RequestType
+            requestId = $requestId
+            requestData = $RequestData
+        }
+    } | ConvertTo-Json -Depth 10 -Compress
+
+    Send-WebSocketMessage -WebSocket $WebSocket -Message $request
+    $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 10000
+
+    if ($response -and $response.op -eq 7 -and $response.d.requestId -eq $requestId) {
+        return $response.d
+    }
+    return $null
+}
+
+function Close-OBSWebSocket {
+    if ($script:wsConnection) {
+        try {
+            $cts = New-Object System.Threading.CancellationTokenSource
+            $cts.CancelAfter(2000)
+            $closeTask = $script:wsConnection.CloseAsync(
+                [System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure,
+                "Installer complete",
+                $cts.Token
+            )
+            $closeTask.Wait()
+        } catch { }
+        $script:wsConnection.Dispose()
+        $script:wsConnection = $null
+    }
+}
+
+#endregion
+
+#region OBS Configuration Functions
+
+function New-OBSScene {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$SceneName
+    )
+
+    # Check if scene exists
+    $scenes = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneList"
+    if ($scenes.requestStatus.result) {
+        $existingScene = $scenes.responseData.scenes | Where-Object { $_.sceneName -eq $SceneName }
+        if ($existingScene) {
+            Write-Info "Scene '$SceneName' already exists"
+            return $true
+        }
+    }
+
+    # Create scene
+    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateScene" -RequestData @{
+        sceneName = $SceneName
+    }
+
+    return $result.requestStatus.result
+}
+
+function New-OBSMediaSource {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$SceneName,
+        [string]$SourceName
+    )
+
+    # Check if source exists
+    $items = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneItemList" -RequestData @{
+        sceneName = $SceneName
+    }
+
+    if ($items.requestStatus.result) {
+        $existingSource = $items.responseData.sceneItems | Where-Object { $_.sourceName -eq $SourceName }
+        if ($existingSource) {
+            Write-Info "Source '$SourceName' already exists"
+            return $true
+        }
+    }
+
+    # Create media source
+    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
+        sceneName = $SceneName
+        inputName = $SourceName
+        inputKind = "ffmpeg_source"
+        inputSettings = @{
+            local_file = ""
+            is_local_file = $false
+            looping = $false
+            restart_on_activate = $false
+        }
+    }
+
+    return $result.requestStatus.result
+}
+
+function New-OBSTextSource {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$SceneName,
+        [string]$SourceName
+    )
+
+    # Check if source exists
+    $items = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneItemList" -RequestData @{
+        sceneName = $SceneName
+    }
+
+    if ($items.requestStatus.result) {
+        $existingSource = $items.responseData.sceneItems | Where-Object { $_.sourceName -eq $SourceName }
+        if ($existingSource) {
+            Write-Info "Source '$SourceName' already exists"
+            return $true
+        }
+    }
+
+    # Create text source (GDI+ on Windows)
+    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
+        sceneName = $SceneName
+        inputName = $SourceName
+        inputKind = "text_gdiplus_v2"
+        inputSettings = @{
+            text = "YouTube Player"
+            font = @{
+                face = "Arial"
+                size = 48
+            }
+        }
+    }
+
+    return $result.requestStatus.result
+}
+
+#endregion
+
+#region Download Functions
 
 function Get-LatestRelease {
     Write-Step "Fetching latest release information..."
@@ -133,7 +431,6 @@ function Get-LatestRelease {
         }
         return $release
     } catch {
-        # If no releases, use main branch
         Write-Info "No releases found, will download from main branch"
         return $null
     }
@@ -159,24 +456,20 @@ function Download-Repository {
     $tempExtract = Join-Path $env:TEMP "obs-yt-player-extract"
 
     try {
-        # Download
         Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
         Write-Success "Download complete"
 
-        # Extract
         Write-Step "Extracting files..."
         if (Test-Path $tempExtract) {
             Remove-Item $tempExtract -Recurse -Force
         }
         Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
 
-        # Find the script folder
         $sourcePath = Join-Path $tempExtract "$extractFolder\$ScriptFolder"
         if (-not (Test-Path $sourcePath)) {
             throw "Could not find $ScriptFolder in downloaded archive"
         }
 
-        # Copy to destination
         $finalDest = Join-Path $DestinationPath $ScriptFolder
         if (Test-Path $finalDest) {
             Write-Step "Updating existing installation..."
@@ -189,52 +482,14 @@ function Download-Repository {
         return $finalDest
 
     } finally {
-        # Cleanup
         if (Test-Path $tempZip) { Remove-Item $tempZip -Force }
         if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force }
     }
 }
 
-function Show-PostInstallInstructions {
-    param(
-        [string]$ScriptPath,
-        [string]$InstanceName = "ytplay"
-    )
+#endregion
 
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host "  Installation Complete!" -ForegroundColor Green
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Next steps in OBS Studio:" -ForegroundColor White
-    Write-Host ""
-    Write-Host "1. " -NoNewline -ForegroundColor Cyan
-    Write-Host "Add the script:"
-    Write-Host "   Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
-    Write-Host "   $ScriptPath\ytplay.py" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "2. " -NoNewline -ForegroundColor Cyan
-    Write-Host "Create a scene named: " -NoNewline
-    Write-Host "$InstanceName" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "3. " -NoNewline -ForegroundColor Cyan
-    Write-Host "Add sources to your scene:"
-    Write-Host "   - Media Source: " -NoNewline -ForegroundColor Gray
-    Write-Host "${InstanceName}_video" -ForegroundColor Yellow
-    Write-Host "     (uncheck 'Local File')" -ForegroundColor DarkGray
-    Write-Host "   - Text Source:  " -NoNewline -ForegroundColor Gray
-    Write-Host "${InstanceName}_title" -ForegroundColor Yellow -NoNewline
-    Write-Host " (optional)" -ForegroundColor DarkGray
-    Write-Host ""
-    Write-Host "4. " -NoNewline -ForegroundColor Cyan
-    Write-Host "Configure in script properties:"
-    Write-Host "   - Set your YouTube Playlist URL" -ForegroundColor Gray
-    Write-Host "   - Optionally add Gemini API key for better metadata" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "Documentation: " -NoNewline
-    Write-Host "https://github.com/$RepoOwner/$RepoName#readme" -ForegroundColor Blue
-    Write-Host ""
-}
+#region User Prompts
 
 function Confirm-Installation {
     param(
@@ -255,7 +510,7 @@ function Confirm-Installation {
 
 function Request-CustomPath {
     Write-Host ""
-    Write-Error "Could not detect OBS installation automatically."
+    Write-ErrorMsg "Could not detect OBS installation automatically."
     Write-Host ""
     Write-Host "Please enter the path to your OBS installation folder" -ForegroundColor White
     Write-Host "(e.g., C:\OBS-Studio-Portable or C:\Program Files\obs-studio):" -ForegroundColor Gray
@@ -264,19 +519,120 @@ function Request-CustomPath {
     $customPath = Read-Host "OBS Path"
 
     if ([string]::IsNullOrWhiteSpace($customPath)) {
-        Write-Error "No path provided. Installation cancelled."
+        Write-ErrorMsg "No path provided. Installation cancelled."
         return $null
     }
 
     if (-not (Test-Path $customPath)) {
-        Write-Error "Path does not exist: $customPath"
+        Write-ErrorMsg "Path does not exist: $customPath"
         return $null
     }
 
     return $customPath
 }
 
-# Main installation logic
+function Request-PlaylistURL {
+    Write-Host ""
+    Write-Host "Enter your YouTube playlist URL" -ForegroundColor White
+    Write-Host "(e.g., https://www.youtube.com/playlist?list=PLxxxxx):" -ForegroundColor Gray
+    Write-Host "(Press Enter to skip and configure later)" -ForegroundColor DarkGray
+    Write-Host ""
+
+    $url = Read-Host "Playlist URL"
+    return $url
+}
+
+#endregion
+
+#region Post-Install
+
+function Show-ManualInstructions {
+    param(
+        [string]$ScriptPath
+    )
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host "  Manual Setup Required" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "OBS is not running or WebSocket is not available." -ForegroundColor White
+    Write-Host "Please complete these steps manually:" -ForegroundColor White
+    Write-Host ""
+    Write-Host "1. " -NoNewline -ForegroundColor Cyan
+    Write-Host "Open OBS Studio"
+    Write-Host ""
+    Write-Host "2. " -NoNewline -ForegroundColor Cyan
+    Write-Host "Add the script:"
+    Write-Host "   Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
+    Write-Host "   $ScriptPath\ytplay.py" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "3. " -NoNewline -ForegroundColor Cyan
+    Write-Host "Create a scene named: " -NoNewline
+    Write-Host "$InstanceName" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "4. " -NoNewline -ForegroundColor Cyan
+    Write-Host "Add sources to your scene:"
+    Write-Host "   - Media Source: " -NoNewline -ForegroundColor Gray
+    Write-Host "${InstanceName}_video" -ForegroundColor Yellow
+    Write-Host "     (uncheck 'Local File')" -ForegroundColor DarkGray
+    Write-Host "   - Text Source:  " -NoNewline -ForegroundColor Gray
+    Write-Host "${InstanceName}_title" -ForegroundColor Yellow -NoNewline
+    Write-Host " (optional)" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "5. " -NoNewline -ForegroundColor Cyan
+    Write-Host "Configure in script properties:"
+    Write-Host "   - Set your YouTube Playlist URL" -ForegroundColor Gray
+    Write-Host ""
+}
+
+function Show-SuccessMessage {
+    param(
+        [string]$ScriptPath,
+        [bool]$AutoConfigured,
+        [string]$PlaylistURL
+    )
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "  Installation Complete!" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+
+    if ($AutoConfigured) {
+        Write-Success "Scene '$InstanceName' created with sources"
+        Write-Host ""
+        Write-Host "Remaining step in OBS Studio:" -ForegroundColor White
+        Write-Host ""
+        Write-Host "1. " -NoNewline -ForegroundColor Cyan
+        Write-Host "Add the script:"
+        Write-Host "   Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
+        Write-Host "   $ScriptPath\ytplay.py" -ForegroundColor Yellow
+
+        if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
+            Write-Host ""
+            Write-Host "2. " -NoNewline -ForegroundColor Cyan
+            Write-Host "Set playlist URL in script properties:" -ForegroundColor White
+            Write-Host "   $PlaylistURL" -ForegroundColor Yellow
+        } else {
+            Write-Host ""
+            Write-Host "2. " -NoNewline -ForegroundColor Cyan
+            Write-Host "Configure playlist URL in script properties" -ForegroundColor White
+        }
+    } else {
+        Show-ManualInstructions -ScriptPath $ScriptPath
+    }
+
+    Write-Host ""
+    Write-Host "Documentation: " -NoNewline
+    Write-Host "https://github.com/$RepoOwner/$RepoName#readme" -ForegroundColor Blue
+    Write-Host ""
+}
+
+#endregion
+
+#region Main Installation
+
 function Install-OBSYouTubePlayer {
     Write-Header
 
@@ -318,10 +674,8 @@ function Install-OBSYouTubePlayer {
             return
         }
 
-        # Determine if custom path is portable
         $isPortable = Test-PortableOBS $customPath
         if (-not $isPortable) {
-            # Might be a system-style install in custom location
             Write-Info "Treating as system-style installation"
         }
 
@@ -335,21 +689,75 @@ function Install-OBSYouTubePlayer {
     Write-Info $scriptsDir
     Write-Host ""
 
-    # Create scripts directory if needed
     if (-not (Test-Path $scriptsDir)) {
         Write-Step "Creating scripts directory..."
         New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
     }
 
-    # Step 5: Download and install
+    # Step 5: Download and install files
     try {
         $installedPath = Download-Repository -DestinationPath $scriptsDir
-        Show-PostInstallInstructions -ScriptPath $installedPath
     } catch {
-        Write-Error "Installation failed: $_"
+        Write-ErrorMsg "Installation failed: $_"
         return
     }
+
+    # Step 6: Ask for playlist URL
+    $playlistURL = Request-PlaylistURL
+
+    # Step 7: Try to configure OBS via WebSocket
+    $autoConfigured = $false
+
+    Write-Host ""
+    Write-Step "Checking if OBS is running..."
+
+    if (Test-OBSRunning) {
+        Write-Success "OBS is running"
+        Write-Step "Connecting to OBS WebSocket..."
+
+        $ws = Connect-OBSWebSocket
+
+        if ($ws) {
+            Write-Success "Connected to OBS WebSocket"
+            Write-Step "Creating scene and sources..."
+
+            try {
+                # Create scene
+                if (New-OBSScene -WebSocket $ws -SceneName $InstanceName) {
+                    Write-Success "Scene '$InstanceName' ready"
+                }
+
+                # Create media source
+                if (New-OBSMediaSource -WebSocket $ws -SceneName $InstanceName -SourceName "${InstanceName}_video") {
+                    Write-Success "Media source '${InstanceName}_video' ready"
+                }
+
+                # Create text source
+                if (New-OBSTextSource -WebSocket $ws -SceneName $InstanceName -SourceName "${InstanceName}_title") {
+                    Write-Success "Text source '${InstanceName}_title' ready"
+                }
+
+                $autoConfigured = $true
+
+            } catch {
+                Write-Warning "Could not fully configure OBS: $_"
+            } finally {
+                Close-OBSWebSocket
+            }
+        } else {
+            Write-Warning "Could not connect to OBS WebSocket"
+            Write-Info "Make sure WebSocket is enabled: Tools -> WebSocket Server Settings"
+            Write-Info "OBS 28+ has WebSocket built-in, older versions need obs-websocket plugin"
+        }
+    } else {
+        Write-Info "OBS is not running"
+    }
+
+    # Step 8: Show completion message
+    Show-SuccessMessage -ScriptPath $installedPath -AutoConfigured $autoConfigured -PlaylistURL $playlistURL
 }
 
 # Run the installer
 Install-OBSYouTubePlayer
+
+#endregion
