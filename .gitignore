@@ -70,3 +70,4 @@ test*.py
 
 # Multi-instance folders
 yt-player-*/
+.coverage
