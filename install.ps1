@@ -318,6 +318,49 @@ function Close-OBSWebSocket {
 
 #region OBS Configuration Functions
 
+function Enable-OBSWebSocket {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    try {
+        # Determine config path
+        if ($IsPortable) {
+            $configDir = Join-Path $OBSPath "config\obs-studio\plugin_config\obs-websocket"
+        } else {
+            $configDir = Join-Path $env:APPDATA "obs-studio\plugin_config\obs-websocket"
+        }
+
+        # Create directory if needed
+        if (-not (Test-Path $configDir)) {
+            New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        }
+
+        $configFile = Join-Path $configDir "config.json"
+
+        # Read existing config or create new
+        if (Test-Path $configFile) {
+            $config = Get-Content $configFile -Raw | ConvertFrom-Json
+        } else {
+            $config = @{}
+        }
+
+        # Enable WebSocket server
+        $config | Add-Member -NotePropertyName "server_enabled" -NotePropertyValue $true -Force
+        $config | Add-Member -NotePropertyName "server_port" -NotePropertyValue 4455 -Force
+        $config | Add-Member -NotePropertyName "alerts_enabled" -NotePropertyValue $false -Force
+
+        # Write config
+        $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
+
+        return $true
+    } catch {
+        Write-Warning "Could not enable WebSocket: $_"
+        return $false
+    }
+}
+
 function New-OBSScene {
     param(
         [System.Net.WebSockets.ClientWebSocket]$WebSocket,
@@ -726,6 +769,13 @@ function Install-OBSYouTubePlayer {
         $startOBS = Read-Host "Start OBS now to auto-configure scene/sources? (Y/n)"
 
         if ($startOBS -eq "" -or $startOBS -ieq "y" -or $startOBS -ieq "yes") {
+            # Enable WebSocket in OBS config before starting
+            Write-Step "Enabling OBS WebSocket..."
+            $wsEnabled = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
+            if ($wsEnabled) {
+                Write-Success "WebSocket enabled in OBS config"
+            }
+
             Write-Step "Starting OBS Studio..."
 
             # Find OBS executable
