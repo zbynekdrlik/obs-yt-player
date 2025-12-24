@@ -714,6 +714,10 @@ function Download-Repository {
     $instanceFolder = "yt-player-$InstanceName"
     $finalDest = Join-Path $DestinationPath $instanceFolder
 
+    # Initialize cache backup path
+    $cacheBackup = Join-Path $env:TEMP "obs-yt-player-cache-backup"
+    $cacheWasBackedUp = $false
+
     try {
         Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
         Write-Success "Download complete"
@@ -733,11 +737,11 @@ function Download-Repository {
             Write-Step "Updating existing installation..."
             # Preserve cache directory
             $cacheDir = Join-Path $finalDest "cache"
-            $cacheBackup = Join-Path $env:TEMP "obs-yt-player-cache-backup"
             if (Test-Path $cacheDir) {
                 Write-Info "Preserving cache directory..."
                 if (Test-Path $cacheBackup) { Remove-Item $cacheBackup -Recurse -Force }
                 Copy-Item -Path $cacheDir -Destination $cacheBackup -Recurse
+                $cacheWasBackedUp = $true
             }
             Remove-Item $finalDest -Recurse -Force
         }
@@ -750,7 +754,7 @@ function Download-Repository {
         Write-Info "Version $($script:InstalledVersion) recorded"
 
         # Restore cache if backed up
-        if (Test-Path $cacheBackup) {
+        if ($cacheWasBackedUp -and (Test-Path $cacheBackup)) {
             $newCacheDir = Join-Path $finalDest "cache"
             if (Test-Path $newCacheDir) { Remove-Item $newCacheDir -Recurse -Force }
             Move-Item -Path $cacheBackup -Destination $newCacheDir
