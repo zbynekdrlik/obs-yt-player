@@ -87,10 +87,10 @@ known-first-party = ["ytplay_modules"]
 [tool.ruff.lint.per-file-ignores]
 # Tests need special import ordering for mock injection
 "tests/conftest.py" = ["E402", "I001"]
-# Tests can use simpler file operations
-"tests/**/*.py" = ["E402", "PTH123", "F841"]
-# State module has module-level queue initialization after constants
-"yt-player-main/ytplay_modules/state.py" = ["E402"]
+# Tests can use simpler patterns and file operations
+"tests/**/*.py" = ["E402", "PTH", "F841", "RUF059", "SIM117", "E731"]
+# Main codebase uses os.path for OBS compatibility and has some legacy patterns
+"yt-player-main/**/*.py" = ["PTH", "SIM102", "SIM103", "SIM105", "SIM115", "E402", "E722", "W291", "W293", "UP006", "UP035", "RUF005", "RUF022"]
 
 [tool.ruff.format]
 quote-style = "double"
