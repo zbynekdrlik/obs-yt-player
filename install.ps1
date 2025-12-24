@@ -332,6 +332,8 @@ function Enable-OBSWebSocket {
             $configDir = Join-Path $env:APPDATA "obs-studio\plugin_config\obs-websocket"
         }
 
+        Write-Info "WebSocket config: $configDir"
+
         # Create directory if needed
         if (-not (Test-Path $configDir)) {
             New-Item -ItemType Directory -Path $configDir -Force | Out-Null
@@ -339,17 +341,14 @@ function Enable-OBSWebSocket {
 
         $configFile = Join-Path $configDir "config.json"
 
-        # Read existing config or create new
-        if (Test-Path $configFile) {
-            $config = Get-Content $configFile -Raw | ConvertFrom-Json
-        } else {
-            $config = @{}
+        # Create config with WebSocket enabled and NO authentication
+        $config = @{
+            server_enabled = $true
+            server_port = 4455
+            alerts_enabled = $false
+            auth_required = $false
+            server_password = ""
         }
-
-        # Enable WebSocket server
-        $config | Add-Member -NotePropertyName "server_enabled" -NotePropertyValue $true -Force
-        $config | Add-Member -NotePropertyName "server_port" -NotePropertyValue 4455 -Force
-        $config | Add-Member -NotePropertyName "alerts_enabled" -NotePropertyValue $false -Force
 
         # Write config
         $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
