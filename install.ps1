@@ -17,13 +17,15 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$InstallerVersion = "1.0.0"
-$InstallerCommit = "0af6e3f"  # Update on each commit
+$InstallerVersion = "1.1.0"
+$InstallerCommit = "975d7ce"  # Update on each commit
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $ScriptFolder = "yt-player-main"
-$InstanceName = "ytplay"
+$DefaultInstanceName = "ytplay"
+$script:InstanceName = "ytplay"  # Will be set by user
 $OBSWebSocketPort = 4455
+$DefaultInstallDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "OBS-YouTube-Player"
 
 # Global WebSocket state
 $script:wsConnection = $null
@@ -104,17 +106,10 @@ function Find-SystemOBS {
     return $null
 }
 
-function Get-ScriptsDirectory {
-    param(
-        [string]$OBSPath,
-        [bool]$IsPortable
-    )
-
-    if ($IsPortable) {
-        return Join-Path $OBSPath "scripts"
-    } else {
-        return Join-Path $env:APPDATA "obs-studio\scripts"
-    }
+function Get-InstallDirectory {
+    # Install to Documents\OBS-YouTube-Player by default
+    # Each instance goes in its own subfolder: yt-player-{name}
+    return $DefaultInstallDir
 }
 
 function Get-OBSConfigDirectory {
@@ -128,6 +123,76 @@ function Get-OBSConfigDirectory {
     } else {
         return Join-Path $env:APPDATA "obs-studio"
     }
+}
+
+function Request-InstanceName {
+    Write-Host ""
+    Write-Host "Instance name determines your scene name in OBS." -ForegroundColor Gray
+    Write-Host "Examples: ytplay, worship, music, ambient" -ForegroundColor Gray
+    Write-Host ""
+
+    $name = Read-Host "Instance name [$DefaultInstanceName]"
+
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = $DefaultInstanceName
+    }
+
+    # Validate name (alphanumeric, underscore, hyphen only)
+    if ($name -notmatch '^[a-zA-Z][a-zA-Z0-9_-]*$') {
+        Write-ErrorMsg "Invalid name. Use only letters, numbers, underscore, hyphen. Must start with letter."
+        return Request-InstanceName
+    }
+
+    return $name.ToLower()
+}
+
+function Rename-InstanceFiles {
+    param(
+        [string]$InstancePath,
+        [string]$NewName
+    )
+
+    # Skip if using default name
+    if ($NewName -eq "ytplay") {
+        return $true
+    }
+
+    try {
+        Write-Step "Renaming instance files to '$NewName'..."
+
+        # Rename main script: ytplay.py -> {name}.py
+        $oldScript = Join-Path $InstancePath "ytplay.py"
+        $newScript = Join-Path $InstancePath "$NewName.py"
+        if (Test-Path $oldScript) {
+            Move-Item -Path $oldScript -Destination $newScript -Force
+        }
+
+        # Rename modules directory: ytplay_modules -> {name}_modules
+        $oldModules = Join-Path $InstancePath "ytplay_modules"
+        $newModules = Join-Path $InstancePath "${NewName}_modules"
+        if (Test-Path $oldModules) {
+            Move-Item -Path $oldModules -Destination $newModules -Force
+        }
+
+        Write-Success "Instance renamed to '$NewName'"
+        return $true
+    } catch {
+        Write-Warning "Could not rename instance: $_"
+        return $false
+    }
+}
+
+function Get-ExistingInstances {
+    param([string]$InstallDir)
+
+    $instances = @()
+    if (Test-Path $InstallDir) {
+        Get-ChildItem -Path $InstallDir -Directory -Filter "yt-player-*" | ForEach-Object {
+            $name = $_.Name -replace '^yt-player-', ''
+            $instances += $name
+        }
+    }
+    return $instances
 }
 
 #endregion
@@ -501,18 +566,19 @@ function New-OBSTextSource {
         }
     }
 
-    # Create text source (GDI+ on Windows)
+    # Create text source (GDI+ on Windows) with simple settings
+    # Note: Font settings use a specific format in OBS
     $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
         sceneName = $SceneName
         inputName = $SourceName
         inputKind = "text_gdiplus_v2"
         inputSettings = @{
-            text = "YouTube Player"
-            font = @{
-                face = "Arial"
-                size = 48
-            }
+            text = ""
         }
+    }
+
+    if (-not $result.requestStatus.result) {
+        Write-Warning "Text source creation failed: $($result.requestStatus.comment)"
     }
 
     return $result.requestStatus.result
@@ -540,7 +606,10 @@ function Get-LatestRelease {
 }
 
 function Download-Repository {
-    param([string]$DestinationPath)
+    param(
+        [string]$DestinationPath,
+        [string]$InstanceName
+    )
 
     $release = Get-LatestRelease
 
@@ -558,6 +627,10 @@ function Download-Repository {
     $tempZip = Join-Path $env:TEMP "obs-yt-player-download.zip"
     $tempExtract = Join-Path $env:TEMP "obs-yt-player-extract"
 
+    # Instance folder: yt-player-{name}
+    $instanceFolder = "yt-player-$InstanceName"
+    $finalDest = Join-Path $DestinationPath $instanceFolder
+
     try {
         Invoke-WebRequest -Uri $downloadUrl -OutFile $tempZip -UseBasicParsing
         Write-Success "Download complete"
@@ -573,13 +646,30 @@ function Download-Repository {
             throw "Could not find $ScriptFolder in downloaded archive"
         }
 
-        $finalDest = Join-Path $DestinationPath $ScriptFolder
         if (Test-Path $finalDest) {
             Write-Step "Updating existing installation..."
+            # Preserve cache directory
+            $cacheDir = Join-Path $finalDest "cache"
+            $cacheBackup = Join-Path $env:TEMP "obs-yt-player-cache-backup"
+            if (Test-Path $cacheDir) {
+                Write-Info "Preserving cache directory..."
+                if (Test-Path $cacheBackup) { Remove-Item $cacheBackup -Recurse -Force }
+                Copy-Item -Path $cacheDir -Destination $cacheBackup -Recurse
+            }
             Remove-Item $finalDest -Recurse -Force
         }
 
+        # Copy template to instance folder
         Copy-Item -Path $sourcePath -Destination $finalDest -Recurse
+
+        # Restore cache if backed up
+        if (Test-Path $cacheBackup) {
+            $newCacheDir = Join-Path $finalDest "cache"
+            if (Test-Path $newCacheDir) { Remove-Item $newCacheDir -Recurse -Force }
+            Move-Item -Path $cacheBackup -Destination $newCacheDir
+            Write-Info "Cache restored"
+        }
+
         Write-Success "Files installed to: $finalDest"
 
         return $finalDest
@@ -662,6 +752,11 @@ function Show-ManualInstructions {
     )
 
     Write-Host ""
+    # Determine the script filename based on instance name
+    $scriptFile = "$($script:InstanceName).py"
+    $fullScriptPath = Join-Path $ScriptPath $scriptFile
+    $instanceName = $script:InstanceName
+
     Write-Host "========================================" -ForegroundColor Yellow
     Write-Host "  Manual Setup Required" -ForegroundColor Yellow
     Write-Host "========================================" -ForegroundColor Yellow
@@ -675,19 +770,19 @@ function Show-ManualInstructions {
     Write-Host "2. " -NoNewline -ForegroundColor Cyan
     Write-Host "Add the script:"
     Write-Host "   Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
-    Write-Host "   $ScriptPath\ytplay.py" -ForegroundColor Yellow
+    Write-Host "   $fullScriptPath" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "3. " -NoNewline -ForegroundColor Cyan
     Write-Host "Create a scene named: " -NoNewline
-    Write-Host "$InstanceName" -ForegroundColor Yellow
+    Write-Host "$instanceName" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "4. " -NoNewline -ForegroundColor Cyan
     Write-Host "Add sources to your scene:"
     Write-Host "   - Media Source: " -NoNewline -ForegroundColor Gray
-    Write-Host "${InstanceName}_video" -ForegroundColor Yellow
+    Write-Host "${instanceName}_video" -ForegroundColor Yellow
     Write-Host "     (uncheck 'Local File')" -ForegroundColor DarkGray
     Write-Host "   - Text Source:  " -NoNewline -ForegroundColor Gray
-    Write-Host "${InstanceName}_title" -ForegroundColor Yellow -NoNewline
+    Write-Host "${instanceName}_title" -ForegroundColor Yellow -NoNewline
     Write-Host " (optional)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "5. " -NoNewline -ForegroundColor Cyan
@@ -703,21 +798,28 @@ function Show-SuccessMessage {
         [string]$PlaylistURL
     )
 
+    # Determine the script filename based on instance name
+    $scriptFile = "$($script:InstanceName).py"
+    $fullScriptPath = Join-Path $ScriptPath $scriptFile
+
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
     Write-Host "  Installation Complete!" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
+    Write-Host "Instance: " -NoNewline
+    Write-Host "$($script:InstanceName)" -ForegroundColor Cyan
+    Write-Host ""
 
     if ($AutoConfigured) {
-        Write-Success "Scene '$InstanceName' created with sources"
+        Write-Success "Scene '$($script:InstanceName)' created with sources"
         Write-Host ""
         Write-Host "Remaining step in OBS Studio:" -ForegroundColor White
         Write-Host ""
         Write-Host "1. " -NoNewline -ForegroundColor Cyan
         Write-Host "Add the script:"
         Write-Host "   Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
-        Write-Host "   $ScriptPath\ytplay.py" -ForegroundColor Yellow
+        Write-Host "   $fullScriptPath" -ForegroundColor Yellow
 
         if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
             Write-Host ""
@@ -733,6 +835,8 @@ function Show-SuccessMessage {
         Show-ManualInstructions -ScriptPath $ScriptPath
     }
 
+    Write-Host ""
+    Write-Host "To add more instances, run installer again with different name." -ForegroundColor Gray
     Write-Host ""
     Write-Host "Documentation: " -NoNewline
     Write-Host "https://github.com/$RepoOwner/$RepoName#readme" -ForegroundColor Blue
@@ -792,30 +896,60 @@ function Install-OBSYouTubePlayer {
         $obsPath = $customPath
     }
 
-    # Step 4: Determine scripts directory
-    $scriptsDir = Get-ScriptsDirectory -OBSPath $obsPath -IsPortable $isPortable
+    # Step 4: Determine install directory (Documents\OBS-YouTube-Player)
+    $installDir = Get-InstallDirectory
 
-    Write-Step "Scripts will be installed to:"
-    Write-Info $scriptsDir
-    Write-Host ""
-
-    if (-not (Test-Path $scriptsDir)) {
-        Write-Step "Creating scripts directory..."
-        New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
+    # Show existing instances if any
+    $existingInstances = Get-ExistingInstances -InstallDir $installDir
+    if ($existingInstances.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Existing instances found:" -ForegroundColor Cyan
+        foreach ($inst in $existingInstances) {
+            Write-Host "  - $inst" -ForegroundColor Gray
+        }
     }
 
-    # Step 5: Download and install files
+    # Step 5: Get instance name
+    $script:InstanceName = Request-InstanceName
+
+    # Check if instance already exists
+    $instancePath = Join-Path $installDir "yt-player-$($script:InstanceName)"
+    if (Test-Path $instancePath) {
+        Write-Warning "Instance '$($script:InstanceName)' already exists"
+        $update = Read-Host "Update existing instance? (Y/n)"
+        if ($update -ine "" -and $update -ine "y" -and $update -ine "yes") {
+            Write-Info "Installation cancelled"
+            return
+        }
+    }
+
+    Write-Host ""
+    Write-Step "Scripts will be installed to:"
+    Write-Info $instancePath
+    Write-Host ""
+
+    if (-not (Test-Path $installDir)) {
+        Write-Step "Creating install directory..."
+        New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+    }
+
+    # Step 6: Download and install files
     try {
-        $installedPath = Download-Repository -DestinationPath $scriptsDir
+        $installedPath = Download-Repository -DestinationPath $installDir -InstanceName $script:InstanceName
+
+        # Rename files if not using default name
+        if ($script:InstanceName -ne "ytplay") {
+            Rename-InstanceFiles -InstancePath $installedPath -NewName $script:InstanceName
+        }
     } catch {
         Write-ErrorMsg "Installation failed: $_"
         return
     }
 
-    # Step 6: Ask for playlist URL
+    # Step 7: Ask for playlist URL
     $playlistURL = Request-PlaylistURL
 
-    # Step 7: Try to configure OBS via WebSocket
+    # Step 8: Try to configure OBS via WebSocket
     $autoConfigured = $false
 
     Write-Host ""
@@ -915,19 +1049,21 @@ function Install-OBSYouTubePlayer {
             Write-Step "Creating scene and sources..."
 
             try {
+                $instName = $script:InstanceName
+
                 # Create scene
-                if (New-OBSScene -WebSocket $ws -SceneName $InstanceName) {
-                    Write-Success "Scene '$InstanceName' ready"
+                if (New-OBSScene -WebSocket $ws -SceneName $instName) {
+                    Write-Success "Scene '$instName' ready"
                 }
 
                 # Create media source
-                if (New-OBSMediaSource -WebSocket $ws -SceneName $InstanceName -SourceName "${InstanceName}_video") {
-                    Write-Success "Media source '${InstanceName}_video' ready"
+                if (New-OBSMediaSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_video") {
+                    Write-Success "Media source '${instName}_video' ready"
                 }
 
                 # Create text source
-                if (New-OBSTextSource -WebSocket $ws -SceneName $InstanceName -SourceName "${InstanceName}_title") {
-                    Write-Success "Text source '${InstanceName}_title' ready"
+                if (New-OBSTextSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_title") {
+                    Write-Success "Text source '${instName}_title' ready"
                 }
 
                 $autoConfigured = $true
