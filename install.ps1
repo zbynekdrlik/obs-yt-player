@@ -17,6 +17,8 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
+$InstallerVersion = "1.0.0"
+$InstallerCommit = "eddb7f3"  # Update on each commit
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $ScriptFolder = "yt-player-main"
@@ -32,6 +34,7 @@ function Write-Header {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "  OBS YouTube Player Installer" -ForegroundColor Cyan
+    Write-Host "  v$InstallerVersion ($InstallerCommit)" -ForegroundColor DarkCyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
 }
