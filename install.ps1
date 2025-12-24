@@ -1131,9 +1131,9 @@ function Install-OBSYouTubePlayer {
 
                 if (Test-OBSRunning) {
                     Write-Success "OBS started successfully"
-                    # Give OBS time to fully initialize WebSocket server
-                    Write-Info "Waiting 8 seconds for WebSocket to initialize..."
-                    Start-Sleep -Seconds 8
+                    # Give OBS time to fully initialize (WebSocket + UI)
+                    Write-Info "Waiting for OBS to fully initialize..."
+                    Start-Sleep -Seconds 12
 
                     # Check again - OBS might have crashed
                     if (Test-OBSRunning) {
@@ -1164,20 +1164,45 @@ function Install-OBSYouTubePlayer {
 
             try {
                 $instName = $script:InstanceName
+                $maxRetries = 3
+                $retryDelay = 3
 
-                # Create scene
-                if (New-OBSScene -WebSocket $ws -SceneName $instName) {
-                    Write-Success "Scene '$instName' ready"
+                # Create scene (with retry)
+                $sceneCreated = $false
+                for ($i = 1; $i -le $maxRetries; $i++) {
+                    if (New-OBSScene -WebSocket $ws -SceneName $instName) {
+                        Write-Success "Scene '$instName' ready"
+                        $sceneCreated = $true
+                        break
+                    }
+                    if ($i -lt $maxRetries) {
+                        Write-Info "Waiting for OBS to be ready... (attempt $i/$maxRetries)"
+                        Start-Sleep -Seconds $retryDelay
+                    }
                 }
 
-                # Create media source
-                if (New-OBSMediaSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_video") {
-                    Write-Success "Media source '${instName}_video' ready"
-                }
+                if ($sceneCreated) {
+                    # Create media source (with retry)
+                    for ($i = 1; $i -le $maxRetries; $i++) {
+                        if (New-OBSMediaSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_video") {
+                            Write-Success "Media source '${instName}_video' ready"
+                            break
+                        }
+                        if ($i -lt $maxRetries) {
+                            Start-Sleep -Seconds $retryDelay
+                        }
+                    }
 
-                # Create text source
-                if (New-OBSTextSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_title") {
-                    Write-Success "Text source '${instName}_title' ready"
+                    # Create text source (with retry)
+                    for ($i = 1; $i -le $maxRetries; $i++) {
+                        if (New-OBSTextSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_title") {
+                            Write-Success "Text source '${instName}_title' ready"
+                            break
+                        }
+                        if ($i -lt $maxRetries) {
+                            Start-Sleep -Seconds $retryDelay
+                        }
+                    }
                 }
 
                 $autoConfigured = $true
