@@ -8,7 +8,26 @@ OBS YouTube Player is a **Windows-only OBS Studio Python script** that syncs You
 
 ## Development Commands
 
-This is an OBS Python script, not a standalone application. There is no build system, test framework, or linting configured.
+**Install dependencies:**
+```bash
+uv sync --dev
+```
+
+**Run tests:**
+```bash
+uv run pytest tests/ -v
+```
+
+**Run linting:**
+```bash
+uv run ruff check .
+uv run ruff format --check .
+```
+
+**Run type checking:**
+```bash
+uv run mypy yt-player-main/ytplay_modules
+```
 
 **Manual testing workflow:**
 1. Load `yt-player-main/ytplay.py` in OBS Studio (Tools → Scripts)
@@ -119,15 +138,27 @@ Each instance is a complete folder copy with renamed script and modules:
 
 | Module | Primary Responsibility |
 |--------|----------------------|
-| `playback_controller.py` | Main loop, video start/stop, source verification |
-| `state_handlers.py` | Media state handling, loop restart scheduling |
+| `playback_controller.py` | Main 1s timer loop, video start/stop, source verification |
+| `state_handlers.py` | Media state handling (PLAYING/ENDED/STOPPED), loop restart |
+| `state.py` | Thread-safe global state with `_state_lock` and accessors |
 | `scene.py` | Scene activation detection, nested scene support |
 | `media_control.py` | OBS media/text source manipulation |
-| `download.py` | yt-dlp video downloading with progress |
-| `normalize.py` | FFmpeg 2-pass loudnorm processing |
+| `download.py` | yt-dlp video downloading with progress tracking |
+| `normalize.py` | FFmpeg 2-pass loudnorm processing (-14 LUFS) |
 | `gemini_metadata.py` | Google Gemini API calls with retry logic |
+| `metadata.py` | Two-tier metadata extraction (Gemini + regex fallback) |
 | `cache.py` | Cache scanning, cleanup of removed playlist items |
-| `state.py` | Thread-safe state with accessor functions |
+| `playlist.py` | Playlist sync worker, yt-dlp flat-playlist fetching |
+| `video_selector.py` | Random selection with no-repeat logic |
+| `play_history.py` | Persistent play tracking across restarts (JSON) |
+| `reprocess.py` | Automatic Gemini retry for `_gf` marked files |
+| `opacity_control.py` | Title fade effects via OBS color filter |
+| `title_manager.py` | Title show/hide timing (1.5s after start, 3.5s before end) |
+| `tools.py` | yt-dlp + FFmpeg auto-download and verification |
+| `utils.py` | YouTube ID validation, filename sanitization |
+| `logger.py` | Dual logging (OBS console + file-based) |
+| `config.py` | Dynamic configuration, scene/source name derivation |
+| `playback.py` | Video processing worker thread |
 
 ## Important Patterns
 
@@ -154,3 +185,25 @@ startupinfo = subprocess.STARTUPINFO()
 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 startupinfo.wShowWindow = subprocess.SW_HIDE
 ```
+
+## Thread Safety
+
+All shared state in `state.py` is protected by `_state_lock`:
+
+```python
+# Reading state (returns copy to prevent external modification)
+def get_cached_videos():
+    with _state_lock:
+        return _cached_videos.copy()
+
+# Writing state (modify inside lock)
+def add_cached_video(video_id, info):
+    with _state_lock:
+        _cached_videos[video_id] = info
+```
+
+**Key rules:**
+- Never hold the lock while doing I/O (file reads, API calls)
+- Use accessor functions, never access `_variables` directly from other modules
+- Copy data before returning from accessors to prevent race conditions
+- The `play_history.py` persistence happens outside the lock to avoid deadlock
