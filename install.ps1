@@ -718,7 +718,9 @@ function Install-OBSYouTubePlayer {
     Write-Host ""
     Write-Step "Checking if OBS is running..."
 
-    if (-not (Test-OBSRunning)) {
+    $obsRunning = Test-OBSRunning
+
+    if (-not $obsRunning) {
         Write-Info "OBS is not running"
         Write-Host ""
         $startOBS = Read-Host "Start OBS now to auto-configure scene/sources? (Y/n)"
@@ -734,7 +736,7 @@ function Install-OBSYouTubePlayer {
 
             if (Test-Path $obsExe) {
                 Start-Process -FilePath $obsExe
-                Write-Info "Waiting for OBS to start..."
+                Write-Info "Waiting for OBS to start (up to 30 seconds)..."
 
                 # Wait for OBS to start (up to 30 seconds)
                 $waitTime = 0
@@ -746,21 +748,29 @@ function Install-OBSYouTubePlayer {
                 Write-Host ""
 
                 if (Test-OBSRunning) {
-                    Write-Success "OBS is running"
-                    # Give OBS a few more seconds to fully initialize WebSocket
-                    Write-Info "Waiting for OBS to initialize..."
-                    Start-Sleep -Seconds 5
+                    Write-Success "OBS started successfully"
+                    # Give OBS time to fully initialize WebSocket server
+                    Write-Info "Waiting 8 seconds for WebSocket to initialize..."
+                    Start-Sleep -Seconds 8
+
+                    # Check again - OBS might have crashed
+                    if (Test-OBSRunning) {
+                        $obsRunning = $true
+                    } else {
+                        Write-Warning "OBS closed unexpectedly (check for errors in OBS)"
+                    }
                 } else {
-                    Write-Warning "OBS did not start in time"
+                    Write-Warning "OBS did not start within 30 seconds"
                 }
             } else {
-                Write-Warning "Could not find OBS executable"
+                Write-Warning "Could not find OBS executable at: $obsExe"
             }
         }
+    } else {
+        $obsRunning = $true
     }
 
-    if (Test-OBSRunning) {
-        Write-Success "OBS is running"
+    if ($obsRunning -and (Test-OBSRunning)) {
         Write-Step "Connecting to OBS WebSocket..."
 
         $ws = Connect-OBSWebSocket
