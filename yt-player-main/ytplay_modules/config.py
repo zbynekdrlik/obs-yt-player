@@ -5,8 +5,25 @@ Central location for all script settings and constants.
 
 import os
 
-# Version - INCREMENT WITH EVERY CODE CHANGE
-SCRIPT_VERSION = "4.1.1"  # Fixed pre-loaded video tracking in played videos list
+
+def _read_version():
+    """Read version from VERSION file, with fallback to hardcoded version."""
+    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    version_file = os.path.join(script_dir, "VERSION")
+
+    try:
+        if os.path.exists(version_file):
+            with open(version_file, "r", encoding="utf-8") as f:
+                return f.read().strip()
+    except Exception:
+        pass
+
+    # Fallback version if VERSION file doesn't exist or can't be read
+    return "4.2.0-dev"
+
+
+# Version info
+SCRIPT_VERSION = _read_version()
 
 # Dynamic script detection - works with any script name
 # Look for .py file in parent directory that's not __init__.py

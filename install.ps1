@@ -189,10 +189,47 @@ function Get-ExistingInstances {
     if (Test-Path $InstallDir) {
         Get-ChildItem -Path $InstallDir -Directory -Filter "yt-player-*" | ForEach-Object {
             $name = $_.Name -replace '^yt-player-', ''
-            $instances += $name
+            $version = Get-InstalledVersion -InstancePath $_.FullName
+            $instances += @{
+                Name = $name
+                Path = $_.FullName
+                Version = $version
+            }
         }
     }
     return $instances
+}
+
+function Show-ExistingInstances {
+    param(
+        [array]$Instances,
+        [string]$LatestVersion
+    )
+
+    if ($Instances.Count -eq 0) {
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Existing instances:" -ForegroundColor Cyan
+
+    foreach ($inst in $Instances) {
+        $name = $inst.Name
+        $version = if ($inst.Version) { $inst.Version } else { "unknown" }
+
+        Write-Host "  - " -NoNewline
+        Write-Host "$name" -ForegroundColor White -NoNewline
+        Write-Host " (v$version)" -ForegroundColor Gray -NoNewline
+
+        # Show update indicator if newer version available
+        if ($LatestVersion -and $inst.Version -and $inst.Version -ne $LatestVersion) {
+            if ($inst.Version -notmatch "^main-") {
+                Write-Host " -> " -NoNewline -ForegroundColor DarkGray
+                Write-Host "$LatestVersion available" -ForegroundColor Yellow -NoNewline
+            }
+        }
+        Write-Host ""
+    }
 }
 
 #endregion
@@ -605,24 +642,61 @@ function Get-LatestRelease {
     }
 }
 
+function Get-InstalledVersion {
+    param([string]$InstancePath)
+
+    $versionFile = Join-Path $InstancePath "VERSION"
+    if (Test-Path $versionFile) {
+        return (Get-Content $versionFile -Raw).Trim()
+    }
+    return $null
+}
+
+function Write-VersionFile {
+    param(
+        [string]$InstancePath,
+        [string]$Version
+    )
+
+    $versionFile = Join-Path $InstancePath "VERSION"
+    $Version | Set-Content -Path $versionFile -Encoding UTF8 -NoNewline
+}
+
 function Download-Repository {
     param(
         [string]$DestinationPath,
-        [string]$InstanceName
+        [string]$InstanceName,
+        $Release = $null
     )
 
-    $release = Get-LatestRelease
+    # Use passed release or fetch if not provided
+    if (-not $Release) {
+        $Release = Get-LatestRelease
+    }
 
-    if ($release) {
-        $version = $release.tag_name
-        Write-Step "Downloading version $version..."
+    $script:InstalledVersion = $null
+
+    if ($Release) {
+        $version = $Release.tag_name
+        $script:InstalledVersion = $version
+        Write-Host ""
+        Write-Host "  Release version: " -NoNewline
+        Write-Host "$version" -ForegroundColor Green
+        Write-Host ""
         $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/tags/$version.zip"
         $extractFolder = "$RepoName-$($version.TrimStart('v'))"
     } else {
-        Write-Step "Downloading latest from main branch..."
+        $version = "main-$(Get-Date -Format 'yyyyMMdd')"
+        $script:InstalledVersion = $version
+        Write-Host ""
+        Write-Host "  Development version: " -NoNewline
+        Write-Host "$version" -ForegroundColor Yellow
+        Write-Host ""
         $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/heads/main.zip"
         $extractFolder = "$RepoName-main"
     }
+
+    Write-Step "Downloading..."
 
     $tempZip = Join-Path $env:TEMP "obs-yt-player-download.zip"
     $tempExtract = Join-Path $env:TEMP "obs-yt-player-extract"
@@ -661,6 +735,10 @@ function Download-Repository {
 
         # Copy template to instance folder
         Copy-Item -Path $sourcePath -Destination $finalDest -Recurse
+
+        # Write VERSION file with installed version
+        Write-VersionFile -InstancePath $finalDest -Version $script:InstalledVersion
+        Write-Info "Version $($script:InstalledVersion) recorded"
 
         # Restore cache if backed up
         if (Test-Path $cacheBackup) {
@@ -809,6 +887,8 @@ function Show-SuccessMessage {
     Write-Host ""
     Write-Host "Instance: " -NoNewline
     Write-Host "$($script:InstanceName)" -ForegroundColor Cyan
+    Write-Host "Version:  " -NoNewline
+    Write-Host "$($script:InstalledVersion)" -ForegroundColor Green
     Write-Host ""
 
     if ($AutoConfigured) {
@@ -899,15 +979,14 @@ function Install-OBSYouTubePlayer {
     # Step 4: Determine install directory (Documents\OBS-YouTube-Player)
     $installDir = Get-InstallDirectory
 
-    # Show existing instances if any
+    # Check for latest release version first
+    Write-Step "Checking for latest version..."
+    $release = Get-LatestRelease
+    $latestVersion = if ($release) { $release.tag_name } else { $null }
+
+    # Show existing instances with version info
     $existingInstances = Get-ExistingInstances -InstallDir $installDir
-    if ($existingInstances.Count -gt 0) {
-        Write-Host ""
-        Write-Host "Existing instances found:" -ForegroundColor Cyan
-        foreach ($inst in $existingInstances) {
-            Write-Host "  - $inst" -ForegroundColor Gray
-        }
-    }
+    Show-ExistingInstances -Instances $existingInstances -LatestVersion $latestVersion
 
     # Step 5: Get instance name
     $script:InstanceName = Request-InstanceName
@@ -915,8 +994,21 @@ function Install-OBSYouTubePlayer {
     # Check if instance already exists
     $instancePath = Join-Path $installDir "yt-player-$($script:InstanceName)"
     if (Test-Path $instancePath) {
+        $existingVersion = Get-InstalledVersion -InstancePath $instancePath
         Write-Warning "Instance '$($script:InstanceName)' already exists"
-        $update = Read-Host "Update existing instance? (Y/n)"
+
+        if ($existingVersion) {
+            Write-Host "  Current version: " -NoNewline
+            Write-Host "$existingVersion" -ForegroundColor Gray
+
+            if ($latestVersion -and $existingVersion -ne $latestVersion) {
+                Write-Host "  Latest version:  " -NoNewline
+                Write-Host "$latestVersion" -ForegroundColor Green
+            }
+        }
+
+        Write-Host ""
+        $update = Read-Host "Update this instance? (Y/n)"
         if ($update -ine "" -and $update -ine "y" -and $update -ine "yes") {
             Write-Info "Installation cancelled"
             return
@@ -935,7 +1027,7 @@ function Install-OBSYouTubePlayer {
 
     # Step 6: Download and install files
     try {
-        $installedPath = Download-Repository -DestinationPath $installDir -InstanceName $script:InstanceName
+        $installedPath = Download-Repository -DestinationPath $installDir -InstanceName $script:InstanceName -Release $release
 
         # Rename files if not using default name
         if ($script:InstanceName -ne "ytplay") {

@@ -59,6 +59,17 @@ def script_properties():
     """Define script properties shown in OBS UI."""
     props = obs.obs_properties_create()
 
+    # Version info at the top
+    obs.obs_properties_add_text(
+        props,
+        "version_info",
+        f"Version: {config.SCRIPT_VERSION}",
+        obs.OBS_TEXT_INFO,
+    )
+
+    # Separator after version
+    obs.obs_properties_add_text(props, "separator_top", "─────────────────────────────", obs.OBS_TEXT_INFO)
+
     # Playlist URL text field
     obs.obs_properties_add_text(props, "playlist_url", "YouTube Playlist URL", obs.OBS_TEXT_DEFAULT)
 
