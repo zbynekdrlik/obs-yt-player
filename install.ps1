@@ -1149,14 +1149,37 @@ function Install-OBSYouTubePlayer {
             }
         }
     } else {
-        $obsRunning = $true
+        # OBS is already running
+        Write-Success "OBS is already running"
+
+        # Check if WebSocket auth is configured
+        $wsConfig = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
+        if ($wsConfig.AuthRequired) {
+            Write-Warning "WebSocket authentication is enabled"
+            Write-Host ""
+            $script:wsPassword = Read-Host "Enter your OBS WebSocket password (or press Enter to skip auto-config)"
+            if ([string]::IsNullOrEmpty($script:wsPassword)) {
+                Write-Info "Skipping auto-configuration"
+                $obsRunning = $false
+            }
+        }
     }
 
     if ($obsRunning -and (Test-OBSRunning)) {
         Write-Step "Connecting to OBS WebSocket..."
 
-        # Use saved password if available
-        $ws = Connect-OBSWebSocket -Password $script:wsPassword
+        # Try to connect with retries
+        $ws = $null
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            $ws = Connect-OBSWebSocket -Password $script:wsPassword
+            if ($ws) {
+                break
+            }
+            if ($attempt -lt 5) {
+                Write-Info "Connection failed, retrying... ($attempt/5)"
+                Start-Sleep -Seconds 2
+            }
+        }
 
         if ($ws) {
             Write-Success "Connected to OBS WebSocket"
