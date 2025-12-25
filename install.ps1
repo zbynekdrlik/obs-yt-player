@@ -624,29 +624,27 @@ function New-OBSTextSource {
         }
     }
 
-    # Create text source (GDI+ on Windows) with simple settings
-    # Note: Font settings use a specific format in OBS
-    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
-        sceneName = $SceneName
-        inputName = $SourceName
-        inputKind = "text_gdiplus_v2"
-        inputSettings = @{
-            text = ""
+    # Try different text source types (varies by OBS version and platform)
+    $textTypes = @("text_gdiplus_v3", "text_gdiplus_v2", "text_gdiplus", "text_ft2_source_v2", "text_ft2_source")
+
+    foreach ($textType in $textTypes) {
+        $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
+            sceneName = $SceneName
+            inputName = $SourceName
+            inputKind = $textType
+            inputSettings = @{
+                text = ""
+            }
+        }
+
+        if ($result -and $result.requestStatus.result) {
+            return $true
         }
     }
 
-    if ($null -eq $result) {
-        Write-Warning "Text source creation failed: No response from OBS (timeout)"
-        return $false
-    }
-
-    if (-not $result.requestStatus.result) {
-        $errorMsg = if ($result.requestStatus.comment) { $result.requestStatus.comment } else { "Unknown error (code: $($result.requestStatus.code))" }
-        Write-Warning "Text source creation failed: $errorMsg"
-        return $false
-    }
-
-    return $true
+    # All types failed
+    Write-Warning "Text source creation failed: No compatible text source type found"
+    return $false
 }
 
 function Get-OBSCurrentSceneCollection {
@@ -666,7 +664,8 @@ function Register-OBSScript {
         [string]$OBSPath,
         [bool]$IsPortable,
         [string]$ScriptPath,
-        [string]$SceneCollectionName
+        [string]$SceneCollectionName,
+        [string]$PlaylistURL = ""
     )
 
     try {
@@ -704,10 +703,16 @@ function Register-OBSScript {
             return $true
         }
 
+        # Build script settings
+        $scriptSettings = [PSCustomObject]@{}
+        if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
+            $scriptSettings | Add-Member -NotePropertyName "playlist_url" -NotePropertyValue $PlaylistURL -Force
+        }
+
         # Add script entry
         $scriptEntry = [PSCustomObject]@{
             path = $ScriptPath
-            settings = [PSCustomObject]@{}
+            settings = $scriptSettings
         }
 
         # Convert to array if needed and add
@@ -1007,7 +1012,7 @@ function Show-SuccessMessage {
     if ($AutoConfigured -and $ScriptRegistered) {
         Write-Success "OBS fully configured!"
         Write-Host ""
-        Write-Host "Next steps:" -ForegroundColor White
+        Write-Host "Next step:" -ForegroundColor White
         Write-Host ""
         Write-Host "1. " -NoNewline -ForegroundColor Cyan
         Write-Host "Restart OBS Studio " -NoNewline
@@ -1015,9 +1020,8 @@ function Show-SuccessMessage {
 
         if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
             Write-Host ""
-            Write-Host "2. " -NoNewline -ForegroundColor Cyan
-            Write-Host "Set playlist URL in script properties (Tools > Scripts):" -ForegroundColor White
-            Write-Host "   $PlaylistURL" -ForegroundColor Yellow
+            Write-Host "Playlist URL configured: " -NoNewline -ForegroundColor Gray
+            Write-Host "$PlaylistURL" -ForegroundColor Green
         } else {
             Write-Host ""
             Write-Host "2. " -NoNewline -ForegroundColor Cyan
@@ -1366,7 +1370,7 @@ function Install-OBSYouTubePlayer {
                     $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
                     if ($sceneCollection) {
                         $scriptFilePath = Join-Path $installedPath "$instName.py"
-                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection) {
+                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
                             Write-Success "Script registered (restart OBS to load)"
                             $scriptRegistered = $true
                         } else {
@@ -1489,7 +1493,7 @@ function Install-OBSYouTubePlayer {
                                     $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
                                     if ($sceneCollection) {
                                         $scriptFilePath = Join-Path $installedPath "$instName.py"
-                                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection) {
+                                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
                                             Write-Success "Script registered (restart OBS to load)"
                                             $scriptRegistered = $true
                                         }
