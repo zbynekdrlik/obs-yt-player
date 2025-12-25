@@ -37,9 +37,10 @@ class TestScriptVersion:
     """Tests for SCRIPT_VERSION constant."""
 
     def test_version_format(self):
-        """Version should be in semantic versioning format (X.Y.Z)."""
-        pattern = r"^\d+\.\d+\.\d+$"
-        assert re.match(pattern, SCRIPT_VERSION), f"Version '{SCRIPT_VERSION}' doesn't match X.Y.Z format"
+        """Version should be in semantic versioning format (X.Y.Z or X.Y.Z-suffix)."""
+        # Allow X.Y.Z or X.Y.Z-suffix (e.g., 4.2.0-dev, 1.0.0-alpha, 2.0.0-rc1)
+        pattern = r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$"
+        assert re.match(pattern, SCRIPT_VERSION), f"Version '{SCRIPT_VERSION}' doesn't match semver format"
 
     def test_version_is_string(self):
         """Version should be a string."""

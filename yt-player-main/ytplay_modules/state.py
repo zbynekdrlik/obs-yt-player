@@ -31,6 +31,7 @@ _first_video_played = False  # Track if first video has been played (for single/
 _current_video_path = None
 _current_playback_video_id = None
 _loop_video_id = None  # Video ID to loop in loop mode
+_playback_started_time = None  # Timestamp when playback was started (for grace period)
 
 # Data structures
 _cached_videos = {}  # {video_id: {"path": str, "song": str, "artist": str, "normalized": bool}}
@@ -251,6 +252,19 @@ def set_loop_video_id(video_id):
     global _loop_video_id
     with _state_lock:
         _loop_video_id = video_id
+
+
+def get_playback_started_time():
+    """Get the timestamp when playback was started."""
+    with _state_lock:
+        return _playback_started_time
+
+
+def set_playback_started_time(timestamp):
+    """Set the timestamp when playback was started."""
+    global _playback_started_time
+    with _state_lock:
+        _playback_started_time = timestamp
 
 
 # ===== DATA STRUCTURE ACCESSORS =====
