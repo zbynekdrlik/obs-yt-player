@@ -405,7 +405,8 @@ function Send-OBSRequest {
     } | ConvertTo-Json -Depth 10 -Compress
 
     Send-WebSocketMessage -WebSocket $WebSocket -Message $request
-    $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 10000
+    Start-Sleep -Milliseconds 100  # Small delay for OBS to process
+    $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 15000
 
     if ($response -and $response.op -eq 7 -and $response.d.requestId -eq $requestId) {
         return $response.d
@@ -643,8 +644,23 @@ function New-OBSTextSource {
         }
     }
 
+    # If kind detection failed, try common types directly
     if (-not $textKind) {
-        Write-Warning "Text source creation failed: No text input kind found in OBS"
+        $fallbackTypes = @("text_gdiplus_v2", "text_gdiplus_v3", "text_gdiplus", "text_ft2_source_v2", "text_ft2_source")
+        foreach ($tryKind in $fallbackTypes) {
+            $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
+                sceneName = $SceneName
+                inputName = $SourceName
+                inputKind = $tryKind
+                inputSettings = @{
+                    text = ""
+                }
+            }
+            if ($result -and $result.requestStatus.result) {
+                return $true
+            }
+        }
+        Write-Warning "Text source creation failed: No compatible text source type found"
         return $false
     }
 
@@ -1405,6 +1421,9 @@ function Install-OBSYouTubePlayer {
                 $textCreated = $false
 
                 if ($sceneCreated) {
+                    # Give OBS time to fully register the scene before creating sources
+                    Start-Sleep -Seconds 2
+
                     # Create media source (with retry)
                     for ($i = 1; $i -le $maxRetries; $i++) {
                         if (New-OBSMediaSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_video") {
