@@ -307,17 +307,49 @@ class TestHandleNoneState:
         assert is_playing() is False
 
     def test_resets_playing_when_no_media_but_playing_state(self):
-        """Should reset playing state when no media but state says playing."""
-        from ytplay_modules.state import is_playing, set_playing, set_scene_active
+        """Should reset playing state when no media but state says playing (after grace period)."""
+        import time
+
+        from ytplay_modules.state import (
+            is_playing,
+            set_playback_started_time,
+            set_playing,
+            set_scene_active,
+        )
         from ytplay_modules.state_handlers import handle_none_state
 
         obs.reset()
         set_scene_active(True)
         set_playing(True)
+        # Set playback started time to 10 seconds ago (past the 5s grace period)
+        set_playback_started_time(time.time() - 10.0)
 
         handle_none_state()
 
         assert is_playing() is False
+
+    def test_does_not_reset_playing_during_grace_period(self):
+        """Should not reset playing state during media loading grace period."""
+        import time
+
+        from ytplay_modules.state import (
+            is_playing,
+            set_playback_started_time,
+            set_playing,
+            set_scene_active,
+        )
+        from ytplay_modules.state_handlers import handle_none_state
+
+        obs.reset()
+        set_scene_active(True)
+        set_playing(True)
+        # Set playback started time to 1 second ago (within the 5s grace period)
+        set_playback_started_time(time.time() - 1.0)
+
+        handle_none_state()
+
+        # Should still be playing because we're within the grace period
+        assert is_playing() is True
 
 
 class TestScheduleLoopRestart:

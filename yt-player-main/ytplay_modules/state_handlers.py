@@ -3,6 +3,8 @@ Playback state handlers.
 Handles different media states: playing, ended, stopped, none.
 """
 
+import time
+
 import obspython as obs
 
 from .config import MEDIA_SOURCE_NAME, PLAYBACK_MODE_LOOP, PLAYBACK_MODE_SINGLE
@@ -14,6 +16,7 @@ from .state import (
     get_current_playback_video_id,
     get_loop_video_id,
     get_playback_mode,
+    get_playback_started_time,
     is_first_video_played,
     is_playing,
     is_scene_active,
@@ -342,7 +345,17 @@ def handle_none_state():
 
             start_next_video()
     elif is_scene_active() and is_playing():
-        # This shouldn't happen - playing but no media?
+        # Check if we're within the grace period (media may still be loading)
+        # OBS takes time to load media after we set the source path
+        playback_started = get_playback_started_time()
+        if playback_started:
+            grace_period = 5.0  # 5 seconds for media to load
+            elapsed = time.time() - playback_started
+            if elapsed < grace_period:
+                # Still within grace period, media may be loading
+                return
+
+        # Past grace period but no media - this is an error
         log("WARNING: Playing state but no media loaded - resetting state")
         set_playing(False)
 

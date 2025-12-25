@@ -3,6 +3,8 @@ Main playback controller.
 Coordinates playback operations and manages the controller timer.
 """
 
+import time
+
 import obspython as obs
 
 from .config import (
@@ -42,6 +44,7 @@ from .state import (
     set_current_video_path,
     set_first_video_played,
     set_loop_video_id,
+    set_playback_started_time,
     set_playing,
     should_stop_threads,
 )
@@ -298,6 +301,7 @@ def start_specific_video(video_id):
 
         # Update playback state
         set_playing(True)
+        set_playback_started_time(time.time())  # Track when playback started for grace period
         set_current_video_path(video_info["path"])
         set_current_playback_video_id(video_id)
 
@@ -363,6 +367,7 @@ def start_next_video():
 
         # Update playback state
         set_playing(True)
+        set_playback_started_time(time.time())  # Track when playback started for grace period
         set_current_video_path(video_info["path"])
         set_current_playback_video_id(video_id)
 
