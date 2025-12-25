@@ -1327,9 +1327,9 @@ function Install-OBSYouTubePlayer {
 
                 if (Test-OBSRunning) {
                     Write-Success "OBS started successfully"
-                    # Give OBS time to fully initialize (WebSocket + UI)
+                    # Give OBS time to fully initialize (WebSocket + UI + internal state)
                     Write-Info "Waiting for OBS to fully initialize..."
-                    Start-Sleep -Seconds 12
+                    Start-Sleep -Seconds 20
 
                     # Check again - OBS might have crashed
                     if (Test-OBSRunning) {
@@ -1383,8 +1383,8 @@ function Install-OBSYouTubePlayer {
 
             try {
                 $instName = $script:InstanceName
-                $maxRetries = 5
-                $retryDelay = 2
+                $maxRetries = 8
+                $retryDelay = 3
 
                 # Create scene (with retry)
                 $sceneCreated = $false
