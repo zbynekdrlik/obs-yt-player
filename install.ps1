@@ -18,7 +18,7 @@ $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
 $InstallerVersion = "1.1.0"
-$InstallerCommit = "fd72ba6"  # Update on each commit
+$InstallerCommit = "74d6b93"  # Update on each commit
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "feature/powershell-installer"  # Branch to download from (when no release)
