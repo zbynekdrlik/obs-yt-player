@@ -405,8 +405,8 @@ function Send-OBSRequest {
     } | ConvertTo-Json -Depth 10 -Compress
 
     Send-WebSocketMessage -WebSocket $WebSocket -Message $request
-    Start-Sleep -Milliseconds 100  # Small delay for OBS to process
-    $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 15000
+    Start-Sleep -Milliseconds 200  # Delay for OBS to process
+    $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 20000
 
     if ($response -and $response.op -eq 7 -and $response.d.requestId -eq $requestId) {
         return $response.d
@@ -542,20 +542,38 @@ function New-OBSScene {
 
     # Check if scene exists
     $scenes = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneList"
-    if ($scenes.requestStatus.result) {
+    if ($scenes -and $scenes.requestStatus.result) {
         $existingScene = $scenes.responseData.scenes | Where-Object { $_.sceneName -eq $SceneName }
         if ($existingScene) {
             Write-Info "Scene '$SceneName' already exists"
             return $true
         }
+    } elseif (-not $scenes) {
+        # GetSceneList timed out - OBS might not be ready
+        return $false
     }
 
-    # Create scene
+    # Try to create scene
     $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateScene" -RequestData @{
         sceneName = $SceneName
     }
 
-    return $result.requestStatus.result
+    if (-not $result) {
+        return $false
+    }
+
+    # Scene created successfully
+    if ($result.requestStatus.result) {
+        return $true
+    }
+
+    # If creation failed because scene already exists (code 601), treat as success
+    if ($result.requestStatus.code -eq 601) {
+        Write-Info "Scene '$SceneName' already exists"
+        return $true
+    }
+
+    return $false
 }
 
 function New-OBSMediaSource {
