@@ -649,6 +649,82 @@ function New-OBSTextSource {
     return $true
 }
 
+function Get-OBSCurrentSceneCollection {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket
+    )
+
+    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneCollectionList"
+    if ($result -and $result.requestStatus.result) {
+        return $result.responseData.currentSceneCollectionName
+    }
+    return $null
+}
+
+function Register-OBSScript {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable,
+        [string]$ScriptPath,
+        [string]$SceneCollectionName
+    )
+
+    try {
+        # Determine scenes directory
+        if ($IsPortable) {
+            $scenesDir = Join-Path $OBSPath "config\obs-studio\basic\scenes"
+        } else {
+            $scenesDir = Join-Path $env:APPDATA "obs-studio\basic\scenes"
+        }
+
+        # Find scene collection file
+        $sceneFile = Join-Path $scenesDir "$SceneCollectionName.json"
+        if (-not (Test-Path $sceneFile)) {
+            Write-Warning "Scene collection file not found: $sceneFile"
+            return $false
+        }
+
+        # Read and parse JSON
+        $content = Get-Content $sceneFile -Raw -Encoding UTF8
+        $sceneData = $content | ConvertFrom-Json
+
+        # Check if modules array exists, create if not
+        if (-not $sceneData.PSObject.Properties['modules']) {
+            $sceneData | Add-Member -NotePropertyName "modules" -NotePropertyValue @{
+                scripts-tool = @()
+            } -Force
+        } elseif (-not $sceneData.modules.PSObject.Properties['scripts-tool']) {
+            $sceneData.modules | Add-Member -NotePropertyName "scripts-tool" -NotePropertyValue @() -Force
+        }
+
+        # Check if script already registered
+        $existingScript = $sceneData.modules.'scripts-tool' | Where-Object { $_.path -eq $ScriptPath }
+        if ($existingScript) {
+            Write-Info "Script already registered in OBS"
+            return $true
+        }
+
+        # Add script entry
+        $scriptEntry = [PSCustomObject]@{
+            path = $ScriptPath
+            settings = [PSCustomObject]@{}
+        }
+
+        # Convert to array if needed and add
+        $scripts = @($sceneData.modules.'scripts-tool')
+        $scripts += $scriptEntry
+        $sceneData.modules.'scripts-tool' = $scripts
+
+        # Write back to file
+        $sceneData | ConvertTo-Json -Depth 20 | Set-Content $sceneFile -Encoding UTF8
+
+        return $true
+    } catch {
+        Write-Warning "Failed to register script: $_"
+        return $false
+    }
+}
+
 #endregion
 
 #region Download Functions
@@ -909,6 +985,7 @@ function Show-SuccessMessage {
     param(
         [string]$ScriptPath,
         [bool]$AutoConfigured,
+        [bool]$ScriptRegistered = $false,
         [string]$PlaylistURL
     )
 
@@ -927,8 +1004,27 @@ function Show-SuccessMessage {
     Write-Host "$($script:InstalledVersion)" -ForegroundColor Green
     Write-Host ""
 
-    if ($AutoConfigured) {
-        Write-Success "OBS auto-configuration completed"
+    if ($AutoConfigured -and $ScriptRegistered) {
+        Write-Success "OBS fully configured!"
+        Write-Host ""
+        Write-Host "Next steps:" -ForegroundColor White
+        Write-Host ""
+        Write-Host "1. " -NoNewline -ForegroundColor Cyan
+        Write-Host "Restart OBS Studio " -NoNewline
+        Write-Host "(required to load the script)" -ForegroundColor Gray
+
+        if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
+            Write-Host ""
+            Write-Host "2. " -NoNewline -ForegroundColor Cyan
+            Write-Host "Set playlist URL in script properties (Tools > Scripts):" -ForegroundColor White
+            Write-Host "   $PlaylistURL" -ForegroundColor Yellow
+        } else {
+            Write-Host ""
+            Write-Host "2. " -NoNewline -ForegroundColor Cyan
+            Write-Host "Configure playlist URL in script properties (Tools > Scripts)" -ForegroundColor White
+        }
+    } elseif ($AutoConfigured) {
+        Write-Success "OBS scene and sources configured"
         Write-Host ""
         Write-Host "Remaining step in OBS Studio:" -ForegroundColor White
         Write-Host ""
@@ -1088,6 +1184,7 @@ function Install-OBSYouTubePlayer {
 
     # Step 8: Try to configure OBS via WebSocket
     $autoConfigured = $false
+    $scriptRegistered = $false
 
     Write-Host ""
     Write-Step "Checking if OBS is running..."
@@ -1263,6 +1360,21 @@ function Install-OBSYouTubePlayer {
                     if (-not $mediaCreated -or -not $textCreated) {
                         Write-Warning "Some sources could not be created automatically"
                     }
+
+                    # Register the script in OBS
+                    Write-Step "Registering script in OBS..."
+                    $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                    if ($sceneCollection) {
+                        $scriptFilePath = Join-Path $installedPath "$instName.py"
+                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection) {
+                            Write-Success "Script registered (restart OBS to load)"
+                            $scriptRegistered = $true
+                        } else {
+                            Write-Warning "Script registration failed - add manually via Tools > Scripts"
+                        }
+                    } else {
+                        Write-Warning "Could not get scene collection - add script manually via Tools > Scripts"
+                    }
                 } else {
                     Write-Warning "Could not create scene - OBS may need more time to initialize"
                     Write-Info "Please create the scene manually after OBS is fully loaded"
@@ -1371,6 +1483,18 @@ function Install-OBSYouTubePlayer {
                                         }
                                         if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryDelay }
                                     }
+
+                                    # Register the script in OBS
+                                    Write-Step "Registering script in OBS..."
+                                    $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                                    if ($sceneCollection) {
+                                        $scriptFilePath = Join-Path $installedPath "$instName.py"
+                                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection) {
+                                            Write-Success "Script registered (restart OBS to load)"
+                                            $scriptRegistered = $true
+                                        }
+                                    }
+
                                     $autoConfigured = $true
                                 }
                             } catch {
@@ -1395,7 +1519,7 @@ function Install-OBSYouTubePlayer {
     }
 
     # Step 9: Show completion message
-    Show-SuccessMessage -ScriptPath $installedPath -AutoConfigured $autoConfigured -PlaylistURL $playlistURL
+    Show-SuccessMessage -ScriptPath $installedPath -AutoConfigured $autoConfigured -ScriptRegistered $scriptRegistered -PlaylistURL $playlistURL
 }
 
 # Run the installer
