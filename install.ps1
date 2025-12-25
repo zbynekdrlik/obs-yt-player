@@ -441,16 +441,36 @@ function Send-OBSRequest {
         Write-Debug "Send failed for: $RequestType"
         return $null
     }
-    Start-Sleep -Milliseconds 200  # Delay for OBS to process
-    $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 20000
 
-    if ($response -and $response.op -eq 7 -and $response.d.requestId -eq $requestId) {
-        $success = $response.d.requestStatus.result
-        $code = $response.d.requestStatus.code
-        Write-Debug "Response: $RequestType -> success=$success, code=$code"
-        return $response.d
+    # Wait for response, skipping any events (OpCode 5) that arrive first
+    $maxAttempts = 10  # Max messages to skip before giving up
+    for ($attempt = 0; $attempt -lt $maxAttempts; $attempt++) {
+        $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 5000
+
+        if (-not $response) {
+            Write-Debug "Response: $RequestType -> TIMEOUT (attempt $($attempt + 1))"
+            continue
+        }
+
+        # Skip events (OpCode 5) - they arrive when OBS state changes
+        if ($response.op -eq 5) {
+            $eventType = $response.d.eventType
+            Write-Debug "Skipping event: $eventType"
+            continue
+        }
+
+        # Check for our response (OpCode 7)
+        if ($response.op -eq 7 -and $response.d.requestId -eq $requestId) {
+            $success = $response.d.requestStatus.result
+            $code = $response.d.requestStatus.code
+            Write-Debug "Response: $RequestType -> success=$success, code=$code"
+            return $response.d
+        }
+
+        Write-Debug "Response: $RequestType -> unexpected op=$($response.op)"
     }
-    Write-Debug "Response: $RequestType -> TIMEOUT or invalid (state: $($WebSocket.State))"
+
+    Write-Debug "Response: $RequestType -> gave up after $maxAttempts attempts (state: $($WebSocket.State))"
     return $null
 }
 
