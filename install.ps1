@@ -682,9 +682,11 @@ function New-OBSMediaSource {
         inputKind = "ffmpeg_source"
         inputSettings = @{
             local_file = ""
-            is_local_file = $false
+            is_local_file = $true  # CRITICAL: Must be true for local file playback
             looping = $false
-            restart_on_activate = $false
+            restart_on_activate = $true  # Restart video when scene becomes active
+            hw_decode = $true  # Hardware decoding for better performance
+            close_when_inactive = $true  # Release resources when not in use
         }
     }
 
