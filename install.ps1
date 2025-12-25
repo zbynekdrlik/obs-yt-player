@@ -18,7 +18,7 @@ $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
 $InstallerVersion = "1.1.0"
-$InstallerCommit = "74d6b93"  # Update on each commit
+$InstallerCommit = "53c688e"  # Update on each commit
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "feature/powershell-installer"  # Branch to download from (when no release)
@@ -664,6 +664,52 @@ function New-OBSTextSource {
     $errorMsg = if ($result.requestStatus.comment) { $result.requestStatus.comment } else { "Unknown error" }
     Write-Warning "Text source creation failed: $errorMsg"
     return $false
+}
+
+function Set-OBSSourceTransform {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket,
+        [string]$SceneName,
+        [string]$SourceName,
+        [hashtable]$Transform
+    )
+
+    # Get scene item ID
+    $items = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneItemList" -RequestData @{
+        sceneName = $SceneName
+    }
+
+    if (-not $items -or -not $items.requestStatus.result) {
+        return $false
+    }
+
+    $item = $items.responseData.sceneItems | Where-Object { $_.sourceName -eq $SourceName }
+    if (-not $item) {
+        return $false
+    }
+
+    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "SetSceneItemTransform" -RequestData @{
+        sceneName = $SceneName
+        sceneItemId = $item.sceneItemId
+        sceneItemTransform = $Transform
+    }
+
+    return ($result -and $result.requestStatus.result)
+}
+
+function Get-OBSVideoSettings {
+    param(
+        [System.Net.WebSockets.ClientWebSocket]$WebSocket
+    )
+
+    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetVideoSettings"
+    if ($result -and $result.requestStatus.result) {
+        return @{
+            Width = $result.responseData.baseWidth
+            Height = $result.responseData.baseHeight
+        }
+    }
+    return $null
 }
 
 function Get-OBSCurrentSceneCollection {
@@ -1380,6 +1426,33 @@ function Install-OBSYouTubePlayer {
                         }
                         if ($i -lt $maxRetries) {
                             Start-Sleep -Seconds $retryDelay
+                        }
+                    }
+
+                    # Position sources on canvas
+                    $videoSettings = Get-OBSVideoSettings -WebSocket $ws
+                    if ($videoSettings) {
+                        $canvasWidth = $videoSettings.Width
+                        $canvasHeight = $videoSettings.Height
+
+                        # Video: stretch to fill screen
+                        if ($mediaCreated) {
+                            Set-OBSSourceTransform -WebSocket $ws -SceneName $instName -SourceName "${instName}_video" -Transform @{
+                                boundsType = "OBS_BOUNDS_STRETCH"
+                                boundsWidth = $canvasWidth
+                                boundsHeight = $canvasHeight
+                                positionX = 0
+                                positionY = 0
+                            } | Out-Null
+                        }
+
+                        # Text: bottom center (subtitle position)
+                        if ($textCreated) {
+                            Set-OBSSourceTransform -WebSocket $ws -SceneName $instName -SourceName "${instName}_title" -Transform @{
+                                positionX = [int]($canvasWidth / 2)
+                                positionY = [int]($canvasHeight - 100)
+                                alignment = 4  # Center alignment
+                            } | Out-Null
                         }
                     }
                 }
