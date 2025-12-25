@@ -314,7 +314,7 @@ function Connect-OBSWebSocket {
             d = $identifyData
         } | ConvertTo-Json -Compress
 
-        Send-WebSocketMessage -WebSocket $clientWebSocket -Message $identifyMsg
+        $null = Send-WebSocketMessage -WebSocket $clientWebSocket -Message $identifyMsg
 
         # Receive Identified response
         $identified = Receive-WebSocketMessage -WebSocket $clientWebSocket -Timeout 5000
