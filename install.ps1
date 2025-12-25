@@ -565,12 +565,22 @@ function New-OBSMediaSource {
         [string]$SourceName
     )
 
-    # Check if source exists
+    # Check if source exists via GetInputList (more reliable than scene items)
+    $inputs = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetInputList"
+    if ($inputs -and $inputs.requestStatus.result) {
+        $existingInput = $inputs.responseData.inputs | Where-Object { $_.inputName -eq $SourceName }
+        if ($existingInput) {
+            Write-Info "Source '$SourceName' already exists"
+            return $true
+        }
+    }
+
+    # Also check scene items as fallback
     $items = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneItemList" -RequestData @{
         sceneName = $SceneName
     }
 
-    if ($items.requestStatus.result) {
+    if ($items -and $items.requestStatus.result) {
         $existingSource = $items.responseData.sceneItems | Where-Object { $_.sourceName -eq $SourceName }
         if ($existingSource) {
             Write-Info "Source '$SourceName' already exists"
@@ -612,12 +622,22 @@ function New-OBSTextSource {
         [string]$SourceName
     )
 
-    # Check if source exists
+    # Check if source exists via GetInputList (more reliable than scene items)
+    $inputs = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetInputList"
+    if ($inputs -and $inputs.requestStatus.result) {
+        $existingInput = $inputs.responseData.inputs | Where-Object { $_.inputName -eq $SourceName }
+        if ($existingInput) {
+            Write-Info "Source '$SourceName' already exists"
+            return $true
+        }
+    }
+
+    # Also check scene items as fallback
     $items = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneItemList" -RequestData @{
         sceneName = $SceneName
     }
 
-    if ($items.requestStatus.result) {
+    if ($items -and $items.requestStatus.result) {
         $existingSource = $items.responseData.sceneItems | Where-Object { $_.sourceName -eq $SourceName }
         if ($existingSource) {
             Write-Info "Source '$SourceName' already exists"
