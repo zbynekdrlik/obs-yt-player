@@ -13,7 +13,7 @@ def _read_version():
 
     try:
         if os.path.exists(version_file):
-            with open(version_file, "r", encoding="utf-8") as f:
+            with open(version_file, encoding="utf-8") as f:
                 return f.read().strip()
     except Exception:
         pass
