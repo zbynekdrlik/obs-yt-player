@@ -45,6 +45,30 @@ create_new_ytplayer.bat <instance_name>
 update_all_instances.bat
 ```
 
+## CI Verification Requirements
+
+**CRITICAL: Always verify CI passes before delivering code to the user.**
+
+After pushing changes:
+1. Run `gh run list --limit 3` to check CI status
+2. Wait for all jobs to complete (use `gh run view <id> --json status,conclusion`)
+3. If any job fails, fix immediately before asking user to test
+
+**Quality thresholds - always be stricter, never lighter:**
+- Never relax test coverage thresholds
+- Never skip or disable failing tests
+- Never ignore linting/type errors
+- Add new CI checks when gaps are discovered (e.g., PowerShell syntax checking was added after a syntax error reached the user)
+
+**CI includes:**
+- Python linting (Ruff)
+- Type checking (Mypy)
+- PowerShell syntax validation
+- Security scanning (Bandit)
+- Tests across Python 3.9-3.13 on Ubuntu and Windows
+
+Delivering broken code wastes user time and erodes trust. When in doubt, add more validation, not less.
+
 ## Architecture
 
 ### Entry Point and OBS Interface
