@@ -691,7 +691,7 @@ function Register-OBSScript {
         # Check if modules array exists, create if not
         if (-not $sceneData.PSObject.Properties['modules']) {
             $sceneData | Add-Member -NotePropertyName "modules" -NotePropertyValue @{
-                scripts-tool = @()
+                'scripts-tool' = @()
             } -Force
         } elseif (-not $sceneData.modules.PSObject.Properties['scripts-tool']) {
             $sceneData.modules | Add-Member -NotePropertyName "scripts-tool" -NotePropertyValue @() -Force
