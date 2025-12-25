@@ -38,7 +38,6 @@ function Write-Header {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "  OBS YouTube Player Installer" -ForegroundColor Cyan
-    Write-Host "  v$InstallerVersion ($InstallerCommit)" -ForegroundColor DarkCyan
     Write-Host "========================================" -ForegroundColor Cyan
     if ($script:DebugMode) {
         Write-Host "  [DEBUG MODE ENABLED]" -ForegroundColor Magenta
@@ -236,20 +235,8 @@ function Show-ExistingInstances {
 
     foreach ($inst in $Instances) {
         $name = $inst.Name
-        $version = if ($inst.Version) { $inst.Version } else { "unknown" }
-
         Write-Host "  - " -NoNewline
-        Write-Host "$name" -ForegroundColor White -NoNewline
-        Write-Host " (v$version)" -ForegroundColor Gray -NoNewline
-
-        # Show update indicator if newer version available
-        if ($LatestVersion -and $inst.Version -and $inst.Version -ne $LatestVersion) {
-            if ($inst.Version -notmatch "^main-") {
-                Write-Host " -> " -NoNewline -ForegroundColor DarkGray
-                Write-Host "$LatestVersion available" -ForegroundColor Yellow -NoNewline
-            }
-        }
-        Write-Host ""
+        Write-Host "$name" -ForegroundColor White
     }
 }
 
@@ -997,21 +984,19 @@ function Download-Repository {
         $version = $Release.tag_name
         $script:InstalledVersion = $version
         Write-Host ""
-        Write-Host "  Release version: " -NoNewline
+        Write-Host "  Installing: " -NoNewline
         Write-Host "$version" -ForegroundColor Green
         Write-Host ""
         $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/tags/$version.zip"
         $extractFolder = "$RepoName-$($version.TrimStart('v'))"
     } else {
-        # Download from configured branch
-        $branchName = $RepoBranch -replace '/', '-'  # Convert slashes for folder name
+        # Download from configured branch (development mode)
+        $branchName = $RepoBranch -replace '/', '-'
         $version = "$branchName-$(Get-Date -Format 'yyyyMMdd')"
         $script:InstalledVersion = $version
         Write-Host ""
-        Write-Host "  Development version: " -NoNewline
-        Write-Host "$version" -ForegroundColor Yellow
-        Write-Host "  Branch: " -NoNewline
-        Write-Host "$RepoBranch" -ForegroundColor Cyan
+        Write-Host "  Installing: " -NoNewline
+        Write-Host "$version (dev)" -ForegroundColor Yellow
         Write-Host ""
         $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/heads/$RepoBranch.zip"
         $extractFolder = "$RepoName-$branchName"
