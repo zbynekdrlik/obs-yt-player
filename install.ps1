@@ -590,7 +590,18 @@ function New-OBSMediaSource {
         }
     }
 
-    return $result.requestStatus.result
+    if ($null -eq $result) {
+        Write-Warning "Media source creation failed: No response from OBS (timeout)"
+        return $false
+    }
+
+    if (-not $result.requestStatus.result) {
+        $errorMsg = if ($result.requestStatus.comment) { $result.requestStatus.comment } else { "Unknown error (code: $($result.requestStatus.code))" }
+        Write-Warning "Media source creation failed: $errorMsg"
+        return $false
+    }
+
+    return $true
 }
 
 function New-OBSTextSource {
@@ -624,11 +635,18 @@ function New-OBSTextSource {
         }
     }
 
-    if (-not $result.requestStatus.result) {
-        Write-Warning "Text source creation failed: $($result.requestStatus.comment)"
+    if ($null -eq $result) {
+        Write-Warning "Text source creation failed: No response from OBS (timeout)"
+        return $false
     }
 
-    return $result.requestStatus.result
+    if (-not $result.requestStatus.result) {
+        $errorMsg = if ($result.requestStatus.comment) { $result.requestStatus.comment } else { "Unknown error (code: $($result.requestStatus.code))" }
+        Write-Warning "Text source creation failed: $errorMsg"
+        return $false
+    }
+
+    return $true
 }
 
 #endregion
