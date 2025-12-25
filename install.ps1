@@ -1565,12 +1565,16 @@ function Install-OBSYouTubePlayer {
                             } | Out-Null
                         }
 
-                        # Text: bottom center (subtitle position)
+                        # Text: bottom of screen, full width (subtitle position)
                         if ($textCreated) {
                             Set-OBSSourceTransform -WebSocket $ws -SceneName $instName -SourceName "${instName}_title" -Transform @{
-                                positionX = [int]($canvasWidth / 2)
-                                positionY = [int]($canvasHeight - 100)
-                                alignment = 4  # Center alignment
+                                positionX = 0
+                                positionY = [int]($canvasHeight - 80)
+                                boundsType = "OBS_BOUNDS_SCALE_INNER"
+                                boundsWidth = $canvasWidth
+                                boundsHeight = 80
+                                boundsAlignment = 0  # Center
+                                alignment = 9  # Bottom-left (anchor point)
                             } | Out-Null
                         }
                     }
