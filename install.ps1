@@ -715,28 +715,35 @@ function Register-OBSScript {
             $sceneData.modules | Add-Member -NotePropertyName "scripts-tool" -NotePropertyValue @() -Force
         }
 
-        # Check if script already registered
-        $existingScript = $sceneData.modules.'scripts-tool' | Where-Object { $_.path -eq $ScriptPath }
-        if ($existingScript) {
-            Write-Info "Script already registered in OBS"
-            return $true
-        }
-
         # Build script settings
         $scriptSettings = [PSCustomObject]@{}
         if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
             $scriptSettings | Add-Member -NotePropertyName "playlist_url" -NotePropertyValue $PlaylistURL -Force
         }
 
-        # Add script entry
-        $scriptEntry = [PSCustomObject]@{
-            path = $ScriptPath
-            settings = $scriptSettings
+        # Check if script already registered
+        $scripts = @($sceneData.modules.'scripts-tool')
+        $existingIndex = -1
+        for ($i = 0; $i -lt $scripts.Count; $i++) {
+            if ($scripts[$i].path -eq $ScriptPath) {
+                $existingIndex = $i
+                break
+            }
         }
 
-        # Convert to array if needed and add
-        $scripts = @($sceneData.modules.'scripts-tool')
-        $scripts += $scriptEntry
+        if ($existingIndex -ge 0) {
+            # Update existing script settings
+            Write-Info "Updating script settings..."
+            $scripts[$existingIndex].settings = $scriptSettings
+        } else {
+            # Add new script entry
+            $scriptEntry = [PSCustomObject]@{
+                path = $ScriptPath
+                settings = $scriptSettings
+            }
+            $scripts += $scriptEntry
+        }
+
         $sceneData.modules.'scripts-tool' = $scripts
 
         # Write back to file
