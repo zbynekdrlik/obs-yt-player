@@ -1256,15 +1256,127 @@ function Install-OBSYouTubePlayer {
                 Close-OBSWebSocket
             }
         } else {
-            Write-Warning "Could not connect to OBS WebSocket"
-            Write-Info "Make sure WebSocket is enabled: Tools -> WebSocket Server Settings"
-            Write-Info "OBS 28+ has WebSocket built-in, older versions need obs-websocket plugin"
+            # Connection failed - diagnose and offer retry
+            $retryConnection = $true
+            while ($retryConnection) {
+                Write-Host ""
+                Write-ErrorMsg "Could not connect to OBS WebSocket"
+                Write-Host ""
+
+                # Diagnose the issue
+                Write-Step "Diagnosing connection issue..."
+
+                $diagnosis = @()
+
+                # Check if OBS is still running
+                if (-not (Test-OBSRunning)) {
+                    $diagnosis += "OBS is not running"
+                }
+
+                # Check WebSocket config
+                $wsConfigPath = if ($isPortable) {
+                    Join-Path $obsPath "config\obs-studio\plugin_config\obs-websocket\config.json"
+                } else {
+                    Join-Path $env:APPDATA "obs-studio\plugin_config\obs-websocket\config.json"
+                }
+
+                if (Test-Path $wsConfigPath) {
+                    try {
+                        $wsConf = Get-Content $wsConfigPath -Raw | ConvertFrom-Json
+                        if ($wsConf.server_enabled -eq $false) {
+                            $diagnosis += "WebSocket server is disabled in OBS"
+                        }
+                        if ($wsConf.auth_required -eq $true -and [string]::IsNullOrEmpty($script:wsPassword)) {
+                            $diagnosis += "WebSocket requires password but none provided"
+                        }
+                    } catch {}
+                } else {
+                    $diagnosis += "WebSocket config file not found (OBS may need to run once first)"
+                }
+
+                # Show diagnosis
+                if ($diagnosis.Count -gt 0) {
+                    Write-Host ""
+                    Write-Host "Possible issues found:" -ForegroundColor Yellow
+                    foreach ($issue in $diagnosis) {
+                        Write-Host "  - $issue" -ForegroundColor Gray
+                    }
+                }
+
+                Write-Host ""
+                Write-Host "Options:" -ForegroundColor White
+                Write-Host "  1. Retry connection" -ForegroundColor Gray
+                Write-Host "  2. Enter/change WebSocket password" -ForegroundColor Gray
+                Write-Host "  3. Skip auto-configuration (manual setup)" -ForegroundColor Gray
+                Write-Host ""
+                $choice = Read-Host "Choose (1-3)"
+
+                switch ($choice) {
+                    "1" {
+                        Write-Step "Retrying connection..."
+                        Start-Sleep -Seconds 2
+                        $ws = Connect-OBSWebSocket -Password $script:wsPassword
+                        if ($ws) {
+                            Write-Success "Connected!"
+                            # Continue with source creation...
+                            $retryConnection = $false
+                            # Repeat source creation logic
+                            Write-Step "Creating scene and sources..."
+                            try {
+                                $instName = $script:InstanceName
+                                $maxRetries = 5
+                                $retryDelay = 2
+                                $sceneCreated = $false
+                                for ($i = 1; $i -le $maxRetries; $i++) {
+                                    if (New-OBSScene -WebSocket $ws -SceneName $instName) {
+                                        Write-Success "Scene '$instName' ready"
+                                        $sceneCreated = $true
+                                        break
+                                    }
+                                    if ($i -lt $maxRetries) {
+                                        Write-Info "OBS not ready, retrying... ($i/$maxRetries)"
+                                        Start-Sleep -Seconds $retryDelay
+                                    }
+                                }
+                                if ($sceneCreated) {
+                                    for ($i = 1; $i -le $maxRetries; $i++) {
+                                        if (New-OBSMediaSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_video") {
+                                            Write-Success "Media source '${instName}_video' ready"
+                                            break
+                                        }
+                                        if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryDelay }
+                                    }
+                                    for ($i = 1; $i -le $maxRetries; $i++) {
+                                        if (New-OBSTextSource -WebSocket $ws -SceneName $instName -SourceName "${instName}_title") {
+                                            Write-Success "Text source '${instName}_title' ready"
+                                            break
+                                        }
+                                        if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryDelay }
+                                    }
+                                    $autoConfigured = $true
+                                }
+                            } catch {
+                                Write-Warning "Error: $_"
+                            } finally {
+                                Close-OBSWebSocket
+                            }
+                        }
+                    }
+                    "2" {
+                        $script:wsPassword = Read-Host "Enter WebSocket password"
+                    }
+                    default {
+                        Write-Info "Skipping auto-configuration"
+                        $retryConnection = $false
+                    }
+                }
+            }
         }
     } else {
-        Write-Info "OBS is not running"
+        Write-Info "OBS is not running - skipping auto-configuration"
     }
 
-    # Step 8: Show completion message
+    # Step 9: Show completion message
     Show-SuccessMessage -ScriptPath $installedPath -AutoConfigured $autoConfigured -PlaylistURL $playlistURL
 }
 
