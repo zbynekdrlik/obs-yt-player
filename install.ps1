@@ -32,6 +32,7 @@ $DefaultInstallDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "OB
 $script:wsConnection = $null
 $script:wsMessageId = 0
 $script:wsPassword = ""
+$script:DebugMode = $env:YTPLAY_DEBUG -eq "1"
 
 function Write-Header {
     Write-Host ""
@@ -39,6 +40,9 @@ function Write-Header {
     Write-Host "  OBS YouTube Player Installer" -ForegroundColor Cyan
     Write-Host "  v$InstallerVersion ($InstallerCommit)" -ForegroundColor DarkCyan
     Write-Host "========================================" -ForegroundColor Cyan
+    if ($script:DebugMode) {
+        Write-Host "  [DEBUG MODE ENABLED]" -ForegroundColor Magenta
+    }
     Write-Host ""
 }
 
@@ -60,6 +64,13 @@ function Write-ErrorMsg {
 function Write-Info {
     param([string]$Message)
     Write-Host "    $Message" -ForegroundColor Gray
+}
+
+function Write-Debug {
+    param([string]$Message)
+    if ($script:DebugMode) {
+        Write-Host "[DEBUG] $Message" -ForegroundColor Magenta
+    }
 }
 
 function Write-Warning {
@@ -404,13 +415,18 @@ function Send-OBSRequest {
         }
     } | ConvertTo-Json -Depth 10 -Compress
 
+    Write-Debug "Sending: $RequestType"
     Send-WebSocketMessage -WebSocket $WebSocket -Message $request
     Start-Sleep -Milliseconds 200  # Delay for OBS to process
     $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 20000
 
     if ($response -and $response.op -eq 7 -and $response.d.requestId -eq $requestId) {
+        $success = $response.d.requestStatus.result
+        $code = $response.d.requestStatus.code
+        Write-Debug "Response: $RequestType -> success=$success, code=$code"
         return $response.d
     }
+    Write-Debug "Response: $RequestType -> TIMEOUT or invalid response"
     return $null
 }
 
@@ -540,9 +556,13 @@ function New-OBSScene {
         [string]$SceneName
     )
 
+    Write-Debug "New-OBSScene: Checking for scene '$SceneName'"
+
     # Check if scene exists
     $scenes = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetSceneList"
     if ($scenes -and $scenes.requestStatus.result) {
+        $sceneNames = ($scenes.responseData.scenes | ForEach-Object { $_.sceneName }) -join ", "
+        Write-Debug "New-OBSScene: Found scenes: $sceneNames"
         $existingScene = $scenes.responseData.scenes | Where-Object { $_.sceneName -eq $SceneName }
         if ($existingScene) {
             Write-Info "Scene '$SceneName' already exists"
@@ -550,20 +570,24 @@ function New-OBSScene {
         }
     } elseif (-not $scenes) {
         # GetSceneList timed out - OBS might not be ready
+        Write-Debug "New-OBSScene: GetSceneList returned null"
         return $false
     }
 
     # Try to create scene
+    Write-Debug "New-OBSScene: Creating scene '$SceneName'"
     $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateScene" -RequestData @{
         sceneName = $SceneName
     }
 
     if (-not $result) {
+        Write-Debug "New-OBSScene: CreateScene returned null"
         return $false
     }
 
     # Scene created successfully
     if ($result.requestStatus.result) {
+        Write-Debug "New-OBSScene: Scene created successfully"
         return $true
     }
 
@@ -573,6 +597,7 @@ function New-OBSScene {
         return $true
     }
 
+    Write-Debug "New-OBSScene: CreateScene failed with code $($result.requestStatus.code)"
     return $false
 }
 
