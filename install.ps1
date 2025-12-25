@@ -624,26 +624,45 @@ function New-OBSTextSource {
         }
     }
 
-    # Try different text source types (varies by OBS version and platform)
-    $textTypes = @("text_gdiplus_v3", "text_gdiplus_v2", "text_gdiplus", "text_ft2_source_v2", "text_ft2_source")
+    # Query OBS for available input kinds and find a text source type
+    $kindsResult = Send-OBSRequest -WebSocket $WebSocket -RequestType "GetInputKindList" -RequestData @{
+        unversioned = $false
+    }
 
-    foreach ($textType in $textTypes) {
-        $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
-            sceneName = $SceneName
-            inputName = $SourceName
-            inputKind = $textType
-            inputSettings = @{
-                text = ""
+    $textKind = $null
+    if ($kindsResult -and $kindsResult.requestStatus.result) {
+        $kinds = $kindsResult.responseData.inputKinds
+        # Look for text source types (prefer GDI+ on Windows, FreeType on others)
+        $textPatterns = @("text_gdiplus", "text_ft2_source")
+        foreach ($pattern in $textPatterns) {
+            $match = $kinds | Where-Object { $_ -like "$pattern*" } | Select-Object -First 1
+            if ($match) {
+                $textKind = $match
+                break
             }
-        }
-
-        if ($result -and $result.requestStatus.result) {
-            return $true
         }
     }
 
-    # All types failed
-    Write-Warning "Text source creation failed: No compatible text source type found"
+    if (-not $textKind) {
+        Write-Warning "Text source creation failed: No text input kind found in OBS"
+        return $false
+    }
+
+    $result = Send-OBSRequest -WebSocket $WebSocket -RequestType "CreateInput" -RequestData @{
+        sceneName = $SceneName
+        inputName = $SourceName
+        inputKind = $textKind
+        inputSettings = @{
+            text = ""
+        }
+    }
+
+    if ($result -and $result.requestStatus.result) {
+        return $true
+    }
+
+    $errorMsg = if ($result.requestStatus.comment) { $result.requestStatus.comment } else { "Unknown error" }
+    Write-Warning "Text source creation failed: $errorMsg"
     return $false
 }
 
