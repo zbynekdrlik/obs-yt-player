@@ -362,13 +362,19 @@ function Send-WebSocketMessage {
         [string]$Message
     )
 
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Message)
-    $segment = New-Object System.ArraySegment[byte] -ArgumentList @(,$bytes)
-    $cts = New-Object System.Threading.CancellationTokenSource
-    $cts.CancelAfter(5000)
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Message)
+        $segment = New-Object System.ArraySegment[byte] -ArgumentList @(,$bytes)
+        $cts = New-Object System.Threading.CancellationTokenSource
+        $cts.CancelAfter(5000)
 
-    $sendTask = $WebSocket.SendAsync($segment, [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $cts.Token)
-    $sendTask.Wait()
+        $sendTask = $WebSocket.SendAsync($segment, [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $cts.Token)
+        $sendTask.Wait()
+        return $true
+    } catch {
+        Write-Debug "Send-WebSocketMessage failed: $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Receive-WebSocketMessage {
@@ -403,6 +409,20 @@ function Send-OBSRequest {
         [hashtable]$RequestData = @{}
     )
 
+    # Check connection state
+    if ($WebSocket.State -ne [System.Net.WebSockets.WebSocketState]::Open) {
+        Write-Debug "WebSocket not open (state: $($WebSocket.State)), attempting reconnect..."
+        $newWs = Connect-OBSWebSocket -Password $script:wsPassword
+        if ($newWs) {
+            $script:wsConnection = $newWs
+            $WebSocket = $newWs
+            Write-Debug "Reconnected successfully"
+        } else {
+            Write-Debug "Reconnect failed"
+            return $null
+        }
+    }
+
     $script:wsMessageId++
     $requestId = "installer_$($script:wsMessageId)"
 
@@ -415,8 +435,12 @@ function Send-OBSRequest {
         }
     } | ConvertTo-Json -Depth 10 -Compress
 
-    Write-Debug "Sending: $RequestType"
-    Send-WebSocketMessage -WebSocket $WebSocket -Message $request
+    Write-Debug "Sending: $RequestType (state: $($WebSocket.State))"
+    $sendResult = Send-WebSocketMessage -WebSocket $WebSocket -Message $request
+    if (-not $sendResult) {
+        Write-Debug "Send failed for: $RequestType"
+        return $null
+    }
     Start-Sleep -Milliseconds 200  # Delay for OBS to process
     $response = Receive-WebSocketMessage -WebSocket $WebSocket -Timeout 20000
 
@@ -426,7 +450,7 @@ function Send-OBSRequest {
         Write-Debug "Response: $RequestType -> success=$success, code=$code"
         return $response.d
     }
-    Write-Debug "Response: $RequestType -> TIMEOUT or invalid response"
+    Write-Debug "Response: $RequestType -> TIMEOUT or invalid (state: $($WebSocket.State))"
     return $null
 }
 
