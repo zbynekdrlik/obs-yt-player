@@ -21,6 +21,7 @@ $InstallerVersion = "1.1.0"
 $InstallerCommit = "49444ff"  # Update on each commit
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
+$RepoBranch = "feature/powershell-installer"  # Branch to download from (when no release)
 $ScriptFolder = "yt-player-main"
 $DefaultInstanceName = "ytplay"
 $script:InstanceName = "ytplay"  # Will be set by user
@@ -695,14 +696,18 @@ function Download-Repository {
         $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/tags/$version.zip"
         $extractFolder = "$RepoName-$($version.TrimStart('v'))"
     } else {
-        $version = "main-$(Get-Date -Format 'yyyyMMdd')"
+        # Download from configured branch
+        $branchName = $RepoBranch -replace '/', '-'  # Convert slashes for folder name
+        $version = "$branchName-$(Get-Date -Format 'yyyyMMdd')"
         $script:InstalledVersion = $version
         Write-Host ""
         Write-Host "  Development version: " -NoNewline
         Write-Host "$version" -ForegroundColor Yellow
+        Write-Host "  Branch: " -NoNewline
+        Write-Host "$RepoBranch" -ForegroundColor Cyan
         Write-Host ""
-        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/heads/main.zip"
-        $extractFolder = "$RepoName-main"
+        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/heads/$RepoBranch.zip"
+        $extractFolder = "$RepoName-$branchName"
     }
 
     Write-Step "Downloading..."
