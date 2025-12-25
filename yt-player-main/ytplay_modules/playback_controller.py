@@ -453,6 +453,12 @@ def start_playback_controller():
         if _playback_timer:
             obs.timer_remove(_playback_timer)
 
+        # Check initial scene state - important if script is loaded after OBS has started
+        # The OBS_FRONTEND_EVENT_FINISHED_LOADING event may have already fired
+        from .scene import verify_initial_state
+
+        verify_initial_state()
+
         # Add new timer
         _playback_timer = playback_controller
         obs.timer_add(_playback_timer, PLAYBACK_CHECK_INTERVAL)
