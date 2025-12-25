@@ -45,6 +45,17 @@ create_new_ytplayer.bat <instance_name>
 update_all_instances.bat
 ```
 
+## Branch Strategy
+
+**Single development branch**: Always use `dev` as the only feature/fix branch.
+
+- Work on `dev` branch for all changes
+- Create PR from `dev` to `main` when ready
+- Delete `dev` after merge, recreate for next task
+- Never create multiple feature branches (no `fix/xxx`, `feature/xxx`)
+
+This project has one developer using Claude as a tool - not a multi-developer workflow.
+
 ## CI Verification Requirements
 
 **CRITICAL: Always verify CI passes before delivering code to the user.**

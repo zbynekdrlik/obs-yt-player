@@ -1030,21 +1030,36 @@ function Download-Repository {
             throw "Could not find $ScriptFolder in downloaded archive"
         }
 
+        $updateMode = $false
         if (Test-Path $finalDest) {
+            $updateMode = $true
             Write-Step "Updating existing installation..."
             # Preserve cache directory
             $cacheDir = Join-Path $finalDest "cache"
             if (Test-Path $cacheDir) {
                 Write-Info "Preserving cache directory..."
                 if (Test-Path $cacheBackup) { Remove-Item $cacheBackup -Recurse -Force }
-                Copy-Item -Path $cacheDir -Destination $cacheBackup -Recurse
+                Copy-Item -Path $cacheDir -Destination $cacheBackup -Recurse -ErrorAction SilentlyContinue
                 $cacheWasBackedUp = $true
             }
-            Remove-Item $finalDest -Recurse -Force
+            # Try to remove the old installation
+            try {
+                Remove-Item $finalDest -Recurse -Force -ErrorAction Stop
+                $updateMode = $false  # Full removal succeeded, treat as fresh install
+            } catch {
+                # Some files may be locked (e.g., log files if OBS is running)
+                Write-Warning "Some files are locked by OBS - will update in place..."
+            }
         }
 
-        # Copy template to instance folder
-        Copy-Item -Path $sourcePath -Destination $finalDest -Recurse
+        # Copy/update files
+        if ($updateMode) {
+            # Copy over existing installation (locked files will be skipped but won't fail)
+            Copy-Item -Path "$sourcePath\*" -Destination $finalDest -Recurse -Force
+        } else {
+            # Fresh install
+            Copy-Item -Path $sourcePath -Destination $finalDest -Recurse
+        }
 
         # Write VERSION file with installed version
         Write-VersionFile -InstancePath $finalDest -Version $script:InstalledVersion
@@ -1304,6 +1319,10 @@ function Install-OBSYouTubePlayer {
     $release = Get-LatestRelease
     $latestVersion = if ($release) { $release.tag_name } else { $null }
 
+    if ($latestVersion) {
+        Write-Success "Latest release: $latestVersion"
+    }
+
     # Show existing instances with version info
     $existingInstances = Get-ExistingInstances -InstallDir $installDir
     Show-ExistingInstances -Instances $existingInstances -LatestVersion $latestVersion
@@ -1332,6 +1351,20 @@ function Install-OBSYouTubePlayer {
         if ($update -ine "" -and $update -ine "y" -and $update -ine "yes") {
             Write-Info "Installation cancelled"
             return
+        }
+
+        # Check if OBS is running - it may lock files during update
+        if (Test-OBSRunning) {
+            Write-Host ""
+            Write-Warning "OBS is currently running"
+            Write-Host "  The script may have files locked that need to be updated." -ForegroundColor Gray
+            Write-Host "  Please close OBS before continuing, or unload the script." -ForegroundColor Gray
+            Write-Host ""
+            $continue = Read-Host "Continue anyway? (y/N)"
+            if ($continue -ine "y" -and $continue -ine "yes") {
+                Write-Info "Please close OBS and run the installer again"
+                return
+            }
         }
     }
 
