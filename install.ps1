@@ -751,6 +751,21 @@ function New-OBSTextSource {
         }
     }
 
+    # Default text settings for reasonable appearance
+    $defaultTextSettings = @{
+        text = ""
+        font = @{
+            face = "Arial"
+            size = 48
+            style = "Regular"
+            flags = 0
+        }
+        color = 16777215  # White (0xFFFFFF)
+        outline = $true
+        outline_color = 0  # Black
+        outline_size = 2
+    }
+
     # If kind detection failed, try common types directly
     if (-not $textKind) {
         $fallbackTypes = @("text_gdiplus_v2", "text_gdiplus_v3", "text_gdiplus", "text_ft2_source_v2", "text_ft2_source")
@@ -759,9 +774,7 @@ function New-OBSTextSource {
                 sceneName = $SceneName
                 inputName = $SourceName
                 inputKind = $tryKind
-                inputSettings = @{
-                    text = ""
-                }
+                inputSettings = $defaultTextSettings
             }
             if ($result -and $result.requestStatus.result) {
                 return $true
@@ -775,9 +788,7 @@ function New-OBSTextSource {
         sceneName = $SceneName
         inputName = $SourceName
         inputKind = $textKind
-        inputSettings = @{
-            text = ""
-        }
+        inputSettings = $defaultTextSettings
     }
 
     if ($result -and $result.requestStatus.result) {
@@ -1204,25 +1215,7 @@ function Show-SuccessMessage {
     Write-Host "$($script:InstalledVersion)" -ForegroundColor Green
     Write-Host ""
 
-    if ($AutoConfigured -and $ScriptRegistered) {
-        Write-Success "OBS fully configured!"
-        Write-Host ""
-        Write-Host "Next step:" -ForegroundColor White
-        Write-Host ""
-        Write-Host "1. " -NoNewline -ForegroundColor Cyan
-        Write-Host "Restart OBS Studio " -NoNewline
-        Write-Host "(required to load the script)" -ForegroundColor Gray
-
-        if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
-            Write-Host ""
-            Write-Host "Playlist URL configured: " -NoNewline -ForegroundColor Gray
-            Write-Host "$PlaylistURL" -ForegroundColor Green
-        } else {
-            Write-Host ""
-            Write-Host "2. " -NoNewline -ForegroundColor Cyan
-            Write-Host "Configure playlist URL in script properties (Tools > Scripts)" -ForegroundColor White
-        }
-    } elseif ($AutoConfigured) {
+    if ($AutoConfigured) {
         Write-Success "OBS scene and sources configured"
         Write-Host ""
         Write-Host "Remaining step in OBS Studio:" -ForegroundColor White
@@ -1590,20 +1583,8 @@ function Install-OBSYouTubePlayer {
                         Write-Warning "Some sources could not be created automatically"
                     }
 
-                    # Register the script in OBS
-                    Write-Step "Registering script in OBS..."
-                    $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
-                    if ($sceneCollection) {
-                        $scriptFilePath = Join-Path $installedPath "$instName.py"
-                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
-                            Write-Success "Script registered (restart OBS to load)"
-                            $scriptRegistered = $true
-                        } else {
-                            Write-Warning "Script registration failed - add manually via Tools > Scripts"
-                        }
-                    } else {
-                        Write-Warning "Could not get scene collection - add script manually via Tools > Scripts"
-                    }
+                    # Note: Script registration via JSON is unreliable, so we always show manual instructions
+                    # The scene and sources are the complex part - adding a script is just one click
                 } else {
                     Write-Warning "Could not create scene - OBS may need more time to initialize"
                     Write-Info "Please create the scene manually after OBS is fully loaded"
