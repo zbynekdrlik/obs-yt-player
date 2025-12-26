@@ -2115,50 +2115,48 @@ function Install-OBSYouTubePlayer {
         if ($restartOBS -eq "" -or $restartOBS -ieq "y" -or $restartOBS -ieq "yes") {
             # STEP 1: Close OBS FIRST (before modifying config)
             Write-Step "Closing OBS gracefully..."
-            $obsClosed = $false
+
+            # Try all methods in sequence until OBS is closed
+            $closeMethod = "none"
 
             # Method 1: Try WebSocket ExitOBS
-            try {
-                $ws = Connect-OBSWebSocket -Password $script:wsPassword
-                if ($ws) {
-                    $result = Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS"
-                    Close-OBSWebSocket
-                    if ($result -and $result.requestStatus.result -eq $true) {
+            if (Test-OBSRunning) {
+                Write-Info "Trying WebSocket close..."
+                try {
+                    $ws = Connect-OBSWebSocket -Password $script:wsPassword
+                    if ($ws) {
+                        $result = Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS"
+                        Close-OBSWebSocket
                         Start-Sleep -Seconds 3
                         if (-not (Test-OBSRunning)) {
-                            $obsClosed = $true
-                            Write-Debug "OBS closed via WebSocket"
+                            $closeMethod = "WebSocket"
                         }
-                    } else {
-                        Write-Debug "ExitOBS returned: success=$($result.requestStatus.result), code=$($result.requestStatus.code)"
                     }
+                } catch {
+                    Write-Debug "WebSocket error: $_"
                 }
-            } catch {
-                Write-Debug "WebSocket close failed: $_"
             }
 
             # Method 2: CloseMainWindow (graceful WM_CLOSE)
-            if (-not $obsClosed -and (Test-OBSRunning)) {
-                Write-Debug "Trying CloseMainWindow..."
+            if (Test-OBSRunning) {
+                Write-Info "Trying CloseMainWindow..."
                 $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
                 if ($obs) {
                     $obs.CloseMainWindow() | Out-Null
-                    $obs.WaitForExit(10000)
+                    Start-Sleep -Seconds 5
                     if (-not (Test-OBSRunning)) {
-                        $obsClosed = $true
-                        Write-Debug "OBS closed via CloseMainWindow"
+                        $closeMethod = "CloseMainWindow"
                     }
                 }
             }
 
             # Method 3: Stop-Process (force kill as last resort)
-            if (-not $obsClosed -and (Test-OBSRunning)) {
-                Write-Debug "Forcing OBS close with Stop-Process..."
+            if (Test-OBSRunning) {
+                Write-Info "Forcing OBS close..."
                 Stop-Process -Name "obs64" -Force -ErrorAction SilentlyContinue
                 Start-Sleep -Seconds 2
                 if (-not (Test-OBSRunning)) {
-                    $obsClosed = $true
-                    Write-Debug "OBS closed via Stop-Process"
+                    $closeMethod = "Stop-Process"
                 }
             }
 
@@ -2167,7 +2165,7 @@ function Install-OBSYouTubePlayer {
                 Write-Warning "Please close OBS manually and run installer again."
                 $obsRunning = $false
             } else {
-                Write-Success "OBS closed"
+                Write-Success "OBS closed (via $closeMethod)"
 
                 # STEP 2: Register script AFTER OBS is fully closed
                 Write-Step "Registering script in OBS config..."
