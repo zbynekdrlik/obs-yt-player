@@ -17,10 +17,17 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.1-dev.4"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
+
+# Fetch version from VERSION file in repo
+try {
+    $versionUrl = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/$RepoBranch/yt-player-main/VERSION"
+    $ScriptVersion = "v" + (Invoke-RestMethod -Uri $versionUrl -TimeoutSec 5).Trim()
+} catch {
+    $ScriptVersion = "v0.0.0-unknown"  # Fallback if fetch fails
+}
 $ScriptFolder = "yt-player-main"
 $DefaultInstanceName = "ytplay"
 $script:InstanceName = "ytplay"  # Will be set by user
@@ -2091,30 +2098,22 @@ function Install-OBSYouTubePlayer {
             }
         }
     } else {
-        # OBS is already running - register script and offer restart
+        # OBS is already running - must close BEFORE modifying config files
+        # (OBS overwrites config on exit, so we must close it first)
         Write-Success "OBS is already running"
-
-        # Register script first (OBS will need restart to load it)
-        Write-Step "Registering script in OBS config..."
-        $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
-        if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
-            Write-Success "Script registered with settings"
-            $scriptRegistered = $true
-        }
-
         Write-Host ""
-        Write-Warning "OBS needs to restart to load the new script"
+        Write-Warning "OBS must be closed to register the script (OBS overwrites config on exit)"
 
         $restartOBS = "Y"
         if ($script:NonInteractive) {
             $restartOBS = if ($script:EnvStartOBS) { $script:EnvStartOBS } else { "Y" }
-            Write-Info "Restart OBS: $restartOBS (non-interactive mode)"
+            Write-Info "Close and restart OBS: $restartOBS (non-interactive mode)"
         } else {
-            $restartOBS = Read-Host "Restart OBS now? (Y/n)"
+            $restartOBS = Read-Host "Close OBS, register script, and restart? (Y/n)"
         }
 
         if ($restartOBS -eq "" -or $restartOBS -ieq "y" -or $restartOBS -ieq "yes") {
-            # Graceful shutdown via WebSocket if possible
+            # STEP 1: Close OBS FIRST (before modifying config)
             Write-Step "Closing OBS gracefully..."
             try {
                 $ws = Connect-OBSWebSocket -Password $script:wsPassword
@@ -2141,10 +2140,21 @@ function Install-OBSYouTubePlayer {
             }
 
             if (Test-OBSRunning) {
-                Write-Warning "OBS did not close. Please restart manually."
+                Write-Warning "OBS did not close. Script registration may fail."
+                Write-Warning "Please close OBS manually and run installer again."
                 $obsRunning = $false
             } else {
-                # Start OBS again
+                Write-Success "OBS closed"
+
+                # STEP 2: Register script AFTER OBS is fully closed
+                Write-Step "Registering script in OBS config..."
+                $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
+                if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
+                    Write-Success "Script registered with settings"
+                    $scriptRegistered = $true
+                }
+
+                # STEP 3: Start OBS again
                 Write-Step "Starting OBS..."
                 Start-OBSProcess -OBSPath $obsPath | Out-Null
 
@@ -2164,7 +2174,7 @@ function Install-OBSYouTubePlayer {
                 }
             }
         } else {
-            Write-Info "Please restart OBS manually to load the script"
+            Write-Info "Please close OBS manually, then run installer again to register script"
             $obsRunning = $false
         }
 
