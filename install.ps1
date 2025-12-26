@@ -1406,7 +1406,14 @@ function Show-SuccessMessage {
     Write-Host "$($script:InstalledVersion)" -ForegroundColor Green
     Write-Host ""
 
-    if ($AutoConfigured) {
+    if ($AutoConfigured -and $ScriptRegistered) {
+        # Everything is done - script is registered and scene/sources created
+        Write-Success "OBS scene and sources configured automatically"
+        Write-Success "Script registered and loaded with settings"
+        Write-Host ""
+        Write-Host "Your player is ready to use!" -ForegroundColor Green
+    } elseif ($AutoConfigured) {
+        # Scene created but script not registered (shouldn't happen normally)
         Write-Success "OBS scene and sources configured automatically"
         Write-Host ""
         Write-Host "Remaining step:" -ForegroundColor White
@@ -1414,6 +1421,19 @@ function Show-SuccessMessage {
         Write-Host "  Add the script in OBS:" -ForegroundColor Gray
         Write-Host "  Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
         Write-Host "  $fullScriptPath" -ForegroundColor Yellow
+    } elseif ($ScriptRegistered) {
+        # Script registered but scene not created (OBS didn't start or WebSocket failed)
+        Write-Success "Script registered in OBS config"
+        Write-Host ""
+        Write-Host "Remaining steps:" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  1. Open OBS Studio" -ForegroundColor Gray
+        Write-Host "  2. Create scene: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($script:InstanceName)" -ForegroundColor Cyan
+        Write-Host "  3. Add Media Source: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($script:InstanceName)_video" -ForegroundColor Cyan
+        Write-Host "  4. Add Text Source: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($script:InstanceName)_title" -ForegroundColor Cyan
     } else {
         Show-ManualInstructions -ScriptPath $ScriptPath
     }
