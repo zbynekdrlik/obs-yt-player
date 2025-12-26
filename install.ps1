@@ -17,8 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$InstallerVersion = "1.1.0"
-$InstallerCommit = "f439c15"  # Update on each commit
+$ScriptVersion = "v4.3.0-dev.1"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -37,7 +36,12 @@ $script:DebugMode = $env:YTPLAY_DEBUG -eq "1"
 function Write-Header {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "  OBS YouTube Player Installer" -ForegroundColor Cyan
+    Write-Host "  OBS YouTube Player Installer " -NoNewline -ForegroundColor Cyan
+    if ($ScriptVersion -match "dev") {
+        Write-Host "[$ScriptVersion]" -ForegroundColor Yellow
+    } else {
+        Write-Host "[$ScriptVersion]" -ForegroundColor Green
+    }
     Write-Host "========================================" -ForegroundColor Cyan
     if ($script:DebugMode) {
         Write-Host "  [DEBUG MODE ENABLED]" -ForegroundColor Magenta
@@ -146,15 +150,17 @@ function Get-OBSConfigDirectory {
 }
 
 function Request-InstanceName {
+    # Use playlist name as default if available, otherwise use DefaultInstanceName
+    $defaultName = if ($script:SelectedPlaylistName) { $script:SelectedPlaylistName } else { $DefaultInstanceName }
+
     Write-Host ""
     Write-Host "Instance name determines your scene name in OBS." -ForegroundColor Gray
-    Write-Host "Examples: ytplay, worship, music, ambient" -ForegroundColor Gray
     Write-Host ""
 
-    $name = Read-Host "Instance name [$DefaultInstanceName]"
+    $name = Read-Host "Instance name [$defaultName]"
 
     if ([string]::IsNullOrWhiteSpace($name)) {
-        $name = $DefaultInstanceName
+        $name = $defaultName
     }
 
     # Validate name (alphanumeric, underscore, hyphen only)
@@ -1144,13 +1150,7 @@ function Request-PlaylistURL {
     Write-Host "Select a playlist:" -ForegroundColor White
     Write-Host ""
 
-    # Check if instance name matches any playlist for auto-selection
-    $defaultChoice = 0
     for ($i = 0; $i -lt $playlists.Count; $i++) {
-        if ($script:InstanceName -eq $playlists[$i].Name -or
-            $script:InstanceName -eq $playlists[$i].Name.Substring(2)) {  # Match without "yt" prefix
-            $defaultChoice = $i + 1
-        }
         $num = $i + 1
         $name = $playlists[$i].Name
         $desc = $playlists[$i].Desc
@@ -1164,28 +1164,31 @@ function Request-PlaylistURL {
     Write-Host "Custom URL" -ForegroundColor White
     Write-Host ""
 
-    $defaultText = if ($defaultChoice -gt 0) { " [$defaultChoice]" } else { " [1]" }
-    $choice = Read-Host "Choice$defaultText"
+    $choice = Read-Host "Choice [1]"
 
     if ([string]::IsNullOrWhiteSpace($choice)) {
-        $choice = if ($defaultChoice -gt 0) { $defaultChoice } else { 1 }
+        $choice = 1
     }
 
     $choiceNum = [int]$choice
     if ($choiceNum -ge 1 -and $choiceNum -le $playlists.Count) {
         $selected = $playlists[$choiceNum - 1]
         Write-Success "Selected: $($selected.Name)"
+        $script:SelectedPlaylistName = $selected.Name
         return $selected.URL
     } elseif ($choiceNum -eq $customNum) {
         Write-Host ""
         $url = Read-Host "Enter playlist URL"
+        $script:SelectedPlaylistName = $null
         if ([string]::IsNullOrWhiteSpace($url)) {
             Write-Warning "No URL entered, using default"
+            $script:SelectedPlaylistName = $playlists[0].Name
             return $playlists[0].URL
         }
         return $url
     } else {
         Write-Warning "Invalid choice, using default"
+        $script:SelectedPlaylistName = $playlists[0].Name
         return $playlists[0].URL
     }
 }
@@ -1368,11 +1371,14 @@ function Install-OBSYouTubePlayer {
         Write-Success "Latest release: $latestVersion"
     }
 
-    # Show existing instances with version info
+    # Step 5: Select playlist first (determines default instance name)
+    $playlistURL = Request-PlaylistURL
+
+    # Show existing instances
     $existingInstances = Get-ExistingInstances -InstallDir $installDir
     Show-ExistingInstances -Instances $existingInstances -LatestVersion $latestVersion
 
-    # Step 5: Get instance name
+    # Step 6: Get instance name (defaults to playlist name)
     $script:InstanceName = Request-InstanceName
 
     # Check if instance already exists
@@ -1436,10 +1442,7 @@ function Install-OBSYouTubePlayer {
         return
     }
 
-    # Step 7: Ask for playlist URL
-    $playlistURL = Request-PlaylistURL
-
-    # Step 8: Try to configure OBS via WebSocket
+    # Step 7: Try to configure OBS via WebSocket
     $autoConfigured = $false
     $scriptRegistered = $false
 
