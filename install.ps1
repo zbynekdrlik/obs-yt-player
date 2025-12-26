@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.1"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.2"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -895,6 +895,9 @@ function Register-OBSScript {
         if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
             $scriptSettings | Add-Member -NotePropertyName "playlist_url" -NotePropertyValue $PlaylistURL -Force
         }
+        if (-not [string]::IsNullOrEmpty($script:GeminiApiKey)) {
+            $scriptSettings | Add-Member -NotePropertyName "gemini_api_key" -NotePropertyValue $script:GeminiApiKey -Force
+        }
 
         # Check if script already registered
         $scripts = @($sceneData.modules.'scripts-tool')
@@ -1133,6 +1136,24 @@ function Request-CustomPath {
     return $customPath
 }
 
+function Request-GeminiApiKey {
+    Write-Host ""
+    Write-Host "Gemini API key (optional, for better song/artist detection)" -ForegroundColor White
+    Write-Host "Get free key at: " -NoNewline -ForegroundColor Gray
+    Write-Host "https://makersuite.google.com/app/apikey" -ForegroundColor Blue
+    Write-Host ""
+
+    $key = Read-Host "Gemini API key (Enter to skip)"
+
+    if ([string]::IsNullOrWhiteSpace($key)) {
+        Write-Info "Skipping Gemini - will use basic title parsing"
+        return $null
+    }
+
+    Write-Success "Gemini API key configured"
+    return $key
+}
+
 function Request-PlaylistURL {
     # Predefined playlists
     $playlists = @(
@@ -1266,25 +1287,13 @@ function Show-SuccessMessage {
     Write-Host ""
 
     if ($AutoConfigured) {
-        Write-Success "OBS scene and sources configured"
+        Write-Success "OBS scene and sources configured automatically"
         Write-Host ""
-        Write-Host "Remaining step in OBS Studio:" -ForegroundColor White
+        Write-Host "Remaining step:" -ForegroundColor White
         Write-Host ""
-        Write-Host "1. " -NoNewline -ForegroundColor Cyan
-        Write-Host "Add the script:"
-        Write-Host "   Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
-        Write-Host "   $fullScriptPath" -ForegroundColor Yellow
-
-        if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
-            Write-Host ""
-            Write-Host "2. " -NoNewline -ForegroundColor Cyan
-            Write-Host "Set playlist URL in script properties:" -ForegroundColor White
-            Write-Host "   $PlaylistURL" -ForegroundColor Yellow
-        } else {
-            Write-Host ""
-            Write-Host "2. " -NoNewline -ForegroundColor Cyan
-            Write-Host "Configure playlist URL in script properties" -ForegroundColor White
-        }
+        Write-Host "  Add the script in OBS:" -ForegroundColor Gray
+        Write-Host "  Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
+        Write-Host "  $fullScriptPath" -ForegroundColor Yellow
     } else {
         Show-ManualInstructions -ScriptPath $ScriptPath
     }
@@ -1373,6 +1382,9 @@ function Install-OBSYouTubePlayer {
 
     # Step 5: Select playlist first (determines default instance name)
     $playlistURL = Request-PlaylistURL
+
+    # Step 5b: Ask for Gemini API key
+    $script:GeminiApiKey = Request-GeminiApiKey
 
     # Show existing instances
     $existingInstances = Get-ExistingInstances -InstallDir $installDir
