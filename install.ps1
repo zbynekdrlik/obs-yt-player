@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.1-dev.1"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.1-dev.2"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -1069,10 +1069,13 @@ function Get-OBSSceneCollectionFromConfig {
     try {
         if ($IsPortable) {
             $globalIni = Join-Path $OBSPath "config\obs-studio\global.ini"
+            $scenesDir = Join-Path $OBSPath "config\obs-studio\basic\scenes"
         } else {
             $globalIni = Join-Path $env:APPDATA "obs-studio\global.ini"
+            $scenesDir = Join-Path $env:APPDATA "obs-studio\basic\scenes"
         }
 
+        # First, try to read from global.ini
         if (Test-Path $globalIni) {
             $content = Get-Content $globalIni -Raw
             if ($content -match 'SceneCollection=(.+)') {
@@ -1082,7 +1085,21 @@ function Get-OBSSceneCollectionFromConfig {
             }
         }
 
-        # Default to "Untitled" if not found
+        # If not in global.ini, find the most recently modified scene collection
+        # (This handles cases where OBS hasn't written to global.ini yet)
+        if (Test-Path $scenesDir) {
+            $sceneFiles = Get-ChildItem -Path $scenesDir -Filter "*.json" |
+                Where-Object { $_.Name -notmatch '\.bak$' } |
+                Sort-Object LastWriteTime -Descending
+
+            if ($sceneFiles.Count -gt 0) {
+                $mostRecent = $sceneFiles[0].BaseName
+                Write-Debug "Using most recently modified scene collection: $mostRecent"
+                return $mostRecent
+            }
+        }
+
+        # Default to "Untitled" if nothing found
         return "Untitled"
     } catch {
         return "Untitled"
