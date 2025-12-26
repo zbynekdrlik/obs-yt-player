@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.1-dev.4"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -95,6 +95,303 @@ function Write-Warning {
     param([string]$Message)
     Write-Host "[~] $Message" -ForegroundColor DarkYellow
 }
+
+#region Python Installation Functions
+
+function Find-Python311 {
+    # Look for Python 3.11 in common locations (OBS requires 3.11 specifically)
+    $searchPaths = @(
+        "C:\Python311",
+        "C:\Python\Python311",
+        "$env:LOCALAPPDATA\Programs\Python\Python311",
+        "${env:ProgramFiles}\Python311",
+        "${env:ProgramFiles(x86)}\Python311"
+    )
+
+    foreach ($path in $searchPaths) {
+        $pythonExe = Join-Path $path "python.exe"
+        $pythonDll = Join-Path $path "python311.dll"
+        if ((Test-Path $pythonExe) -and (Test-Path $pythonDll)) {
+            Write-Debug "Found Python 3.11 at: $path"
+            return $path
+        }
+    }
+
+    # Also check PATH for python 3.11
+    try {
+        $pythonPath = (Get-Command python -ErrorAction SilentlyContinue).Source
+        if ($pythonPath) {
+            $version = & python --version 2>&1
+            if ($version -match "Python 3\.11") {
+                $pythonDir = Split-Path -Parent $pythonPath
+                $pythonDll = Join-Path $pythonDir "python311.dll"
+                if (Test-Path $pythonDll) {
+                    Write-Debug "Found Python 3.11 in PATH: $pythonDir"
+                    return $pythonDir
+                }
+            }
+        }
+    } catch {}
+
+    return $null
+}
+
+function Install-Python311 {
+    Write-Step "Python 3.11 is required for OBS scripts..."
+    Write-Info "Downloading Python 3.11 installer..."
+
+    $pythonUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
+    $installerPath = Join-Path $env:TEMP "python-3.11.9-amd64.exe"
+    $installDir = "C:\Python311"
+
+    try {
+        # Download Python installer
+        Invoke-WebRequest -Uri $pythonUrl -OutFile $installerPath -UseBasicParsing
+        Write-Success "Downloaded Python 3.11"
+
+        Write-Info "Installing Python 3.11 (this may take a minute)..."
+
+        # Silent install with specific options:
+        # - InstallAllUsers=0: Install for current user only (no admin required)
+        # - TargetDir: Install to C:\Python311 (standard location OBS looks for)
+        # - PrependPath=0: Don't modify PATH (avoid conflicts)
+        # - Include_pip=1: Include pip
+        # - Include_launcher=0: Don't install py launcher (avoid conflicts)
+        $installArgs = @(
+            "/quiet",
+            "InstallAllUsers=1",
+            "TargetDir=$installDir",
+            "PrependPath=0",
+            "Include_pip=1",
+            "Include_launcher=0",
+            "Include_test=0"
+        )
+
+        $process = Start-Process -FilePath $installerPath -ArgumentList $installArgs -Wait -PassThru
+
+        if ($process.ExitCode -eq 0) {
+            Write-Success "Python 3.11 installed to $installDir"
+            return $installDir
+        } else {
+            Write-Warning "Python installer exited with code $($process.ExitCode)"
+            Write-Info "You may need to install Python 3.11 manually"
+            return $null
+        }
+    } catch {
+        Write-Warning "Failed to install Python 3.11: $_"
+        Write-Info "Please install Python 3.11 manually from python.org"
+        return $null
+    } finally {
+        if (Test-Path $installerPath) {
+            Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Configure-OBSPython {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable,
+        [string]$PythonPath
+    )
+
+    try {
+        # The Python path for OBS uses forward slashes
+        $pythonDllPath = $PythonPath.Replace('\', '/')
+
+        # Determine OBS config paths
+        if ($IsPortable) {
+            $obsConfigDir = Join-Path $OBSPath "config\obs-studio"
+        } else {
+            $obsConfigDir = Join-Path $env:APPDATA "obs-studio"
+        }
+
+        $globalIni = Join-Path $obsConfigDir "global.ini"
+        $userIni = Join-Path $obsConfigDir "user.ini"
+
+        # Helper function to update ini file Python section
+        function Update-IniPythonPath {
+            param([string]$IniPath, [string]$PyPath)
+
+            if (Test-Path $IniPath) {
+                $content = Get-Content $IniPath -Raw
+                # Remove existing Python section if present
+                $content = $content -replace '\[Python\][\r\n]+Path64bit=[^\r\n]+[\r\n]*', ''
+                # Ensure trailing newline
+                if (-not $content.EndsWith("`n")) { $content += "`n" }
+                # Add Python section
+                $content += "`n[Python]`nPath64bit=$PyPath`n"
+                Set-Content $IniPath -Value $content -NoNewline
+            } else {
+                # Create new file with Python section
+                $content = "[Python]`nPath64bit=$PyPath`n"
+                Set-Content $IniPath -Value $content -NoNewline
+            }
+        }
+
+        # Update both global.ini and user.ini (OBS reads from user.ini primarily)
+        Update-IniPythonPath -IniPath $globalIni -PyPath $pythonDllPath
+        Update-IniPythonPath -IniPath $userIni -PyPath $pythonDllPath
+
+        Write-Success "OBS Python configured: $pythonDllPath"
+        return $true
+    } catch {
+        Write-Warning "Failed to configure OBS Python: $_"
+        return $false
+    }
+}
+
+function Ensure-Python311 {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    Write-Step "Checking Python 3.11 installation..."
+
+    # First check if Python 3.11 is installed
+    $pythonPath = Find-Python311
+
+    if (-not $pythonPath) {
+        Write-Warning "Python 3.11 not found"
+
+        if ($script:NonInteractive) {
+            Write-Info "Installing Python 3.11 (non-interactive mode)"
+            $pythonPath = Install-Python311
+        } else {
+            Write-Host ""
+            Write-Host "OBS requires Python 3.11 for scripts to work." -ForegroundColor White
+            Write-Host "Would you like to install Python 3.11 now?" -ForegroundColor White
+            Write-Host ""
+            $install = Read-Host "Install Python 3.11? (Y/n)"
+            if ($install -eq "" -or $install -ieq "y" -or $install -ieq "yes") {
+                $pythonPath = Install-Python311
+            } else {
+                Write-Info "Skipping Python installation"
+                Write-Warning "Scripts will not work until Python 3.11 is installed and configured"
+                return $null
+            }
+        }
+    } else {
+        Write-Success "Python 3.11 found at: $pythonPath"
+    }
+
+    if ($pythonPath) {
+        # Configure OBS to use this Python installation
+        Write-Step "Configuring OBS to use Python 3.11..."
+        if (Configure-OBSPython -OBSPath $OBSPath -IsPortable $IsPortable -PythonPath $pythonPath) {
+            return $pythonPath
+        }
+    }
+
+    return $null
+}
+
+#endregion
+
+#region OBS Process Management
+
+function Test-IsSSHSession {
+    # Detect if we're running in an SSH session (no desktop)
+    # SSH sessions typically don't have a console window attached to explorer
+    $sshClient = $env:SSH_CLIENT
+    $sshConnection = $env:SSH_CONNECTION
+    $sshTty = $env:SSH_TTY
+
+    if ($sshClient -or $sshConnection -or $sshTty) {
+        return $true
+    }
+
+    # Also check if we're in a non-interactive session with no visible desktop
+    # This happens when running via remote PowerShell or SSH on Windows
+    $explorerProcess = Get-Process -Name "explorer" -ErrorAction SilentlyContinue
+    if (-not $explorerProcess) {
+        return $true
+    }
+
+    return $false
+}
+
+function Start-OBSViaScheduler {
+    param(
+        [string]$OBSExePath
+    )
+
+    # Create a scheduled task to start OBS in the user's desktop session
+    # This is required when running via SSH because OBS needs a desktop session
+    # CRITICAL: OBS must be started from its directory (bin\64bit) or it fails silently
+    $taskName = "YTPlayStartOBS"
+    $obsDir = Split-Path -Parent $OBSExePath
+
+    try {
+        # Delete any existing task
+        schtasks /Delete /TN $taskName /F 2>$null | Out-Null
+
+        # Create task to run OBS from its directory
+        # Use cmd /c with proper escaping for paths with spaces
+        $action = "cmd /c cd /d `"$obsDir`" && start `"`" `"$OBSExePath`""
+
+        # Create the task with /IT flag for interactive session
+        $result = schtasks /Create /TN $taskName /TR $action /SC ONCE /ST 00:00 /RU $env:USERNAME /IT /F 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Debug "Failed to create scheduled task: $result"
+            return $false
+        }
+
+        # Run the task immediately
+        $runResult = schtasks /Run /TN $taskName 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Debug "Failed to run scheduled task: $runResult"
+            return $false
+        }
+
+        # Clean up the task after a delay
+        Start-Sleep -Seconds 2
+        schtasks /Delete /TN $taskName /F 2>$null | Out-Null
+
+        return $true
+    } catch {
+        Write-Debug "Scheduler error: $_"
+        return $false
+    }
+}
+
+function Start-OBSProcess {
+    param(
+        [string]$OBSPath
+    )
+
+    # Find OBS executable
+    $obsExe = Join-Path $OBSPath "bin\64bit\obs64.exe"
+    if (-not (Test-Path $obsExe)) {
+        $obsExe = Join-Path $OBSPath "bin\32bit\obs32.exe"
+    }
+
+    if (-not (Test-Path $obsExe)) {
+        Write-Warning "Could not find OBS executable at: $OBSPath"
+        return $false
+    }
+
+    $obsDir = Split-Path -Parent $obsExe
+
+    # Check if we need to use Task Scheduler (SSH/remote session)
+    if ($script:NonInteractive -and (Test-IsSSHSession)) {
+        Write-Debug "Detected SSH session, using Task Scheduler to start OBS"
+        if (Start-OBSViaScheduler -OBSExePath $obsExe) {
+            return $true
+        } else {
+            Write-Warning "Task Scheduler method failed, trying direct start"
+        }
+    }
+
+    # Direct start (normal case)
+    Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+    return $true
+}
+
+#endregion
 
 #region OBS Detection Functions
 
@@ -889,10 +1186,13 @@ function Get-OBSSceneCollectionFromConfig {
     try {
         if ($IsPortable) {
             $globalIni = Join-Path $OBSPath "config\obs-studio\global.ini"
+            $scenesDir = Join-Path $OBSPath "config\obs-studio\basic\scenes"
         } else {
             $globalIni = Join-Path $env:APPDATA "obs-studio\global.ini"
+            $scenesDir = Join-Path $env:APPDATA "obs-studio\basic\scenes"
         }
 
+        # First, try to read from global.ini
         if (Test-Path $globalIni) {
             $content = Get-Content $globalIni -Raw
             if ($content -match 'SceneCollection=(.+)') {
@@ -902,11 +1202,88 @@ function Get-OBSSceneCollectionFromConfig {
             }
         }
 
-        # Default to "Untitled" if not found
+        # If not in global.ini, find the most recently modified scene collection
+        # (This handles cases where OBS hasn't written to global.ini yet)
+        if (Test-Path $scenesDir) {
+            $sceneFiles = Get-ChildItem -Path $scenesDir -Filter "*.json" |
+                Where-Object { $_.Name -notmatch '\.bak$' } |
+                Sort-Object LastWriteTime -Descending
+
+            if ($sceneFiles.Count -gt 0) {
+                $mostRecent = $sceneFiles[0].BaseName
+                Write-Debug "Using most recently modified scene collection: $mostRecent"
+                return $mostRecent
+            }
+        }
+
+        # Default to "Untitled" if nothing found
         return "Untitled"
     } catch {
         return "Untitled"
     }
+}
+
+function Register-OBSScriptInAllCollections {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable,
+        [string]$ScriptPath,
+        [string]$SceneName,
+        [string]$PlaylistURL = ""
+    )
+
+    # Register script in ALL scene collections that contain the target scene
+    # This ensures the script works regardless of which collection is active
+
+    if ($IsPortable) {
+        $scenesDir = Join-Path $OBSPath "config\obs-studio\basic\scenes"
+    } else {
+        $scenesDir = Join-Path $env:APPDATA "obs-studio\basic\scenes"
+    }
+
+    if (-not (Test-Path $scenesDir)) {
+        Write-Warning "Scenes directory not found"
+        return $false
+    }
+
+    $registeredCount = 0
+    $sceneFiles = Get-ChildItem -Path $scenesDir -Filter "*.json" |
+        Where-Object { $_.Name -notmatch '\.bak$' }
+
+    foreach ($file in $sceneFiles) {
+        try {
+            $content = Get-Content $file.FullName -Raw -Encoding UTF8
+            $sceneData = $content | ConvertFrom-Json
+
+            # Check if this collection contains the target scene
+            $hasScene = $false
+            if ($sceneData.sources) {
+                $hasScene = $sceneData.sources | Where-Object { $_.name -eq $SceneName }
+            }
+
+            if ($hasScene) {
+                $collectionName = $file.BaseName
+                Write-Debug "Found scene '$SceneName' in collection: $collectionName"
+
+                # Register in this collection
+                if (Register-OBSScript -OBSPath $OBSPath -IsPortable $IsPortable -ScriptPath $ScriptPath -SceneCollectionName $collectionName -PlaylistURL $PlaylistURL) {
+                    $registeredCount++
+                    Write-Info "Registered in: $collectionName"
+                }
+            }
+        } catch {
+            Write-Debug "Error processing $($file.Name): $_"
+        }
+    }
+
+    if ($registeredCount -eq 0) {
+        # No collections had the scene, try registering in the most recently modified one
+        Write-Debug "Scene not found in any collection, using default"
+        $defaultCollection = Get-OBSSceneCollectionFromConfig -OBSPath $OBSPath -IsPortable $IsPortable
+        return Register-OBSScript -OBSPath $OBSPath -IsPortable $IsPortable -ScriptPath $ScriptPath -SceneCollectionName $defaultCollection -PlaylistURL $PlaylistURL
+    }
+
+    return $true
 }
 
 function Register-OBSScript {
@@ -1595,6 +1972,9 @@ function Install-OBSYouTubePlayer {
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
     }
 
+    # Step 5c: Ensure Python 3.11 is installed and configured for OBS
+    $script:PythonConfigured = Ensure-Python311 -OBSPath $obsPath -IsPortable $isPortable
+
     # Step 6: Download and install files
     try {
         $installedPath = Download-Repository -DestinationPath $installDir -InstanceName $script:InstanceName -Release $release
@@ -1671,10 +2051,8 @@ function Install-OBSYouTubePlayer {
 
             # Register script BEFORE starting OBS so it loads with settings
             Write-Step "Pre-registering script in OBS config..."
-            $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
             $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
-            Write-Info "Scene collection: $sceneCollection"
-            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+            if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
                 Write-Success "Script pre-registered with settings"
                 $scriptRegistered = $true
             } else {
@@ -1683,16 +2061,7 @@ function Install-OBSYouTubePlayer {
 
             Write-Step "Starting OBS Studio..."
 
-            # Find OBS executable
-            $obsExe = Join-Path $obsPath "bin\64bit\obs64.exe"
-            if (-not (Test-Path $obsExe)) {
-                $obsExe = Join-Path $obsPath "bin\32bit\obs32.exe"
-            }
-
-            if (Test-Path $obsExe) {
-                # Start OBS from its own directory (required for locale files)
-                $obsDir = Split-Path -Parent $obsExe
-                Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+            if (Start-OBSProcess -OBSPath $obsPath) {
                 Write-Info "Waiting for OBS to start (up to 30 seconds)..."
 
                 # Wait for OBS to start (up to 30 seconds)
@@ -1719,8 +2088,6 @@ function Install-OBSYouTubePlayer {
                 } else {
                     Write-Warning "OBS did not start within 30 seconds"
                 }
-            } else {
-                Write-Warning "Could not find OBS executable at: $obsExe"
             }
         }
     } else {
@@ -1729,10 +2096,8 @@ function Install-OBSYouTubePlayer {
 
         # Register script first (OBS will need restart to load it)
         Write-Step "Registering script in OBS config..."
-        $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
         $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
-        Write-Info "Scene collection: $sceneCollection"
-        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+        if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
             Write-Success "Script registered with settings"
             $scriptRegistered = $true
         }
@@ -1759,9 +2124,13 @@ function Install-OBSYouTubePlayer {
                     Start-Sleep -Seconds 3
                 }
             } catch {
-                # Fallback to taskkill (without /F for graceful)
-                Stop-Process -Name "obs64" -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 3
+                # Fallback to graceful close via CloseMainWindow (sends WM_CLOSE)
+                $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
+                if ($obs) {
+                    $obs.CloseMainWindow() | Out-Null
+                    # Wait for graceful close
+                    $obs.WaitForExit(10000)
+                }
             }
 
             # Wait for OBS to fully close
@@ -1777,12 +2146,7 @@ function Install-OBSYouTubePlayer {
             } else {
                 # Start OBS again
                 Write-Step "Starting OBS..."
-                $obsExe = Join-Path $obsPath "bin\64bit\obs64.exe"
-                if (-not (Test-Path $obsExe)) {
-                    $obsExe = Join-Path $obsPath "bin\32bit\obs32.exe"
-                }
-                $obsDir = Split-Path -Parent $obsExe
-                Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+                Start-OBSProcess -OBSPath $obsPath | Out-Null
 
                 # Wait for OBS to start
                 $waitTime = 0
