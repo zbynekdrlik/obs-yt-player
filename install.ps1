@@ -1952,19 +1952,54 @@ function Install-OBSYouTubePlayer {
         # Check if OBS is running - it may lock files during update
         if (Test-OBSRunning) {
             Write-Host ""
-            Write-Warning "OBS is currently running"
-            Write-Host "  The script may have files locked that need to be updated." -ForegroundColor Gray
-            Write-Host "  Please close OBS before continuing, or unload the script." -ForegroundColor Gray
+            Write-Warning "OBS is currently running - will close to update files"
             Write-Host ""
 
+            $closeOBS = $false
             if ($script:NonInteractive) {
-                Write-Info "Continuing anyway (non-interactive mode)"
+                Write-Info "Will close OBS to update files (non-interactive mode)"
+                $closeOBS = $true
             } else {
-                $continue = Read-Host "Continue anyway? (y/N)"
-                if ($continue -ine "y" -and $continue -ine "yes") {
-                    Write-Info "Please close OBS and run the installer again"
+                $response = Read-Host "Close OBS to update? (Y/n)"
+                $closeOBS = ($response -eq "" -or $response -ieq "y" -or $response -ieq "yes")
+            }
+
+            if ($closeOBS) {
+                Write-Step "Closing OBS to update files..."
+                # Try all close methods
+                if (Test-OBSRunning) {
+                    Write-Info "Trying WebSocket close..."
+                    try {
+                        $ws = Connect-OBSWebSocket -Password $script:wsPassword
+                        if ($ws) {
+                            Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS" | Out-Null
+                            Close-OBSWebSocket
+                            Start-Sleep -Seconds 3
+                        }
+                    } catch { }
+                }
+                if (Test-OBSRunning) {
+                    Write-Info "Trying CloseMainWindow..."
+                    $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
+                    if ($obs) {
+                        $obs.CloseMainWindow() | Out-Null
+                        Start-Sleep -Seconds 5
+                    }
+                }
+                if (Test-OBSRunning) {
+                    Write-Info "Forcing OBS close..."
+                    Stop-Process -Name "obs64" -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                }
+                if (Test-OBSRunning) {
+                    Write-ErrorMsg "Could not close OBS. Please close it manually."
                     return
                 }
+                Write-Success "OBS closed for update"
+                $script:OBSWasClosedForUpdate = $true
+            } else {
+                Write-Info "Please close OBS and run the installer again"
+                return
             }
         }
     }
