@@ -19,7 +19,7 @@ $ProgressPreference = "SilentlyContinue"  # Faster downloads
 # Configuration
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
-$RepoBranch = "dev"  # DEV BRANCH: downloads from dev, shows dev version
+$RepoBranch = "main"  # Branch to download from (uses releases on main)
 
 # Fetch version from VERSION file in repo
 try {
