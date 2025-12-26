@@ -242,3 +242,24 @@ def add_cached_video(video_id, info):
 - Use accessor functions, never access `_variables` directly from other modules
 - Copy data before returning from accessors to prevent race conditions
 - The `play_history.py` persistence happens outside the lock to avoid deadlock
+
+## Remote Testing via SSH
+
+When testing installer or OBS functionality via SSH, GUI applications must be started using Windows Task Scheduler to run in the logged-in user's desktop session.
+
+**Starting OBS via Task Scheduler:**
+```cmd
+schtasks /Create /TN StartOBS /TR "cmd /c cd /d \"C:\Program Files\obs-studio\bin\64bit\" && start \"\" obs64.exe" /SC ONCE /ST 00:00 /RU <username> /IT /F
+schtasks /Run /TN StartOBS
+schtasks /Delete /TN StartOBS /F
+```
+
+**CRITICAL: OBS must be started from its directory** (`C:\Program Files\obs-studio\bin\64bit`). Starting OBS from a different working directory causes it to fail silently without creating a log file.
+
+**Running PowerShell scripts via scheduler:**
+```cmd
+schtasks /Create /TN TaskName /TR "powershell -ExecutionPolicy Bypass -File C:\path\to\script.ps1" /SC ONCE /ST 00:00 /RU <username> /IT /F
+schtasks /Run /TN TaskName
+```
+
+The `/IT` flag is required to run the task interactively in the user's desktop session.

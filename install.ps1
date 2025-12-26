@@ -196,29 +196,42 @@ function Configure-OBSPython {
     )
 
     try {
-        # Determine OBS scripting config path
-        if ($IsPortable) {
-            $configDir = Join-Path $OBSPath "config\obs-studio\plugin_config\obs-scripting"
-        } else {
-            $configDir = Join-Path $env:APPDATA "obs-studio\plugin_config\obs-scripting"
-        }
-
-        $configFile = Join-Path $configDir "config.json"
-
-        # Create directory if needed
-        if (-not (Test-Path $configDir)) {
-            New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-        }
-
-        # The Python path for OBS needs to point to the directory containing python311.dll
+        # The Python path for OBS uses forward slashes
         $pythonDllPath = $PythonPath.Replace('\', '/')
 
-        # Create OBS scripting config
-        $config = @{
-            "python_path" = $pythonDllPath
+        # Determine OBS config paths
+        if ($IsPortable) {
+            $obsConfigDir = Join-Path $OBSPath "config\obs-studio"
+        } else {
+            $obsConfigDir = Join-Path $env:APPDATA "obs-studio"
         }
 
-        $config | ConvertTo-Json | Set-Content $configFile -Encoding UTF8
+        $globalIni = Join-Path $obsConfigDir "global.ini"
+        $userIni = Join-Path $obsConfigDir "user.ini"
+
+        # Helper function to update ini file Python section
+        function Update-IniPythonPath {
+            param([string]$IniPath, [string]$PyPath)
+
+            if (Test-Path $IniPath) {
+                $content = Get-Content $IniPath -Raw
+                # Remove existing Python section if present
+                $content = $content -replace '\[Python\][\r\n]+Path64bit=[^\r\n]+[\r\n]*', ''
+                # Ensure trailing newline
+                if (-not $content.EndsWith("`n")) { $content += "`n" }
+                # Add Python section
+                $content += "`n[Python]`nPath64bit=$PyPath`n"
+                Set-Content $IniPath -Value $content -NoNewline
+            } else {
+                # Create new file with Python section
+                $content = "[Python]`nPath64bit=$PyPath`n"
+                Set-Content $IniPath -Value $content -NoNewline
+            }
+        }
+
+        # Update both global.ini and user.ini (OBS reads from user.ini primarily)
+        Update-IniPythonPath -IniPath $globalIni -PyPath $pythonDllPath
+        Update-IniPythonPath -IniPath $userIni -PyPath $pythonDllPath
 
         Write-Success "OBS Python configured: $pythonDllPath"
         return $true
@@ -306,6 +319,7 @@ function Start-OBSViaScheduler {
 
     # Create a scheduled task to start OBS in the user's desktop session
     # This is required when running via SSH because OBS needs a desktop session
+    # CRITICAL: OBS must be started from its directory (bin\64bit) or it fails silently
     $taskName = "YTPlayStartOBS"
     $obsDir = Split-Path -Parent $OBSExePath
 
@@ -313,8 +327,9 @@ function Start-OBSViaScheduler {
         # Delete any existing task
         schtasks /Delete /TN $taskName /F 2>$null | Out-Null
 
-        # Create task to run immediately as the current user, interactively
-        $action = "cmd /c `"cd /d `"$obsDir`" && start `"`" `"$OBSExePath`"`""
+        # Create task to run OBS from its directory
+        # Use cmd /c with proper escaping for paths with spaces
+        $action = "cmd /c cd /d `"$obsDir`" && start `"`" `"$OBSExePath`""
 
         # Create the task with /IT flag for interactive session
         $result = schtasks /Create /TN $taskName /TR $action /SC ONCE /ST 00:00 /RU $env:USERNAME /IT /F 2>&1
@@ -2109,9 +2124,13 @@ function Install-OBSYouTubePlayer {
                     Start-Sleep -Seconds 3
                 }
             } catch {
-                # Fallback to taskkill (without /F for graceful)
-                Stop-Process -Name "obs64" -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 3
+                # Fallback to graceful close via CloseMainWindow (sends WM_CLOSE)
+                $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
+                if ($obs) {
+                    $obs.CloseMainWindow() | Out-Null
+                    # Wait for graceful close
+                    $obs.WaitForExit(10000)
+                }
             }
 
             # Wait for OBS to fully close
