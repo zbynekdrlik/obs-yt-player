@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.9"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.10"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -930,8 +930,9 @@ function Register-OBSScript {
         }
 
         if ($existingIndex -ge 0) {
-            # Update existing script settings
+            # Update existing script entry (normalize path and update settings)
             Write-Info "Updating script settings..."
+            $scripts[$existingIndex].path = $normalizedScriptPath
             $scripts[$existingIndex].settings = $scriptSettings
         } else {
             # Add new script entry (use forward slashes to match OBS format)
