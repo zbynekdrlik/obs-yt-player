@@ -33,6 +33,21 @@ $script:wsMessageId = 0
 $script:wsPassword = ""
 $script:DebugMode = $env:YTPLAY_DEBUG -eq "1"
 
+# Non-interactive mode via environment variables
+# Set these to bypass Read-Host prompts:
+#   YTPLAY_PLAYLIST_URL - Playlist URL or preset number (1-8)
+#   YTPLAY_GEMINI_KEY - Gemini API key (optional)
+#   YTPLAY_INSTANCE_NAME - Instance name (uses playlist default if not set)
+#   YTPLAY_OBS_PATH - Custom OBS path (uses auto-detect if not set)
+#   YTPLAY_START_OBS - "Y" or "N" to start/not start OBS
+#   YTPLAY_AUTO_CONFIRM - Set to "1" to auto-accept all confirmations
+$script:NonInteractive = $env:YTPLAY_AUTO_CONFIRM -eq "1"
+$script:EnvPlaylistURL = $env:YTPLAY_PLAYLIST_URL
+$script:EnvGeminiKey = $env:YTPLAY_GEMINI_KEY
+$script:EnvInstanceName = $env:YTPLAY_INSTANCE_NAME
+$script:EnvOBSPath = $env:YTPLAY_OBS_PATH
+$script:EnvStartOBS = $env:YTPLAY_START_OBS
+
 function Write-Header {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
@@ -152,6 +167,17 @@ function Get-OBSConfigDirectory {
 function Request-InstanceName {
     # Use playlist name as default if available, otherwise use DefaultInstanceName
     $defaultName = if ($script:SelectedPlaylistName) { $script:SelectedPlaylistName } else { $DefaultInstanceName }
+
+    # Non-interactive mode
+    if ($script:NonInteractive) {
+        $name = if ($script:EnvInstanceName) { $script:EnvInstanceName } else { $defaultName }
+        Write-Info "Using instance name: $name (non-interactive mode)"
+        if ($name -notmatch '^[a-zA-Z][a-zA-Z0-9_-]*$') {
+            Write-ErrorMsg "Invalid instance name from environment. Using default."
+            $name = $defaultName
+        }
+        return $name.ToLower()
+    }
 
     Write-Host ""
     Write-Host "Instance name determines your scene name in OBS." -ForegroundColor Gray
@@ -1157,6 +1183,11 @@ function Confirm-Installation {
     Write-Host "  $Path" -ForegroundColor Yellow
     Write-Host ""
 
+    if ($script:NonInteractive) {
+        Write-Info "Auto-accepting detected OBS path (non-interactive mode)"
+        return $true
+    }
+
     $response = Read-Host "Install OBS YouTube Player here? (Y/n)"
     return ($response -eq "" -or $response -ieq "y" -or $response -ieq "yes")
 }
@@ -1191,6 +1222,17 @@ function Request-GeminiApiKey {
     Write-Host "https://makersuite.google.com/app/apikey" -ForegroundColor Blue
     Write-Host ""
 
+    if ($script:NonInteractive -and $script:EnvGeminiKey) {
+        Write-Info "Using Gemini API key from environment (non-interactive mode)"
+        Write-Success "Gemini API key configured"
+        return $script:EnvGeminiKey
+    }
+
+    if ($script:NonInteractive) {
+        Write-Info "No Gemini API key provided (non-interactive mode)"
+        return $null
+    }
+
     $key = Read-Host "Gemini API key (Enter to skip)"
 
     if ([string]::IsNullOrWhiteSpace($key)) {
@@ -1214,6 +1256,36 @@ function Request-PlaylistURL {
         @{ Name = "ytchristmas"; Desc = "Christmas music"; URL = "https://www.youtube.com/watch?v=aC2LUPJ3dOk&list=PLFdHTR758BvfFgZlzcL17qvB307ysgHvn" }
         @{ Name = "ytyoung"; Desc = "Youth/young music"; URL = "https://www.youtube.com/watch?v=NQJyrsHn9K8&list=PLFdHTR758Bvegbr-HbkHM_C6-SwOP6xVE" }
     )
+
+    # Non-interactive mode: use environment variable
+    if ($script:NonInteractive -and $script:EnvPlaylistURL) {
+        $envChoice = $script:EnvPlaylistURL
+        # Check if it's a number (preset) or URL
+        if ($envChoice -match '^\d+$') {
+            $choiceNum = [int]$envChoice
+            if ($choiceNum -ge 1 -and $choiceNum -le $playlists.Count) {
+                $selected = $playlists[$choiceNum - 1]
+                Write-Info "Using preset playlist: $($selected.Name) (non-interactive mode)"
+                Write-Success "Selected: $($selected.Name)"
+                $script:SelectedPlaylistName = $selected.Name
+                return $selected.URL
+            }
+        } else {
+            # It's a URL
+            Write-Info "Using playlist URL from environment (non-interactive mode)"
+            $script:SelectedPlaylistName = $null
+            return $envChoice
+        }
+    }
+
+    if ($script:NonInteractive) {
+        # Default to first playlist
+        $selected = $playlists[0]
+        Write-Info "Using default playlist (non-interactive mode)"
+        Write-Success "Selected: $($selected.Name)"
+        $script:SelectedPlaylistName = $selected.Name
+        return $selected.URL
+    }
 
     Write-Host ""
     Write-Host "Select a playlist:" -ForegroundColor White
@@ -1462,10 +1534,15 @@ function Install-OBSYouTubePlayer {
         }
 
         Write-Host ""
-        $update = Read-Host "Update this instance? (Y/n)"
-        if ($update -ine "" -and $update -ine "y" -and $update -ine "yes") {
-            Write-Info "Installation cancelled"
-            return
+
+        if ($script:NonInteractive) {
+            Write-Info "Auto-updating instance (non-interactive mode)"
+        } else {
+            $update = Read-Host "Update this instance? (Y/n)"
+            if ($update -ine "" -and $update -ine "y" -and $update -ine "yes") {
+                Write-Info "Installation cancelled"
+                return
+            }
         }
 
         # Check if OBS is running - it may lock files during update
@@ -1475,10 +1552,15 @@ function Install-OBSYouTubePlayer {
             Write-Host "  The script may have files locked that need to be updated." -ForegroundColor Gray
             Write-Host "  Please close OBS before continuing, or unload the script." -ForegroundColor Gray
             Write-Host ""
-            $continue = Read-Host "Continue anyway? (y/N)"
-            if ($continue -ine "y" -and $continue -ine "yes") {
-                Write-Info "Please close OBS and run the installer again"
-                return
+
+            if ($script:NonInteractive) {
+                Write-Info "Continuing anyway (non-interactive mode)"
+            } else {
+                $continue = Read-Host "Continue anyway? (y/N)"
+                if ($continue -ine "y" -and $continue -ine "yes") {
+                    Write-Info "Please close OBS and run the installer again"
+                    return
+                }
             }
         }
     }
@@ -1518,7 +1600,14 @@ function Install-OBSYouTubePlayer {
     if (-not $obsRunning) {
         Write-Info "OBS is not running"
         Write-Host ""
-        $startOBS = Read-Host "Start OBS now to auto-configure scene/sources? (Y/n)"
+
+        $startOBS = "Y"
+        if ($script:NonInteractive) {
+            $startOBS = if ($script:EnvStartOBS) { $script:EnvStartOBS } else { "Y" }
+            Write-Info "Start OBS: $startOBS (non-interactive mode)"
+        } else {
+            $startOBS = Read-Host "Start OBS now to auto-configure scene/sources? (Y/n)"
+        }
 
         if ($startOBS -eq "" -or $startOBS -ieq "y" -or $startOBS -ieq "yes") {
             # Enable WebSocket in OBS config before starting
@@ -1531,21 +1620,31 @@ function Install-OBSYouTubePlayer {
                 # If auth is required, offer to disable or enter password
                 if ($wsConfig.AuthRequired) {
                     Write-Warning "WebSocket authentication is enabled"
-                    Write-Host ""
-                    Write-Host "Options:" -ForegroundColor White
-                    Write-Host "  1. Enter your WebSocket password" -ForegroundColor Gray
-                    Write-Host "  2. Disable authentication (recommended for local use)" -ForegroundColor Gray
-                    Write-Host ""
-                    $authChoice = Read-Host "Choose (1 or 2)"
 
-                    if ($authChoice -eq "2") {
-                        # Disable authentication
+                    if ($script:NonInteractive) {
+                        # In non-interactive mode, disable auth for automation
+                        Write-Info "Disabling authentication (non-interactive mode)"
                         $disableResult = Disable-OBSWebSocketAuth -OBSPath $obsPath -IsPortable $isPortable
                         if ($disableResult) {
                             Write-Success "Authentication disabled"
                         }
                     } else {
-                        $script:wsPassword = Read-Host "Enter your OBS WebSocket password"
+                        Write-Host ""
+                        Write-Host "Options:" -ForegroundColor White
+                        Write-Host "  1. Enter your WebSocket password" -ForegroundColor Gray
+                        Write-Host "  2. Disable authentication (recommended for local use)" -ForegroundColor Gray
+                        Write-Host ""
+                        $authChoice = Read-Host "Choose (1 or 2)"
+
+                        if ($authChoice -eq "2") {
+                            # Disable authentication
+                            $disableResult = Disable-OBSWebSocketAuth -OBSPath $obsPath -IsPortable $isPortable
+                            if ($disableResult) {
+                                Write-Success "Authentication disabled"
+                            }
+                        } else {
+                            $script:wsPassword = Read-Host "Enter your OBS WebSocket password"
+                        }
                     }
                 }
             }
@@ -1620,7 +1719,14 @@ function Install-OBSYouTubePlayer {
 
         Write-Host ""
         Write-Warning "OBS needs to restart to load the new script"
-        $restartOBS = Read-Host "Restart OBS now? (Y/n)"
+
+        $restartOBS = "Y"
+        if ($script:NonInteractive) {
+            $restartOBS = if ($script:EnvStartOBS) { $script:EnvStartOBS } else { "Y" }
+            Write-Info "Restart OBS: $restartOBS (non-interactive mode)"
+        } else {
+            $restartOBS = Read-Host "Restart OBS now? (Y/n)"
+        }
 
         if ($restartOBS -eq "" -or $restartOBS -ieq "y" -or $restartOBS -ieq "yes") {
             # Graceful shutdown via WebSocket if possible
