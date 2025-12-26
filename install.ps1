@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.5"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.6"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -1787,18 +1787,25 @@ function Install-OBSYouTubePlayer {
                                     # Register the script in OBS
                                     Write-Step "Registering script in OBS..."
                                     $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                                    Write-Debug "Scene collection: $sceneCollection"
                                     if ($sceneCollection) {
                                         $scriptFilePath = Join-Path $installedPath "$instName.py"
+                                        Write-Info "Saving settings to scene collection '$sceneCollection'..."
                                         if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
-                                            Write-Success "Script registered (restart OBS to load)"
+                                            Write-Success "Script settings saved"
                                             $scriptRegistered = $true
+                                        } else {
+                                            Write-Warning "Failed to save script settings"
                                         }
+                                    } else {
+                                        Write-Warning "Could not get current scene collection"
                                     }
 
                                     $autoConfigured = $true
                                 }
                             } catch {
-                                Write-Warning "Error: $_"
+                                Write-Warning "WebSocket error: $_"
+                                Write-Warning "Stack: $($_.ScriptStackTrace)"
                             } finally {
                                 Close-OBSWebSocket
                             }
