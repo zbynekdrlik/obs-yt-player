@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.2"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.3"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -982,31 +982,28 @@ function Download-Repository {
         $Release = $null
     )
 
-    # Use passed release or fetch if not provided
-    if (-not $Release) {
-        $Release = Get-LatestRelease
-    }
+    # Use passed release - don't auto-fetch (caller controls this)
+    # For dev versions, $Release will be $null intentionally
 
-    $script:InstalledVersion = $null
+    # Always use ScriptVersion as the unified version
+    $script:InstalledVersion = $ScriptVersion
+
+    Write-Host ""
+    Write-Host "  Installing: " -NoNewline
+    if ($ScriptVersion -match "dev") {
+        Write-Host "$ScriptVersion" -ForegroundColor Yellow
+    } else {
+        Write-Host "$ScriptVersion" -ForegroundColor Green
+    }
+    Write-Host ""
 
     if ($Release) {
-        $version = $Release.tag_name
-        $script:InstalledVersion = $version
-        Write-Host ""
-        Write-Host "  Installing: " -NoNewline
-        Write-Host "$version" -ForegroundColor Green
-        Write-Host ""
-        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/tags/$version.zip"
-        $extractFolder = "$RepoName-$($version.TrimStart('v'))"
+        # Download from release tag
+        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/tags/$($Release.tag_name).zip"
+        $extractFolder = "$RepoName-$($Release.tag_name.TrimStart('v'))"
     } else {
-        # Download from configured branch (development mode)
+        # Download from branch (development mode)
         $branchName = $RepoBranch -replace '/', '-'
-        $version = "$branchName-$(Get-Date -Format 'yyyyMMdd')"
-        $script:InstalledVersion = $version
-        Write-Host ""
-        Write-Host "  Installing: " -NoNewline
-        Write-Host "$version (dev)" -ForegroundColor Yellow
-        Write-Host ""
         $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/heads/$RepoBranch.zip"
         $extractFolder = "$RepoName-$branchName"
     }
@@ -1371,13 +1368,17 @@ function Install-OBSYouTubePlayer {
         Write-Info "$installDir (Documents folder)"
     }
 
-    # Check for latest release version first
-    Write-Step "Checking for latest version..."
-    $release = Get-LatestRelease
-    $latestVersion = if ($release) { $release.tag_name } else { $null }
-
-    if ($latestVersion) {
-        Write-Success "Latest release: $latestVersion"
+    # Check version - dev installer uses dev branch, release installer uses release
+    $release = $null
+    if ($ScriptVersion -match "dev") {
+        Write-Info "Development version - will install from dev branch"
+        $RepoBranch = "dev"  # Override to use dev branch
+    } else {
+        Write-Step "Checking for latest version..."
+        $release = Get-LatestRelease
+        if ($release) {
+            Write-Success "Latest release: $($release.tag_name)"
+        }
     }
 
     # Step 5: Select playlist first (determines default instance name)
