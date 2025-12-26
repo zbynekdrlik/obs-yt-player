@@ -2115,28 +2115,51 @@ function Install-OBSYouTubePlayer {
         if ($restartOBS -eq "" -or $restartOBS -ieq "y" -or $restartOBS -ieq "yes") {
             # STEP 1: Close OBS FIRST (before modifying config)
             Write-Step "Closing OBS gracefully..."
+            $obsClosed = $false
+
+            # Method 1: Try WebSocket ExitOBS
             try {
                 $ws = Connect-OBSWebSocket -Password $script:wsPassword
                 if ($ws) {
-                    Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS" | Out-Null
+                    $result = Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS"
                     Close-OBSWebSocket
-                    Start-Sleep -Seconds 3
+                    if ($result -and $result.requestStatus.result -eq $true) {
+                        Start-Sleep -Seconds 3
+                        if (-not (Test-OBSRunning)) {
+                            $obsClosed = $true
+                            Write-Debug "OBS closed via WebSocket"
+                        }
+                    } else {
+                        Write-Debug "ExitOBS returned: success=$($result.requestStatus.result), code=$($result.requestStatus.code)"
+                    }
                 }
             } catch {
-                # Fallback to graceful close via CloseMainWindow (sends WM_CLOSE)
+                Write-Debug "WebSocket close failed: $_"
+            }
+
+            # Method 2: CloseMainWindow (graceful WM_CLOSE)
+            if (-not $obsClosed -and (Test-OBSRunning)) {
+                Write-Debug "Trying CloseMainWindow..."
                 $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
                 if ($obs) {
                     $obs.CloseMainWindow() | Out-Null
-                    # Wait for graceful close
                     $obs.WaitForExit(10000)
+                    if (-not (Test-OBSRunning)) {
+                        $obsClosed = $true
+                        Write-Debug "OBS closed via CloseMainWindow"
+                    }
                 }
             }
 
-            # Wait for OBS to fully close
-            $waitCount = 0
-            while ((Test-OBSRunning) -and $waitCount -lt 10) {
-                Start-Sleep -Seconds 1
-                $waitCount++
+            # Method 3: Stop-Process (force kill as last resort)
+            if (-not $obsClosed -and (Test-OBSRunning)) {
+                Write-Debug "Forcing OBS close with Stop-Process..."
+                Stop-Process -Name "obs64" -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
+                if (-not (Test-OBSRunning)) {
+                    $obsClosed = $true
+                    Write-Debug "OBS closed via Stop-Process"
+                }
             }
 
             if (Test-OBSRunning) {
