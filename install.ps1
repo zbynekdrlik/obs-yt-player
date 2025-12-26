@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.1-dev.2"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.1-dev.3"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -272,6 +272,108 @@ function Ensure-Python311 {
     }
 
     return $null
+}
+
+#endregion
+
+#region OBS Process Management
+
+function Test-IsSSHSession {
+    # Detect if we're running in an SSH session (no desktop)
+    # SSH sessions typically don't have a console window attached to explorer
+    $sshClient = $env:SSH_CLIENT
+    $sshConnection = $env:SSH_CONNECTION
+    $sshTty = $env:SSH_TTY
+
+    if ($sshClient -or $sshConnection -or $sshTty) {
+        return $true
+    }
+
+    # Also check if we're in a non-interactive session with no visible desktop
+    # This happens when running via remote PowerShell or SSH on Windows
+    $explorerProcess = Get-Process -Name "explorer" -ErrorAction SilentlyContinue
+    if (-not $explorerProcess) {
+        return $true
+    }
+
+    return $false
+}
+
+function Start-OBSViaScheduler {
+    param(
+        [string]$OBSExePath
+    )
+
+    # Create a scheduled task to start OBS in the user's desktop session
+    # This is required when running via SSH because OBS needs a desktop session
+    $taskName = "YTPlayStartOBS"
+    $obsDir = Split-Path -Parent $OBSExePath
+
+    try {
+        # Delete any existing task
+        schtasks /Delete /TN $taskName /F 2>$null | Out-Null
+
+        # Create task to run immediately as the current user, interactively
+        $action = "cmd /c `"cd /d `"$obsDir`" && start `"`" `"$OBSExePath`"`""
+
+        # Create the task with /IT flag for interactive session
+        $result = schtasks /Create /TN $taskName /TR $action /SC ONCE /ST 00:00 /RU $env:USERNAME /IT /F 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Debug "Failed to create scheduled task: $result"
+            return $false
+        }
+
+        # Run the task immediately
+        $runResult = schtasks /Run /TN $taskName 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Debug "Failed to run scheduled task: $runResult"
+            return $false
+        }
+
+        # Clean up the task after a delay
+        Start-Sleep -Seconds 2
+        schtasks /Delete /TN $taskName /F 2>$null | Out-Null
+
+        return $true
+    } catch {
+        Write-Debug "Scheduler error: $_"
+        return $false
+    }
+}
+
+function Start-OBSProcess {
+    param(
+        [string]$OBSPath
+    )
+
+    # Find OBS executable
+    $obsExe = Join-Path $OBSPath "bin\64bit\obs64.exe"
+    if (-not (Test-Path $obsExe)) {
+        $obsExe = Join-Path $OBSPath "bin\32bit\obs32.exe"
+    }
+
+    if (-not (Test-Path $obsExe)) {
+        Write-Warning "Could not find OBS executable at: $OBSPath"
+        return $false
+    }
+
+    $obsDir = Split-Path -Parent $obsExe
+
+    # Check if we need to use Task Scheduler (SSH/remote session)
+    if ($script:NonInteractive -and (Test-IsSSHSession)) {
+        Write-Debug "Detected SSH session, using Task Scheduler to start OBS"
+        if (Start-OBSViaScheduler -OBSExePath $obsExe) {
+            return $true
+        } else {
+            Write-Warning "Task Scheduler method failed, trying direct start"
+        }
+    }
+
+    # Direct start (normal case)
+    Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+    return $true
 }
 
 #endregion
@@ -1883,16 +1985,7 @@ function Install-OBSYouTubePlayer {
 
             Write-Step "Starting OBS Studio..."
 
-            # Find OBS executable
-            $obsExe = Join-Path $obsPath "bin\64bit\obs64.exe"
-            if (-not (Test-Path $obsExe)) {
-                $obsExe = Join-Path $obsPath "bin\32bit\obs32.exe"
-            }
-
-            if (Test-Path $obsExe) {
-                # Start OBS from its own directory (required for locale files)
-                $obsDir = Split-Path -Parent $obsExe
-                Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+            if (Start-OBSProcess -OBSPath $obsPath) {
                 Write-Info "Waiting for OBS to start (up to 30 seconds)..."
 
                 # Wait for OBS to start (up to 30 seconds)
@@ -1919,8 +2012,6 @@ function Install-OBSYouTubePlayer {
                 } else {
                     Write-Warning "OBS did not start within 30 seconds"
                 }
-            } else {
-                Write-Warning "Could not find OBS executable at: $obsExe"
             }
         }
     } else {
@@ -1977,12 +2068,7 @@ function Install-OBSYouTubePlayer {
             } else {
                 # Start OBS again
                 Write-Step "Starting OBS..."
-                $obsExe = Join-Path $obsPath "bin\64bit\obs64.exe"
-                if (-not (Test-Path $obsExe)) {
-                    $obsExe = Join-Path $obsPath "bin\32bit\obs32.exe"
-                }
-                $obsDir = Split-Path -Parent $obsExe
-                Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+                Start-OBSProcess -OBSPath $obsPath | Out-Null
 
                 # Wait for OBS to start
                 $waitTime = 0
