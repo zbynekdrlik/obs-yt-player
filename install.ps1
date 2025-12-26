@@ -1633,7 +1633,7 @@ function Request-PlaylistURL {
     $playlists = @(
         @{ Name = "ytfast"; Desc = "Fast/upbeat music"; URL = "https://www.youtube.com/watch?v=9vpwt0LdFhs&list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U" }
         @{ Name = "ytslow"; Desc = "Slow/calm music"; URL = "https://www.youtube.com/watch?v=iWuqiILKtgc&list=PLFdHTR758Bvd9c7dKV-ZZFQ1jg30ahHFq" }
-        @{ Name = "yt90s"; Desc = "90s hits"; URL = "https://www.youtube.com/watch?v=r1_MOB2kJ_U&list=PLFdHTR758BvfM0XYF6Q2nEDnW0CqHXI17" }
+        @{ Name = "yt90s"; Desc = "90-second countdown music"; URL = "https://www.youtube.com/watch?v=r1_MOB2kJ_U&list=PLFdHTR758BvfM0XYF6Q2nEDnW0CqHXI17" }
         @{ Name = "ytwarmup"; Desc = "Warmup music"; URL = "https://www.youtube.com/watch?v=N50kF0FE3hM&list=PLFdHTR758BvcHRX3nVKMEPHuBdU75dBVE" }
         @{ Name = "ytworship"; Desc = "Worship songs"; URL = "https://www.youtube.com/watch?v=poFZcg6f4J4&list=PLFdHTR758BveEaqE5BWIQI7ukkijjdbbG" }
         @{ Name = "ytpresence"; Desc = "Presence/ambient"; URL = "https://www.youtube.com/watch?v=mYjdVQX2cJQ&list=PLFdHTR758BveAZ9YDY4ALy9iGxQVrkGRl" }
