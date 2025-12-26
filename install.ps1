@@ -17,10 +17,17 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.1-dev.4"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
-$RepoBranch = "main"  # Branch to download from (when no release)
+$RepoBranch = "main"  # Branch to download from (uses releases on main)
+
+# Fetch version from VERSION file in repo
+try {
+    $versionUrl = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/$RepoBranch/yt-player-main/VERSION"
+    $ScriptVersion = "v" + (Invoke-RestMethod -Uri $versionUrl -TimeoutSec 5).Trim()
+} catch {
+    $ScriptVersion = "v0.0.0-unknown"  # Fallback if fetch fails
+}
 $ScriptFolder = "yt-player-main"
 $DefaultInstanceName = "ytplay"
 $script:InstanceName = "ytplay"  # Will be set by user
@@ -1626,7 +1633,7 @@ function Request-PlaylistURL {
     $playlists = @(
         @{ Name = "ytfast"; Desc = "Fast/upbeat music"; URL = "https://www.youtube.com/watch?v=9vpwt0LdFhs&list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U" }
         @{ Name = "ytslow"; Desc = "Slow/calm music"; URL = "https://www.youtube.com/watch?v=iWuqiILKtgc&list=PLFdHTR758Bvd9c7dKV-ZZFQ1jg30ahHFq" }
-        @{ Name = "yt90s"; Desc = "90s hits"; URL = "https://www.youtube.com/watch?v=r1_MOB2kJ_U&list=PLFdHTR758BvfM0XYF6Q2nEDnW0CqHXI17" }
+        @{ Name = "yt90s"; Desc = "90-second countdown music"; URL = "https://www.youtube.com/watch?v=r1_MOB2kJ_U&list=PLFdHTR758BvfM0XYF6Q2nEDnW0CqHXI17" }
         @{ Name = "ytwarmup"; Desc = "Warmup music"; URL = "https://www.youtube.com/watch?v=N50kF0FE3hM&list=PLFdHTR758BvcHRX3nVKMEPHuBdU75dBVE" }
         @{ Name = "ytworship"; Desc = "Worship songs"; URL = "https://www.youtube.com/watch?v=poFZcg6f4J4&list=PLFdHTR758BveEaqE5BWIQI7ukkijjdbbG" }
         @{ Name = "ytpresence"; Desc = "Presence/ambient"; URL = "https://www.youtube.com/watch?v=mYjdVQX2cJQ&list=PLFdHTR758BveAZ9YDY4ALy9iGxQVrkGRl" }
@@ -1945,19 +1952,54 @@ function Install-OBSYouTubePlayer {
         # Check if OBS is running - it may lock files during update
         if (Test-OBSRunning) {
             Write-Host ""
-            Write-Warning "OBS is currently running"
-            Write-Host "  The script may have files locked that need to be updated." -ForegroundColor Gray
-            Write-Host "  Please close OBS before continuing, or unload the script." -ForegroundColor Gray
+            Write-Warning "OBS is currently running - will close to update files"
             Write-Host ""
 
+            $closeOBS = $false
             if ($script:NonInteractive) {
-                Write-Info "Continuing anyway (non-interactive mode)"
+                Write-Info "Will close OBS to update files (non-interactive mode)"
+                $closeOBS = $true
             } else {
-                $continue = Read-Host "Continue anyway? (y/N)"
-                if ($continue -ine "y" -and $continue -ine "yes") {
-                    Write-Info "Please close OBS and run the installer again"
+                $response = Read-Host "Close OBS to update? (Y/n)"
+                $closeOBS = ($response -eq "" -or $response -ieq "y" -or $response -ieq "yes")
+            }
+
+            if ($closeOBS) {
+                Write-Step "Closing OBS to update files..."
+                # Try all close methods
+                if (Test-OBSRunning) {
+                    Write-Info "Trying WebSocket close..."
+                    try {
+                        $ws = Connect-OBSWebSocket -Password $script:wsPassword
+                        if ($ws) {
+                            Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS" | Out-Null
+                            Close-OBSWebSocket
+                            Start-Sleep -Seconds 3
+                        }
+                    } catch { }
+                }
+                if (Test-OBSRunning) {
+                    Write-Info "Trying CloseMainWindow..."
+                    $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
+                    if ($obs) {
+                        $obs.CloseMainWindow() | Out-Null
+                        Start-Sleep -Seconds 5
+                    }
+                }
+                if (Test-OBSRunning) {
+                    Write-Info "Forcing OBS close..."
+                    Stop-Process -Name "obs64" -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                }
+                if (Test-OBSRunning) {
+                    Write-ErrorMsg "Could not close OBS. Please close it manually."
                     return
                 }
+                Write-Success "OBS closed for update"
+                $script:OBSWasClosedForUpdate = $true
+            } else {
+                Write-Info "Please close OBS and run the installer again"
+                return
             }
         }
     }
@@ -2091,60 +2133,84 @@ function Install-OBSYouTubePlayer {
             }
         }
     } else {
-        # OBS is already running - register script and offer restart
+        # OBS is already running - must close BEFORE modifying config files
+        # (OBS overwrites config on exit, so we must close it first)
         Write-Success "OBS is already running"
-
-        # Register script first (OBS will need restart to load it)
-        Write-Step "Registering script in OBS config..."
-        $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
-        if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
-            Write-Success "Script registered with settings"
-            $scriptRegistered = $true
-        }
-
         Write-Host ""
-        Write-Warning "OBS needs to restart to load the new script"
+        Write-Warning "OBS must be closed to register the script (OBS overwrites config on exit)"
 
         $restartOBS = "Y"
         if ($script:NonInteractive) {
             $restartOBS = if ($script:EnvStartOBS) { $script:EnvStartOBS } else { "Y" }
-            Write-Info "Restart OBS: $restartOBS (non-interactive mode)"
+            Write-Info "Close and restart OBS: $restartOBS (non-interactive mode)"
         } else {
-            $restartOBS = Read-Host "Restart OBS now? (Y/n)"
+            $restartOBS = Read-Host "Close OBS, register script, and restart? (Y/n)"
         }
 
         if ($restartOBS -eq "" -or $restartOBS -ieq "y" -or $restartOBS -ieq "yes") {
-            # Graceful shutdown via WebSocket if possible
+            # STEP 1: Close OBS FIRST (before modifying config)
             Write-Step "Closing OBS gracefully..."
-            try {
-                $ws = Connect-OBSWebSocket -Password $script:wsPassword
-                if ($ws) {
-                    Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS" | Out-Null
-                    Close-OBSWebSocket
-                    Start-Sleep -Seconds 3
+
+            # Try all methods in sequence until OBS is closed
+            $closeMethod = "none"
+
+            # Method 1: Try WebSocket ExitOBS
+            if (Test-OBSRunning) {
+                Write-Info "Trying WebSocket close..."
+                try {
+                    $ws = Connect-OBSWebSocket -Password $script:wsPassword
+                    if ($ws) {
+                        $result = Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS"
+                        Close-OBSWebSocket
+                        Start-Sleep -Seconds 3
+                        if (-not (Test-OBSRunning)) {
+                            $closeMethod = "WebSocket"
+                        }
+                    }
+                } catch {
+                    Write-Debug "WebSocket error: $_"
                 }
-            } catch {
-                # Fallback to graceful close via CloseMainWindow (sends WM_CLOSE)
+            }
+
+            # Method 2: CloseMainWindow (graceful WM_CLOSE)
+            if (Test-OBSRunning) {
+                Write-Info "Trying CloseMainWindow..."
                 $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
                 if ($obs) {
                     $obs.CloseMainWindow() | Out-Null
-                    # Wait for graceful close
-                    $obs.WaitForExit(10000)
+                    Start-Sleep -Seconds 5
+                    if (-not (Test-OBSRunning)) {
+                        $closeMethod = "CloseMainWindow"
+                    }
                 }
             }
 
-            # Wait for OBS to fully close
-            $waitCount = 0
-            while ((Test-OBSRunning) -and $waitCount -lt 10) {
-                Start-Sleep -Seconds 1
-                $waitCount++
+            # Method 3: Stop-Process (force kill as last resort)
+            if (Test-OBSRunning) {
+                Write-Info "Forcing OBS close..."
+                Stop-Process -Name "obs64" -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
+                if (-not (Test-OBSRunning)) {
+                    $closeMethod = "Stop-Process"
+                }
             }
 
             if (Test-OBSRunning) {
-                Write-Warning "OBS did not close. Please restart manually."
+                Write-Warning "OBS did not close. Script registration may fail."
+                Write-Warning "Please close OBS manually and run installer again."
                 $obsRunning = $false
             } else {
-                # Start OBS again
+                Write-Success "OBS closed (via $closeMethod)"
+
+                # STEP 2: Register script AFTER OBS is fully closed
+                Write-Step "Registering script in OBS config..."
+                $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
+                if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
+                    Write-Success "Script registered with settings"
+                    $scriptRegistered = $true
+                }
+
+                # STEP 3: Start OBS again
                 Write-Step "Starting OBS..."
                 Start-OBSProcess -OBSPath $obsPath | Out-Null
 
@@ -2164,7 +2230,7 @@ function Install-OBSYouTubePlayer {
                 }
             }
         } else {
-            Write-Info "Please restart OBS manually to load the script"
+            Write-Info "Please close OBS manually, then run installer again to register script"
             $obsRunning = $false
         }
 

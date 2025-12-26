@@ -54,6 +54,11 @@ update_all_instances.bat
 - Delete `dev` after merge, recreate for next task
 - Never create multiple feature branches (no `fix/xxx`, `feature/xxx`)
 
+**CRITICAL - Claude restrictions:**
+- **NEVER commit or push directly to `main`** - main branch is protected
+- **NEVER merge PRs** - only the user can merge PRs, Claude must wait for user approval
+- Always work on `dev` branch and create PRs for user review
+
 This project has one developer using Claude as a tool - not a multi-developer workflow.
 
 ## CI Verification Requirements

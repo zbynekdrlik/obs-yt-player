@@ -80,6 +80,25 @@ jobs:
           }
           Write-Host "All PowerShell files passed syntax check"
 
+      - name: Verify installer branch configuration
+        shell: pwsh
+        run: |
+          # On main branch or PRs to main, $RepoBranch must be "main"
+          $content = Get-Content -Path "install.ps1" -Raw
+          if ($content -match '\$RepoBranch\s*=\s*"(\w+)"') {
+            $branch = $Matches[1]
+            Write-Host "Installer RepoBranch is set to: $branch"
+            if ($branch -ne "main") {
+              Write-Error "ERROR: install.ps1 has RepoBranch='$branch' but must be 'main' for main branch/PRs"
+              Write-Error "Change line 22 to: `$RepoBranch = `"main`""
+              exit 1
+            }
+            Write-Host "Branch configuration is correct for main branch"
+          } else {
+            Write-Error "Could not find RepoBranch variable in install.ps1"
+            exit 1
+          }
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest
