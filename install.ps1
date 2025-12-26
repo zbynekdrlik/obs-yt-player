@@ -1128,21 +1128,66 @@ function Request-CustomPath {
 }
 
 function Request-PlaylistURL {
-    $defaultURL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
+    # Predefined playlists
+    $playlists = @(
+        @{ Name = "ytfast"; Desc = "Fast/upbeat music"; URL = "https://www.youtube.com/watch?v=9vpwt0LdFhs&list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U" }
+        @{ Name = "ytslow"; Desc = "Slow/calm music"; URL = "https://www.youtube.com/watch?v=iWuqiILKtgc&list=PLFdHTR758Bvd9c7dKV-ZZFQ1jg30ahHFq" }
+        @{ Name = "yt90s"; Desc = "90s hits"; URL = "https://www.youtube.com/watch?v=r1_MOB2kJ_U&list=PLFdHTR758BvfM0XYF6Q2nEDnW0CqHXI17" }
+        @{ Name = "ytwarmup"; Desc = "Warmup music"; URL = "https://www.youtube.com/watch?v=N50kF0FE3hM&list=PLFdHTR758BvcHRX3nVKMEPHuBdU75dBVE" }
+        @{ Name = "ytworship"; Desc = "Worship songs"; URL = "https://www.youtube.com/watch?v=poFZcg6f4J4&list=PLFdHTR758BveEaqE5BWIQI7ukkijjdbbG" }
+        @{ Name = "ytpresence"; Desc = "Presence/ambient"; URL = "https://www.youtube.com/watch?v=mYjdVQX2cJQ&list=PLFdHTR758BveAZ9YDY4ALy9iGxQVrkGRl" }
+        @{ Name = "ytchristmas"; Desc = "Christmas music"; URL = "https://www.youtube.com/watch?v=aC2LUPJ3dOk&list=PLFdHTR758BvfFgZlzcL17qvB307ysgHvn" }
+        @{ Name = "ytyoung"; Desc = "Youth/young music"; URL = "https://www.youtube.com/watch?v=NQJyrsHn9K8&list=PLFdHTR758Bvegbr-HbkHM_C6-SwOP6xVE" }
+    )
 
     Write-Host ""
-    Write-Host "Enter your YouTube playlist URL" -ForegroundColor White
-    Write-Host "Default (press Enter): " -NoNewline -ForegroundColor Gray
-    Write-Host $defaultURL -ForegroundColor DarkCyan
+    Write-Host "Select a playlist:" -ForegroundColor White
     Write-Host ""
 
-    $url = Read-Host "Playlist URL"
-
-    if ([string]::IsNullOrWhiteSpace($url)) {
-        Write-Info "Using default playlist"
-        return $defaultURL
+    # Check if instance name matches any playlist for auto-selection
+    $defaultChoice = 0
+    for ($i = 0; $i -lt $playlists.Count; $i++) {
+        if ($script:InstanceName -eq $playlists[$i].Name -or
+            $script:InstanceName -eq $playlists[$i].Name.Substring(2)) {  # Match without "yt" prefix
+            $defaultChoice = $i + 1
+        }
+        $num = $i + 1
+        $name = $playlists[$i].Name
+        $desc = $playlists[$i].Desc
+        Write-Host "  $num. " -NoNewline -ForegroundColor Cyan
+        Write-Host "$name" -NoNewline -ForegroundColor White
+        Write-Host " - $desc" -ForegroundColor Gray
     }
-    return $url
+
+    $customNum = $playlists.Count + 1
+    Write-Host "  $customNum. " -NoNewline -ForegroundColor Cyan
+    Write-Host "Custom URL" -ForegroundColor White
+    Write-Host ""
+
+    $defaultText = if ($defaultChoice -gt 0) { " [$defaultChoice]" } else { " [1]" }
+    $choice = Read-Host "Choice$defaultText"
+
+    if ([string]::IsNullOrWhiteSpace($choice)) {
+        $choice = if ($defaultChoice -gt 0) { $defaultChoice } else { 1 }
+    }
+
+    $choiceNum = [int]$choice
+    if ($choiceNum -ge 1 -and $choiceNum -le $playlists.Count) {
+        $selected = $playlists[$choiceNum - 1]
+        Write-Success "Selected: $($selected.Name)"
+        return $selected.URL
+    } elseif ($choiceNum -eq $customNum) {
+        Write-Host ""
+        $url = Read-Host "Enter playlist URL"
+        if ([string]::IsNullOrWhiteSpace($url)) {
+            Write-Warning "No URL entered, using default"
+            return $playlists[0].URL
+        }
+        return $url
+    } else {
+        Write-Warning "Invalid choice, using default"
+        return $playlists[0].URL
+    }
 }
 
 #endregion
