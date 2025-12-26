@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.3"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.4"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -894,16 +894,21 @@ function Register-OBSScript {
         $scriptSettings = [PSCustomObject]@{}
         if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
             $scriptSettings | Add-Member -NotePropertyName "playlist_url" -NotePropertyValue $PlaylistURL -Force
+            Write-Debug "Setting playlist_url: $PlaylistURL"
         }
         if (-not [string]::IsNullOrEmpty($script:GeminiApiKey)) {
             $scriptSettings | Add-Member -NotePropertyName "gemini_api_key" -NotePropertyValue $script:GeminiApiKey -Force
+            Write-Debug "Setting gemini_api_key: [REDACTED]"
         }
+        Write-Info "Saving settings: playlist=$(-not [string]::IsNullOrEmpty($PlaylistURL)), gemini=$(-not [string]::IsNullOrEmpty($script:GeminiApiKey))"
 
-        # Check if script already registered
+        # Check if script already registered (normalize paths for comparison)
         $scripts = @($sceneData.modules.'scripts-tool')
         $existingIndex = -1
+        $normalizedScriptPath = $ScriptPath.Replace('\', '/')
         for ($i = 0; $i -lt $scripts.Count; $i++) {
-            if ($scripts[$i].path -eq $ScriptPath) {
+            $existingPath = $scripts[$i].path.Replace('\', '/')
+            if ($existingPath -eq $normalizedScriptPath) {
                 $existingIndex = $i
                 break
             }
