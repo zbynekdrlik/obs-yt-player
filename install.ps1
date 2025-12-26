@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.1-dev.3"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.1-dev.4"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -1208,6 +1208,69 @@ function Get-OBSSceneCollectionFromConfig {
     }
 }
 
+function Register-OBSScriptInAllCollections {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable,
+        [string]$ScriptPath,
+        [string]$SceneName,
+        [string]$PlaylistURL = ""
+    )
+
+    # Register script in ALL scene collections that contain the target scene
+    # This ensures the script works regardless of which collection is active
+
+    if ($IsPortable) {
+        $scenesDir = Join-Path $OBSPath "config\obs-studio\basic\scenes"
+    } else {
+        $scenesDir = Join-Path $env:APPDATA "obs-studio\basic\scenes"
+    }
+
+    if (-not (Test-Path $scenesDir)) {
+        Write-Warning "Scenes directory not found"
+        return $false
+    }
+
+    $registeredCount = 0
+    $sceneFiles = Get-ChildItem -Path $scenesDir -Filter "*.json" |
+        Where-Object { $_.Name -notmatch '\.bak$' }
+
+    foreach ($file in $sceneFiles) {
+        try {
+            $content = Get-Content $file.FullName -Raw -Encoding UTF8
+            $sceneData = $content | ConvertFrom-Json
+
+            # Check if this collection contains the target scene
+            $hasScene = $false
+            if ($sceneData.sources) {
+                $hasScene = $sceneData.sources | Where-Object { $_.name -eq $SceneName }
+            }
+
+            if ($hasScene) {
+                $collectionName = $file.BaseName
+                Write-Debug "Found scene '$SceneName' in collection: $collectionName"
+
+                # Register in this collection
+                if (Register-OBSScript -OBSPath $OBSPath -IsPortable $IsPortable -ScriptPath $ScriptPath -SceneCollectionName $collectionName -PlaylistURL $PlaylistURL) {
+                    $registeredCount++
+                    Write-Info "Registered in: $collectionName"
+                }
+            }
+        } catch {
+            Write-Debug "Error processing $($file.Name): $_"
+        }
+    }
+
+    if ($registeredCount -eq 0) {
+        # No collections had the scene, try registering in the most recently modified one
+        Write-Debug "Scene not found in any collection, using default"
+        $defaultCollection = Get-OBSSceneCollectionFromConfig -OBSPath $OBSPath -IsPortable $IsPortable
+        return Register-OBSScript -OBSPath $OBSPath -IsPortable $IsPortable -ScriptPath $ScriptPath -SceneCollectionName $defaultCollection -PlaylistURL $PlaylistURL
+    }
+
+    return $true
+}
+
 function Register-OBSScript {
     param(
         [string]$OBSPath,
@@ -1973,10 +2036,8 @@ function Install-OBSYouTubePlayer {
 
             # Register script BEFORE starting OBS so it loads with settings
             Write-Step "Pre-registering script in OBS config..."
-            $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
             $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
-            Write-Info "Scene collection: $sceneCollection"
-            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+            if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
                 Write-Success "Script pre-registered with settings"
                 $scriptRegistered = $true
             } else {
@@ -2020,10 +2081,8 @@ function Install-OBSYouTubePlayer {
 
         # Register script first (OBS will need restart to load it)
         Write-Step "Registering script in OBS config..."
-        $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
         $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
-        Write-Info "Scene collection: $sceneCollection"
-        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+        if (Register-OBSScriptInAllCollections -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneName $script:InstanceName -PlaylistURL $playlistURL) {
             Write-Success "Script registered with settings"
             $scriptRegistered = $true
         }
