@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.1-dev.1"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -95,6 +95,186 @@ function Write-Warning {
     param([string]$Message)
     Write-Host "[~] $Message" -ForegroundColor DarkYellow
 }
+
+#region Python Installation Functions
+
+function Find-Python311 {
+    # Look for Python 3.11 in common locations (OBS requires 3.11 specifically)
+    $searchPaths = @(
+        "C:\Python311",
+        "C:\Python\Python311",
+        "$env:LOCALAPPDATA\Programs\Python\Python311",
+        "${env:ProgramFiles}\Python311",
+        "${env:ProgramFiles(x86)}\Python311"
+    )
+
+    foreach ($path in $searchPaths) {
+        $pythonExe = Join-Path $path "python.exe"
+        $pythonDll = Join-Path $path "python311.dll"
+        if ((Test-Path $pythonExe) -and (Test-Path $pythonDll)) {
+            Write-Debug "Found Python 3.11 at: $path"
+            return $path
+        }
+    }
+
+    # Also check PATH for python 3.11
+    try {
+        $pythonPath = (Get-Command python -ErrorAction SilentlyContinue).Source
+        if ($pythonPath) {
+            $version = & python --version 2>&1
+            if ($version -match "Python 3\.11") {
+                $pythonDir = Split-Path -Parent $pythonPath
+                $pythonDll = Join-Path $pythonDir "python311.dll"
+                if (Test-Path $pythonDll) {
+                    Write-Debug "Found Python 3.11 in PATH: $pythonDir"
+                    return $pythonDir
+                }
+            }
+        }
+    } catch {}
+
+    return $null
+}
+
+function Install-Python311 {
+    Write-Step "Python 3.11 is required for OBS scripts..."
+    Write-Info "Downloading Python 3.11 installer..."
+
+    $pythonUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
+    $installerPath = Join-Path $env:TEMP "python-3.11.9-amd64.exe"
+    $installDir = "C:\Python311"
+
+    try {
+        # Download Python installer
+        Invoke-WebRequest -Uri $pythonUrl -OutFile $installerPath -UseBasicParsing
+        Write-Success "Downloaded Python 3.11"
+
+        Write-Info "Installing Python 3.11 (this may take a minute)..."
+
+        # Silent install with specific options:
+        # - InstallAllUsers=0: Install for current user only (no admin required)
+        # - TargetDir: Install to C:\Python311 (standard location OBS looks for)
+        # - PrependPath=0: Don't modify PATH (avoid conflicts)
+        # - Include_pip=1: Include pip
+        # - Include_launcher=0: Don't install py launcher (avoid conflicts)
+        $installArgs = @(
+            "/quiet",
+            "InstallAllUsers=1",
+            "TargetDir=$installDir",
+            "PrependPath=0",
+            "Include_pip=1",
+            "Include_launcher=0",
+            "Include_test=0"
+        )
+
+        $process = Start-Process -FilePath $installerPath -ArgumentList $installArgs -Wait -PassThru
+
+        if ($process.ExitCode -eq 0) {
+            Write-Success "Python 3.11 installed to $installDir"
+            return $installDir
+        } else {
+            Write-Warning "Python installer exited with code $($process.ExitCode)"
+            Write-Info "You may need to install Python 3.11 manually"
+            return $null
+        }
+    } catch {
+        Write-Warning "Failed to install Python 3.11: $_"
+        Write-Info "Please install Python 3.11 manually from python.org"
+        return $null
+    } finally {
+        if (Test-Path $installerPath) {
+            Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Configure-OBSPython {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable,
+        [string]$PythonPath
+    )
+
+    try {
+        # Determine OBS scripting config path
+        if ($IsPortable) {
+            $configDir = Join-Path $OBSPath "config\obs-studio\plugin_config\obs-scripting"
+        } else {
+            $configDir = Join-Path $env:APPDATA "obs-studio\plugin_config\obs-scripting"
+        }
+
+        $configFile = Join-Path $configDir "config.json"
+
+        # Create directory if needed
+        if (-not (Test-Path $configDir)) {
+            New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        }
+
+        # The Python path for OBS needs to point to the directory containing python311.dll
+        $pythonDllPath = $PythonPath.Replace('\', '/')
+
+        # Create OBS scripting config
+        $config = @{
+            "python_path" = $pythonDllPath
+        }
+
+        $config | ConvertTo-Json | Set-Content $configFile -Encoding UTF8
+
+        Write-Success "OBS Python configured: $pythonDllPath"
+        return $true
+    } catch {
+        Write-Warning "Failed to configure OBS Python: $_"
+        return $false
+    }
+}
+
+function Ensure-Python311 {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    Write-Step "Checking Python 3.11 installation..."
+
+    # First check if Python 3.11 is installed
+    $pythonPath = Find-Python311
+
+    if (-not $pythonPath) {
+        Write-Warning "Python 3.11 not found"
+
+        if ($script:NonInteractive) {
+            Write-Info "Installing Python 3.11 (non-interactive mode)"
+            $pythonPath = Install-Python311
+        } else {
+            Write-Host ""
+            Write-Host "OBS requires Python 3.11 for scripts to work." -ForegroundColor White
+            Write-Host "Would you like to install Python 3.11 now?" -ForegroundColor White
+            Write-Host ""
+            $install = Read-Host "Install Python 3.11? (Y/n)"
+            if ($install -eq "" -or $install -ieq "y" -or $install -ieq "yes") {
+                $pythonPath = Install-Python311
+            } else {
+                Write-Info "Skipping Python installation"
+                Write-Warning "Scripts will not work until Python 3.11 is installed and configured"
+                return $null
+            }
+        }
+    } else {
+        Write-Success "Python 3.11 found at: $pythonPath"
+    }
+
+    if ($pythonPath) {
+        # Configure OBS to use this Python installation
+        Write-Step "Configuring OBS to use Python 3.11..."
+        if (Configure-OBSPython -OBSPath $OBSPath -IsPortable $IsPortable -PythonPath $pythonPath) {
+            return $pythonPath
+        }
+    }
+
+    return $null
+}
+
+#endregion
 
 #region OBS Detection Functions
 
@@ -1594,6 +1774,9 @@ function Install-OBSYouTubePlayer {
         Write-Step "Creating install directory..."
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
     }
+
+    # Step 5c: Ensure Python 3.11 is installed and configured for OBS
+    $script:PythonConfigured = Ensure-Python311 -OBSPath $obsPath -IsPortable $isPortable
 
     # Step 6: Download and install files
     try {
