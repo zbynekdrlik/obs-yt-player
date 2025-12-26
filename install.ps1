@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.6"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.7"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -867,7 +867,22 @@ function Register-OBSScript {
         if ($IsPortable) {
             $scenesDir = Join-Path $OBSPath "config\obs-studio\basic\scenes"
         } else {
+            # Try current user's AppData first
             $scenesDir = Join-Path $env:APPDATA "obs-studio\basic\scenes"
+
+            # If not found, search other users' AppData (for multi-user scenarios)
+            if (-not (Test-Path $scenesDir)) {
+                $usersDir = Split-Path (Split-Path $env:USERPROFILE)
+                $userDirs = Get-ChildItem $usersDir -Directory -ErrorAction SilentlyContinue
+                foreach ($userDir in $userDirs) {
+                    $altPath = Join-Path $userDir.FullName "AppData\Roaming\obs-studio\basic\scenes"
+                    if (Test-Path $altPath) {
+                        $scenesDir = $altPath
+                        Write-Debug "Found OBS config at: $scenesDir"
+                        break
+                    }
+                }
+            }
         }
 
         # Find scene collection file
