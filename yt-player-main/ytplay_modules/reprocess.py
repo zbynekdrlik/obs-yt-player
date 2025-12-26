@@ -107,8 +107,8 @@ def reprocess_video(video_info):
         new_filename = f"{safe_song}_{safe_artist}_{video_id}_normalized.mp4"
         new_path = os.path.join(cache_dir, new_filename)
 
-        # Rename the file if paths are different
-        if current_path != new_path and os.path.exists(current_path):
+        # Rename the file if paths are different (normalize for comparison)
+        if os.path.normpath(current_path) != os.path.normpath(new_path) and os.path.exists(current_path):
             try:
                 # Remove new path if it exists (shouldn't happen)
                 if os.path.exists(new_path):

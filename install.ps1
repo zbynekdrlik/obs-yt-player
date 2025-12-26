@@ -17,8 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$InstallerVersion = "1.1.0"
-$InstallerCommit = "f439c15"  # Update on each commit
+$ScriptVersion = "v4.3.0-dev.11"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -34,10 +33,30 @@ $script:wsMessageId = 0
 $script:wsPassword = ""
 $script:DebugMode = $env:YTPLAY_DEBUG -eq "1"
 
+# Non-interactive mode via environment variables
+# Set these to bypass Read-Host prompts:
+#   YTPLAY_PLAYLIST_URL - Playlist URL or preset number (1-8)
+#   YTPLAY_GEMINI_KEY - Gemini API key (optional)
+#   YTPLAY_INSTANCE_NAME - Instance name (uses playlist default if not set)
+#   YTPLAY_OBS_PATH - Custom OBS path (uses auto-detect if not set)
+#   YTPLAY_START_OBS - "Y" or "N" to start/not start OBS
+#   YTPLAY_AUTO_CONFIRM - Set to "1" to auto-accept all confirmations
+$script:NonInteractive = $env:YTPLAY_AUTO_CONFIRM -eq "1"
+$script:EnvPlaylistURL = $env:YTPLAY_PLAYLIST_URL
+$script:EnvGeminiKey = $env:YTPLAY_GEMINI_KEY
+$script:EnvInstanceName = $env:YTPLAY_INSTANCE_NAME
+$script:EnvOBSPath = $env:YTPLAY_OBS_PATH
+$script:EnvStartOBS = $env:YTPLAY_START_OBS
+
 function Write-Header {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "  OBS YouTube Player Installer" -ForegroundColor Cyan
+    Write-Host "  OBS YouTube Player Installer " -NoNewline -ForegroundColor Cyan
+    if ($ScriptVersion -match "dev") {
+        Write-Host "[$ScriptVersion]" -ForegroundColor Yellow
+    } else {
+        Write-Host "[$ScriptVersion]" -ForegroundColor Green
+    }
     Write-Host "========================================" -ForegroundColor Cyan
     if ($script:DebugMode) {
         Write-Host "  [DEBUG MODE ENABLED]" -ForegroundColor Magenta
@@ -146,15 +165,28 @@ function Get-OBSConfigDirectory {
 }
 
 function Request-InstanceName {
+    # Use playlist name as default if available, otherwise use DefaultInstanceName
+    $defaultName = if ($script:SelectedPlaylistName) { $script:SelectedPlaylistName } else { $DefaultInstanceName }
+
+    # Non-interactive mode
+    if ($script:NonInteractive) {
+        $name = if ($script:EnvInstanceName) { $script:EnvInstanceName } else { $defaultName }
+        Write-Info "Using instance name: $name (non-interactive mode)"
+        if ($name -notmatch '^[a-zA-Z][a-zA-Z0-9_-]*$') {
+            Write-ErrorMsg "Invalid instance name from environment. Using default."
+            $name = $defaultName
+        }
+        return $name.ToLower()
+    }
+
     Write-Host ""
     Write-Host "Instance name determines your scene name in OBS." -ForegroundColor Gray
-    Write-Host "Examples: ytplay, worship, music, ambient" -ForegroundColor Gray
     Write-Host ""
 
-    $name = Read-Host "Instance name [$DefaultInstanceName]"
+    $name = Read-Host "Instance name [$defaultName]"
 
     if ([string]::IsNullOrWhiteSpace($name)) {
-        $name = $DefaultInstanceName
+        $name = $defaultName
     }
 
     # Validate name (alphanumeric, underscore, hyphen only)
@@ -847,6 +879,36 @@ function Get-OBSCurrentSceneCollection {
     return $null
 }
 
+function Get-OBSSceneCollectionFromConfig {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    # Read current scene collection from OBS global.ini (no WebSocket needed)
+    try {
+        if ($IsPortable) {
+            $globalIni = Join-Path $OBSPath "config\obs-studio\global.ini"
+        } else {
+            $globalIni = Join-Path $env:APPDATA "obs-studio\global.ini"
+        }
+
+        if (Test-Path $globalIni) {
+            $content = Get-Content $globalIni -Raw
+            if ($content -match 'SceneCollection=(.+)') {
+                $sceneCollection = $matches[1].Trim()
+                Write-Debug "Found scene collection from config: $sceneCollection"
+                return $sceneCollection
+            }
+        }
+
+        # Default to "Untitled" if not found
+        return "Untitled"
+    } catch {
+        return "Untitled"
+    }
+}
+
 function Register-OBSScript {
     param(
         [string]$OBSPath,
@@ -861,7 +923,22 @@ function Register-OBSScript {
         if ($IsPortable) {
             $scenesDir = Join-Path $OBSPath "config\obs-studio\basic\scenes"
         } else {
+            # Try current user's AppData first
             $scenesDir = Join-Path $env:APPDATA "obs-studio\basic\scenes"
+
+            # If not found, search other users' AppData (for multi-user scenarios)
+            if (-not (Test-Path $scenesDir)) {
+                $usersDir = Split-Path (Split-Path $env:USERPROFILE)
+                $userDirs = Get-ChildItem $usersDir -Directory -ErrorAction SilentlyContinue
+                foreach ($userDir in $userDirs) {
+                    $altPath = Join-Path $userDir.FullName "AppData\Roaming\obs-studio\basic\scenes"
+                    if (Test-Path $altPath) {
+                        $scenesDir = $altPath
+                        Write-Debug "Found OBS config at: $scenesDir"
+                        break
+                    }
+                }
+            }
         }
 
         # Find scene collection file
@@ -888,26 +965,35 @@ function Register-OBSScript {
         $scriptSettings = [PSCustomObject]@{}
         if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
             $scriptSettings | Add-Member -NotePropertyName "playlist_url" -NotePropertyValue $PlaylistURL -Force
+            Write-Debug "Setting playlist_url: $PlaylistURL"
         }
+        if (-not [string]::IsNullOrEmpty($script:GeminiApiKey)) {
+            $scriptSettings | Add-Member -NotePropertyName "gemini_api_key" -NotePropertyValue $script:GeminiApiKey -Force
+            Write-Debug "Setting gemini_api_key: [REDACTED]"
+        }
+        Write-Info "Saving settings: playlist=$(-not [string]::IsNullOrEmpty($PlaylistURL)), gemini=$(-not [string]::IsNullOrEmpty($script:GeminiApiKey))"
 
-        # Check if script already registered
+        # Check if script already registered (normalize paths for comparison)
         $scripts = @($sceneData.modules.'scripts-tool')
         $existingIndex = -1
+        $normalizedScriptPath = $ScriptPath.Replace('\', '/')
         for ($i = 0; $i -lt $scripts.Count; $i++) {
-            if ($scripts[$i].path -eq $ScriptPath) {
+            $existingPath = $scripts[$i].path.Replace('\', '/')
+            if ($existingPath -eq $normalizedScriptPath) {
                 $existingIndex = $i
                 break
             }
         }
 
         if ($existingIndex -ge 0) {
-            # Update existing script settings
+            # Update existing script entry (normalize path and update settings)
             Write-Info "Updating script settings..."
+            $scripts[$existingIndex].path = $normalizedScriptPath
             $scripts[$existingIndex].settings = $scriptSettings
         } else {
-            # Add new script entry
+            # Add new script entry (use forward slashes to match OBS format)
             $scriptEntry = [PSCustomObject]@{
-                path = $ScriptPath
+                path = $normalizedScriptPath
                 settings = $scriptSettings
             }
             $scripts += $scriptEntry
@@ -973,31 +1059,28 @@ function Download-Repository {
         $Release = $null
     )
 
-    # Use passed release or fetch if not provided
-    if (-not $Release) {
-        $Release = Get-LatestRelease
-    }
+    # Use passed release - don't auto-fetch (caller controls this)
+    # For dev versions, $Release will be $null intentionally
 
-    $script:InstalledVersion = $null
+    # Always use ScriptVersion as the unified version
+    $script:InstalledVersion = $ScriptVersion
+
+    Write-Host ""
+    Write-Host "  Installing: " -NoNewline
+    if ($ScriptVersion -match "dev") {
+        Write-Host "$ScriptVersion" -ForegroundColor Yellow
+    } else {
+        Write-Host "$ScriptVersion" -ForegroundColor Green
+    }
+    Write-Host ""
 
     if ($Release) {
-        $version = $Release.tag_name
-        $script:InstalledVersion = $version
-        Write-Host ""
-        Write-Host "  Installing: " -NoNewline
-        Write-Host "$version" -ForegroundColor Green
-        Write-Host ""
-        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/tags/$version.zip"
-        $extractFolder = "$RepoName-$($version.TrimStart('v'))"
+        # Download from release tag
+        $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/tags/$($Release.tag_name).zip"
+        $extractFolder = "$RepoName-$($Release.tag_name.TrimStart('v'))"
     } else {
-        # Download from configured branch (development mode)
+        # Download from branch (development mode)
         $branchName = $RepoBranch -replace '/', '-'
-        $version = "$branchName-$(Get-Date -Format 'yyyyMMdd')"
-        $script:InstalledVersion = $version
-        Write-Host ""
-        Write-Host "  Installing: " -NoNewline
-        Write-Host "$version (dev)" -ForegroundColor Yellow
-        Write-Host ""
         $downloadUrl = "https://github.com/$RepoOwner/$RepoName/archive/refs/heads/$RepoBranch.zip"
         $extractFolder = "$RepoName-$branchName"
     }
@@ -1100,6 +1183,11 @@ function Confirm-Installation {
     Write-Host "  $Path" -ForegroundColor Yellow
     Write-Host ""
 
+    if ($script:NonInteractive) {
+        Write-Info "Auto-accepting detected OBS path (non-interactive mode)"
+        return $true
+    }
+
     $response = Read-Host "Install OBS YouTube Player here? (Y/n)"
     return ($response -eq "" -or $response -ieq "y" -or $response -ieq "yes")
 }
@@ -1127,22 +1215,123 @@ function Request-CustomPath {
     return $customPath
 }
 
-function Request-PlaylistURL {
-    $defaultURL = "https://www.youtube.com/playlist?list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U"
-
+function Request-GeminiApiKey {
     Write-Host ""
-    Write-Host "Enter your YouTube playlist URL" -ForegroundColor White
-    Write-Host "Default (press Enter): " -NoNewline -ForegroundColor Gray
-    Write-Host $defaultURL -ForegroundColor DarkCyan
+    Write-Host "Gemini API key (optional, for better song/artist detection)" -ForegroundColor White
+    Write-Host "Get free key at: " -NoNewline -ForegroundColor Gray
+    Write-Host "https://makersuite.google.com/app/apikey" -ForegroundColor Blue
     Write-Host ""
 
-    $url = Read-Host "Playlist URL"
-
-    if ([string]::IsNullOrWhiteSpace($url)) {
-        Write-Info "Using default playlist"
-        return $defaultURL
+    if ($script:NonInteractive -and $script:EnvGeminiKey) {
+        Write-Info "Using Gemini API key from environment (non-interactive mode)"
+        Write-Success "Gemini API key configured"
+        return $script:EnvGeminiKey
     }
-    return $url
+
+    if ($script:NonInteractive) {
+        Write-Info "No Gemini API key provided (non-interactive mode)"
+        return $null
+    }
+
+    $key = Read-Host "Gemini API key (Enter to skip)"
+
+    if ([string]::IsNullOrWhiteSpace($key)) {
+        Write-Info "Skipping Gemini - will use basic title parsing"
+        return $null
+    }
+
+    Write-Success "Gemini API key configured"
+    return $key
+}
+
+function Request-PlaylistURL {
+    # Predefined playlists
+    $playlists = @(
+        @{ Name = "ytfast"; Desc = "Fast/upbeat music"; URL = "https://www.youtube.com/watch?v=9vpwt0LdFhs&list=PLFdHTR758BvdEXF1tZ_3g8glRuev6EC6U" }
+        @{ Name = "ytslow"; Desc = "Slow/calm music"; URL = "https://www.youtube.com/watch?v=iWuqiILKtgc&list=PLFdHTR758Bvd9c7dKV-ZZFQ1jg30ahHFq" }
+        @{ Name = "yt90s"; Desc = "90s hits"; URL = "https://www.youtube.com/watch?v=r1_MOB2kJ_U&list=PLFdHTR758BvfM0XYF6Q2nEDnW0CqHXI17" }
+        @{ Name = "ytwarmup"; Desc = "Warmup music"; URL = "https://www.youtube.com/watch?v=N50kF0FE3hM&list=PLFdHTR758BvcHRX3nVKMEPHuBdU75dBVE" }
+        @{ Name = "ytworship"; Desc = "Worship songs"; URL = "https://www.youtube.com/watch?v=poFZcg6f4J4&list=PLFdHTR758BveEaqE5BWIQI7ukkijjdbbG" }
+        @{ Name = "ytpresence"; Desc = "Presence/ambient"; URL = "https://www.youtube.com/watch?v=mYjdVQX2cJQ&list=PLFdHTR758BveAZ9YDY4ALy9iGxQVrkGRl" }
+        @{ Name = "ytchristmas"; Desc = "Christmas music"; URL = "https://www.youtube.com/watch?v=aC2LUPJ3dOk&list=PLFdHTR758BvfFgZlzcL17qvB307ysgHvn" }
+        @{ Name = "ytyoung"; Desc = "Youth/young music"; URL = "https://www.youtube.com/watch?v=NQJyrsHn9K8&list=PLFdHTR758Bvegbr-HbkHM_C6-SwOP6xVE" }
+    )
+
+    # Non-interactive mode: use environment variable
+    if ($script:NonInteractive -and $script:EnvPlaylistURL) {
+        $envChoice = $script:EnvPlaylistURL
+        # Check if it's a number (preset) or URL
+        if ($envChoice -match '^\d+$') {
+            $choiceNum = [int]$envChoice
+            if ($choiceNum -ge 1 -and $choiceNum -le $playlists.Count) {
+                $selected = $playlists[$choiceNum - 1]
+                Write-Info "Using preset playlist: $($selected.Name) (non-interactive mode)"
+                Write-Success "Selected: $($selected.Name)"
+                $script:SelectedPlaylistName = $selected.Name
+                return $selected.URL
+            }
+        } else {
+            # It's a URL
+            Write-Info "Using playlist URL from environment (non-interactive mode)"
+            $script:SelectedPlaylistName = $null
+            return $envChoice
+        }
+    }
+
+    if ($script:NonInteractive) {
+        # Default to first playlist
+        $selected = $playlists[0]
+        Write-Info "Using default playlist (non-interactive mode)"
+        Write-Success "Selected: $($selected.Name)"
+        $script:SelectedPlaylistName = $selected.Name
+        return $selected.URL
+    }
+
+    Write-Host ""
+    Write-Host "Select a playlist:" -ForegroundColor White
+    Write-Host ""
+
+    for ($i = 0; $i -lt $playlists.Count; $i++) {
+        $num = $i + 1
+        $name = $playlists[$i].Name
+        $desc = $playlists[$i].Desc
+        Write-Host "  $num. " -NoNewline -ForegroundColor Cyan
+        Write-Host "$name" -NoNewline -ForegroundColor White
+        Write-Host " - $desc" -ForegroundColor Gray
+    }
+
+    $customNum = $playlists.Count + 1
+    Write-Host "  $customNum. " -NoNewline -ForegroundColor Cyan
+    Write-Host "Custom URL" -ForegroundColor White
+    Write-Host ""
+
+    $choice = Read-Host "Choice [1]"
+
+    if ([string]::IsNullOrWhiteSpace($choice)) {
+        $choice = 1
+    }
+
+    $choiceNum = [int]$choice
+    if ($choiceNum -ge 1 -and $choiceNum -le $playlists.Count) {
+        $selected = $playlists[$choiceNum - 1]
+        Write-Success "Selected: $($selected.Name)"
+        $script:SelectedPlaylistName = $selected.Name
+        return $selected.URL
+    } elseif ($choiceNum -eq $customNum) {
+        Write-Host ""
+        $url = Read-Host "Enter playlist URL"
+        $script:SelectedPlaylistName = $null
+        if ([string]::IsNullOrWhiteSpace($url)) {
+            Write-Warning "No URL entered, using default"
+            $script:SelectedPlaylistName = $playlists[0].Name
+            return $playlists[0].URL
+        }
+        return $url
+    } else {
+        Write-Warning "Invalid choice, using default"
+        $script:SelectedPlaylistName = $playlists[0].Name
+        return $playlists[0].URL
+    }
 }
 
 #endregion
@@ -1217,26 +1406,34 @@ function Show-SuccessMessage {
     Write-Host "$($script:InstalledVersion)" -ForegroundColor Green
     Write-Host ""
 
-    if ($AutoConfigured) {
-        Write-Success "OBS scene and sources configured"
+    if ($AutoConfigured -and $ScriptRegistered) {
+        # Everything is done - script is registered and scene/sources created
+        Write-Success "OBS scene and sources configured automatically"
+        Write-Success "Script registered and loaded with settings"
         Write-Host ""
-        Write-Host "Remaining step in OBS Studio:" -ForegroundColor White
+        Write-Host "Your player is ready to use!" -ForegroundColor Green
+    } elseif ($AutoConfigured) {
+        # Scene created but script not registered (shouldn't happen normally)
+        Write-Success "OBS scene and sources configured automatically"
         Write-Host ""
-        Write-Host "1. " -NoNewline -ForegroundColor Cyan
-        Write-Host "Add the script:"
-        Write-Host "   Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
-        Write-Host "   $fullScriptPath" -ForegroundColor Yellow
-
-        if (-not [string]::IsNullOrEmpty($PlaylistURL)) {
-            Write-Host ""
-            Write-Host "2. " -NoNewline -ForegroundColor Cyan
-            Write-Host "Set playlist URL in script properties:" -ForegroundColor White
-            Write-Host "   $PlaylistURL" -ForegroundColor Yellow
-        } else {
-            Write-Host ""
-            Write-Host "2. " -NoNewline -ForegroundColor Cyan
-            Write-Host "Configure playlist URL in script properties" -ForegroundColor White
-        }
+        Write-Host "Remaining step:" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  Add the script in OBS:" -ForegroundColor Gray
+        Write-Host "  Tools -> Scripts -> Click '+' -> Select:" -ForegroundColor Gray
+        Write-Host "  $fullScriptPath" -ForegroundColor Yellow
+    } elseif ($ScriptRegistered) {
+        # Script registered but scene not created (OBS didn't start or WebSocket failed)
+        Write-Success "Script registered in OBS config"
+        Write-Host ""
+        Write-Host "Remaining steps:" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  1. Open OBS Studio" -ForegroundColor Gray
+        Write-Host "  2. Create scene: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($script:InstanceName)" -ForegroundColor Cyan
+        Write-Host "  3. Add Media Source: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($script:InstanceName)_video" -ForegroundColor Cyan
+        Write-Host "  4. Add Text Source: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($script:InstanceName)_title" -ForegroundColor Cyan
     } else {
         Show-ManualInstructions -ScriptPath $ScriptPath
     }
@@ -1314,20 +1511,30 @@ function Install-OBSYouTubePlayer {
         Write-Info "$installDir (Documents folder)"
     }
 
-    # Check for latest release version first
-    Write-Step "Checking for latest version..."
-    $release = Get-LatestRelease
-    $latestVersion = if ($release) { $release.tag_name } else { $null }
-
-    if ($latestVersion) {
-        Write-Success "Latest release: $latestVersion"
+    # Check version - dev installer uses dev branch, release installer uses release
+    $release = $null
+    if ($ScriptVersion -match "dev") {
+        Write-Info "Development version - will install from dev branch"
+        $RepoBranch = "dev"  # Override to use dev branch
+    } else {
+        Write-Step "Checking for latest version..."
+        $release = Get-LatestRelease
+        if ($release) {
+            Write-Success "Latest release: $($release.tag_name)"
+        }
     }
 
-    # Show existing instances with version info
+    # Step 5: Select playlist first (determines default instance name)
+    $playlistURL = Request-PlaylistURL
+
+    # Step 5b: Ask for Gemini API key
+    $script:GeminiApiKey = Request-GeminiApiKey
+
+    # Show existing instances
     $existingInstances = Get-ExistingInstances -InstallDir $installDir
     Show-ExistingInstances -Instances $existingInstances -LatestVersion $latestVersion
 
-    # Step 5: Get instance name
+    # Step 6: Get instance name (defaults to playlist name)
     $script:InstanceName = Request-InstanceName
 
     # Check if instance already exists
@@ -1347,10 +1554,15 @@ function Install-OBSYouTubePlayer {
         }
 
         Write-Host ""
-        $update = Read-Host "Update this instance? (Y/n)"
-        if ($update -ine "" -and $update -ine "y" -and $update -ine "yes") {
-            Write-Info "Installation cancelled"
-            return
+
+        if ($script:NonInteractive) {
+            Write-Info "Auto-updating instance (non-interactive mode)"
+        } else {
+            $update = Read-Host "Update this instance? (Y/n)"
+            if ($update -ine "" -and $update -ine "y" -and $update -ine "yes") {
+                Write-Info "Installation cancelled"
+                return
+            }
         }
 
         # Check if OBS is running - it may lock files during update
@@ -1360,10 +1572,15 @@ function Install-OBSYouTubePlayer {
             Write-Host "  The script may have files locked that need to be updated." -ForegroundColor Gray
             Write-Host "  Please close OBS before continuing, or unload the script." -ForegroundColor Gray
             Write-Host ""
-            $continue = Read-Host "Continue anyway? (y/N)"
-            if ($continue -ine "y" -and $continue -ine "yes") {
-                Write-Info "Please close OBS and run the installer again"
-                return
+
+            if ($script:NonInteractive) {
+                Write-Info "Continuing anyway (non-interactive mode)"
+            } else {
+                $continue = Read-Host "Continue anyway? (y/N)"
+                if ($continue -ine "y" -and $continue -ine "yes") {
+                    Write-Info "Please close OBS and run the installer again"
+                    return
+                }
             }
         }
     }
@@ -1391,10 +1608,7 @@ function Install-OBSYouTubePlayer {
         return
     }
 
-    # Step 7: Ask for playlist URL
-    $playlistURL = Request-PlaylistURL
-
-    # Step 8: Try to configure OBS via WebSocket
+    # Step 7: Try to configure OBS via WebSocket
     $autoConfigured = $false
     $scriptRegistered = $false
 
@@ -1406,7 +1620,14 @@ function Install-OBSYouTubePlayer {
     if (-not $obsRunning) {
         Write-Info "OBS is not running"
         Write-Host ""
-        $startOBS = Read-Host "Start OBS now to auto-configure scene/sources? (Y/n)"
+
+        $startOBS = "Y"
+        if ($script:NonInteractive) {
+            $startOBS = if ($script:EnvStartOBS) { $script:EnvStartOBS } else { "Y" }
+            Write-Info "Start OBS: $startOBS (non-interactive mode)"
+        } else {
+            $startOBS = Read-Host "Start OBS now to auto-configure scene/sources? (Y/n)"
+        }
 
         if ($startOBS -eq "" -or $startOBS -ieq "y" -or $startOBS -ieq "yes") {
             # Enable WebSocket in OBS config before starting
@@ -1419,23 +1640,45 @@ function Install-OBSYouTubePlayer {
                 # If auth is required, offer to disable or enter password
                 if ($wsConfig.AuthRequired) {
                     Write-Warning "WebSocket authentication is enabled"
-                    Write-Host ""
-                    Write-Host "Options:" -ForegroundColor White
-                    Write-Host "  1. Enter your WebSocket password" -ForegroundColor Gray
-                    Write-Host "  2. Disable authentication (recommended for local use)" -ForegroundColor Gray
-                    Write-Host ""
-                    $authChoice = Read-Host "Choose (1 or 2)"
 
-                    if ($authChoice -eq "2") {
-                        # Disable authentication
+                    if ($script:NonInteractive) {
+                        # In non-interactive mode, disable auth for automation
+                        Write-Info "Disabling authentication (non-interactive mode)"
                         $disableResult = Disable-OBSWebSocketAuth -OBSPath $obsPath -IsPortable $isPortable
                         if ($disableResult) {
                             Write-Success "Authentication disabled"
                         }
                     } else {
-                        $script:wsPassword = Read-Host "Enter your OBS WebSocket password"
+                        Write-Host ""
+                        Write-Host "Options:" -ForegroundColor White
+                        Write-Host "  1. Enter your WebSocket password" -ForegroundColor Gray
+                        Write-Host "  2. Disable authentication (recommended for local use)" -ForegroundColor Gray
+                        Write-Host ""
+                        $authChoice = Read-Host "Choose (1 or 2)"
+
+                        if ($authChoice -eq "2") {
+                            # Disable authentication
+                            $disableResult = Disable-OBSWebSocketAuth -OBSPath $obsPath -IsPortable $isPortable
+                            if ($disableResult) {
+                                Write-Success "Authentication disabled"
+                            }
+                        } else {
+                            $script:wsPassword = Read-Host "Enter your OBS WebSocket password"
+                        }
                     }
                 }
+            }
+
+            # Register script BEFORE starting OBS so it loads with settings
+            Write-Step "Pre-registering script in OBS config..."
+            $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
+            $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
+            Write-Info "Scene collection: $sceneCollection"
+            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+                Write-Success "Script pre-registered with settings"
+                $scriptRegistered = $true
+            } else {
+                Write-Warning "Could not pre-register script"
             }
 
             Write-Step "Starting OBS Studio..."
@@ -1481,18 +1724,97 @@ function Install-OBSYouTubePlayer {
             }
         }
     } else {
-        # OBS is already running
+        # OBS is already running - register script and offer restart
         Write-Success "OBS is already running"
 
-        # Check if WebSocket auth is configured
-        $wsConfig = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
-        if ($wsConfig.AuthRequired) {
-            Write-Warning "WebSocket authentication is enabled"
-            Write-Host ""
-            $script:wsPassword = Read-Host "Enter your OBS WebSocket password (or press Enter to skip auto-config)"
-            if ([string]::IsNullOrEmpty($script:wsPassword)) {
-                Write-Info "Skipping auto-configuration"
+        # Register script first (OBS will need restart to load it)
+        Write-Step "Registering script in OBS config..."
+        $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
+        $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
+        Write-Info "Scene collection: $sceneCollection"
+        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+            Write-Success "Script registered with settings"
+            $scriptRegistered = $true
+        }
+
+        Write-Host ""
+        Write-Warning "OBS needs to restart to load the new script"
+
+        $restartOBS = "Y"
+        if ($script:NonInteractive) {
+            $restartOBS = if ($script:EnvStartOBS) { $script:EnvStartOBS } else { "Y" }
+            Write-Info "Restart OBS: $restartOBS (non-interactive mode)"
+        } else {
+            $restartOBS = Read-Host "Restart OBS now? (Y/n)"
+        }
+
+        if ($restartOBS -eq "" -or $restartOBS -ieq "y" -or $restartOBS -ieq "yes") {
+            # Graceful shutdown via WebSocket if possible
+            Write-Step "Closing OBS gracefully..."
+            try {
+                $ws = Connect-OBSWebSocket -Password $script:wsPassword
+                if ($ws) {
+                    Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS" | Out-Null
+                    Close-OBSWebSocket
+                    Start-Sleep -Seconds 3
+                }
+            } catch {
+                # Fallback to taskkill (without /F for graceful)
+                Stop-Process -Name "obs64" -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 3
+            }
+
+            # Wait for OBS to fully close
+            $waitCount = 0
+            while ((Test-OBSRunning) -and $waitCount -lt 10) {
+                Start-Sleep -Seconds 1
+                $waitCount++
+            }
+
+            if (Test-OBSRunning) {
+                Write-Warning "OBS did not close. Please restart manually."
                 $obsRunning = $false
+            } else {
+                # Start OBS again
+                Write-Step "Starting OBS..."
+                $obsExe = Join-Path $obsPath "bin\64bit\obs64.exe"
+                if (-not (Test-Path $obsExe)) {
+                    $obsExe = Join-Path $obsPath "bin\32bit\obs32.exe"
+                }
+                $obsDir = Split-Path -Parent $obsExe
+                Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+
+                # Wait for OBS to start
+                $waitTime = 0
+                while (-not (Test-OBSRunning) -and $waitTime -lt 30) {
+                    Start-Sleep -Seconds 2
+                    $waitTime += 2
+                }
+
+                if (Test-OBSRunning) {
+                    Write-Success "OBS restarted with script loaded"
+                    Start-Sleep -Seconds 15  # Wait for initialization
+                } else {
+                    Write-Warning "OBS did not restart"
+                    $obsRunning = $false
+                }
+            }
+        } else {
+            Write-Info "Please restart OBS manually to load the script"
+            $obsRunning = $false
+        }
+
+        # Check if WebSocket auth is configured for scene/source creation
+        if ($obsRunning) {
+            $wsConfig = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
+            if ($wsConfig.AuthRequired) {
+                Write-Warning "WebSocket authentication is enabled"
+                Write-Host ""
+                $script:wsPassword = Read-Host "Enter your OBS WebSocket password (or press Enter to skip auto-config)"
+                if ([string]::IsNullOrEmpty($script:wsPassword)) {
+                    Write-Info "Skipping auto-configuration"
+                    $obsRunning = $false
+                }
             }
         }
     }
@@ -1607,8 +1929,23 @@ function Install-OBSYouTubePlayer {
                         Write-Warning "Some sources could not be created automatically"
                     }
 
-                    # Note: Script registration via JSON is unreliable, so we always show manual instructions
-                    # The scene and sources are the complex part - adding a script is just one click
+                    # Script was pre-registered before OBS started, just verify settings
+                    if (-not $scriptRegistered) {
+                        Write-Step "Registering script in OBS..."
+                        $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                        if ($sceneCollection) {
+                            $scriptFilePath = Join-Path $installedPath "$instName.py"
+                            Write-Info "Saving settings to scene collection '$sceneCollection'..."
+                            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+                                Write-Success "Script settings saved"
+                                $scriptRegistered = $true
+                            } else {
+                                Write-Warning "Failed to save script settings"
+                            }
+                        } else {
+                            Write-Warning "Could not get current scene collection"
+                        }
+                    }
                 } else {
                     Write-Warning "Could not create scene - OBS may need more time to initialize"
                     Write-Info "Please create the scene manually after OBS is fully loaded"
@@ -1718,21 +2055,30 @@ function Install-OBSYouTubePlayer {
                                         if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryDelay }
                                     }
 
-                                    # Register the script in OBS
-                                    Write-Step "Registering script in OBS..."
-                                    $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
-                                    if ($sceneCollection) {
-                                        $scriptFilePath = Join-Path $installedPath "$instName.py"
-                                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
-                                            Write-Success "Script registered (restart OBS to load)"
-                                            $scriptRegistered = $true
+                                    # Script was pre-registered, just verify if needed
+                                    if (-not $scriptRegistered) {
+                                        Write-Step "Registering script in OBS..."
+                                        $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                                        Write-Debug "Scene collection: $sceneCollection"
+                                        if ($sceneCollection) {
+                                            $scriptFilePath = Join-Path $installedPath "$instName.py"
+                                            Write-Info "Saving settings to scene collection '$sceneCollection'..."
+                                            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+                                                Write-Success "Script settings saved"
+                                                $scriptRegistered = $true
+                                            } else {
+                                                Write-Warning "Failed to save script settings"
+                                            }
+                                        } else {
+                                            Write-Warning "Could not get current scene collection"
                                         }
                                     }
 
                                     $autoConfigured = $true
                                 }
                             } catch {
-                                Write-Warning "Error: $_"
+                                Write-Warning "WebSocket error: $_"
+                                Write-Warning "Stack: $($_.ScriptStackTrace)"
                             } finally {
                                 Close-OBSWebSocket
                             }

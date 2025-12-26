@@ -129,8 +129,8 @@ def update_media_source(video_path, force_reload=False):
             current_file = obs.obs_data_get_string(current_settings, "local_file")
             obs.obs_data_release(current_settings)
 
-            # Check if we're trying to load the same file
-            is_same_file = current_file == video_path
+            # Check if we're trying to load the same file (normalize paths for comparison)
+            is_same_file = os.path.normpath(current_file) == os.path.normpath(video_path)
 
             # If it's the same file or force_reload is True, we need a multi-step reload
             if is_same_file or force_reload:
