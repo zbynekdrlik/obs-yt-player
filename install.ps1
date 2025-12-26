@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.7"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.8"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -1688,8 +1688,21 @@ function Install-OBSYouTubePlayer {
                         Write-Warning "Some sources could not be created automatically"
                     }
 
-                    # Note: Script registration via JSON is unreliable, so we always show manual instructions
-                    # The scene and sources are the complex part - adding a script is just one click
+                    # Register the script in OBS config
+                    Write-Step "Registering script in OBS..."
+                    $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                    if ($sceneCollection) {
+                        $scriptFilePath = Join-Path $installedPath "$instName.py"
+                        Write-Info "Saving settings to scene collection '$sceneCollection'..."
+                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+                            Write-Success "Script settings saved"
+                            $scriptRegistered = $true
+                        } else {
+                            Write-Warning "Failed to save script settings"
+                        }
+                    } else {
+                        Write-Warning "Could not get current scene collection"
+                    }
                 } else {
                     Write-Warning "Could not create scene - OBS may need more time to initialize"
                     Write-Info "Please create the scene manually after OBS is fully loaded"
