@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"  # Faster downloads
 
 # Configuration
-$ScriptVersion = "v4.3.0-dev.10"  # Set to "vX.Y.Z" for releases
+$ScriptVersion = "v4.3.0-dev.11"  # Set to "vX.Y.Z" for releases
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
 $RepoBranch = "main"  # Branch to download from (when no release)
@@ -853,6 +853,36 @@ function Get-OBSCurrentSceneCollection {
     return $null
 }
 
+function Get-OBSSceneCollectionFromConfig {
+    param(
+        [string]$OBSPath,
+        [bool]$IsPortable
+    )
+
+    # Read current scene collection from OBS global.ini (no WebSocket needed)
+    try {
+        if ($IsPortable) {
+            $globalIni = Join-Path $OBSPath "config\obs-studio\global.ini"
+        } else {
+            $globalIni = Join-Path $env:APPDATA "obs-studio\global.ini"
+        }
+
+        if (Test-Path $globalIni) {
+            $content = Get-Content $globalIni -Raw
+            if ($content -match 'SceneCollection=(.+)') {
+                $sceneCollection = $matches[1].Trim()
+                Write-Debug "Found scene collection from config: $sceneCollection"
+                return $sceneCollection
+            }
+        }
+
+        # Default to "Untitled" if not found
+        return "Untitled"
+    } catch {
+        return "Untitled"
+    }
+}
+
 function Register-OBSScript {
     param(
         [string]$OBSPath,
@@ -1520,6 +1550,18 @@ function Install-OBSYouTubePlayer {
                 }
             }
 
+            # Register script BEFORE starting OBS so it loads with settings
+            Write-Step "Pre-registering script in OBS config..."
+            $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
+            $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
+            Write-Info "Scene collection: $sceneCollection"
+            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+                Write-Success "Script pre-registered with settings"
+                $scriptRegistered = $true
+            } else {
+                Write-Warning "Could not pre-register script"
+            }
+
             Write-Step "Starting OBS Studio..."
 
             # Find OBS executable
@@ -1563,18 +1605,90 @@ function Install-OBSYouTubePlayer {
             }
         }
     } else {
-        # OBS is already running
+        # OBS is already running - register script and offer restart
         Write-Success "OBS is already running"
 
-        # Check if WebSocket auth is configured
-        $wsConfig = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
-        if ($wsConfig.AuthRequired) {
-            Write-Warning "WebSocket authentication is enabled"
-            Write-Host ""
-            $script:wsPassword = Read-Host "Enter your OBS WebSocket password (or press Enter to skip auto-config)"
-            if ([string]::IsNullOrEmpty($script:wsPassword)) {
-                Write-Info "Skipping auto-configuration"
+        # Register script first (OBS will need restart to load it)
+        Write-Step "Registering script in OBS config..."
+        $sceneCollection = Get-OBSSceneCollectionFromConfig -OBSPath $obsPath -IsPortable $isPortable
+        $scriptFilePath = Join-Path $installedPath "$($script:InstanceName).py"
+        Write-Info "Scene collection: $sceneCollection"
+        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+            Write-Success "Script registered with settings"
+            $scriptRegistered = $true
+        }
+
+        Write-Host ""
+        Write-Warning "OBS needs to restart to load the new script"
+        $restartOBS = Read-Host "Restart OBS now? (Y/n)"
+
+        if ($restartOBS -eq "" -or $restartOBS -ieq "y" -or $restartOBS -ieq "yes") {
+            # Graceful shutdown via WebSocket if possible
+            Write-Step "Closing OBS gracefully..."
+            try {
+                $ws = Connect-OBSWebSocket -Password $script:wsPassword
+                if ($ws) {
+                    Send-OBSRequest -WebSocket $ws -RequestType "ExitOBS" | Out-Null
+                    Close-OBSWebSocket
+                    Start-Sleep -Seconds 3
+                }
+            } catch {
+                # Fallback to taskkill (without /F for graceful)
+                Stop-Process -Name "obs64" -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 3
+            }
+
+            # Wait for OBS to fully close
+            $waitCount = 0
+            while ((Test-OBSRunning) -and $waitCount -lt 10) {
+                Start-Sleep -Seconds 1
+                $waitCount++
+            }
+
+            if (Test-OBSRunning) {
+                Write-Warning "OBS did not close. Please restart manually."
                 $obsRunning = $false
+            } else {
+                # Start OBS again
+                Write-Step "Starting OBS..."
+                $obsExe = Join-Path $obsPath "bin\64bit\obs64.exe"
+                if (-not (Test-Path $obsExe)) {
+                    $obsExe = Join-Path $obsPath "bin\32bit\obs32.exe"
+                }
+                $obsDir = Split-Path -Parent $obsExe
+                Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+
+                # Wait for OBS to start
+                $waitTime = 0
+                while (-not (Test-OBSRunning) -and $waitTime -lt 30) {
+                    Start-Sleep -Seconds 2
+                    $waitTime += 2
+                }
+
+                if (Test-OBSRunning) {
+                    Write-Success "OBS restarted with script loaded"
+                    Start-Sleep -Seconds 15  # Wait for initialization
+                } else {
+                    Write-Warning "OBS did not restart"
+                    $obsRunning = $false
+                }
+            }
+        } else {
+            Write-Info "Please restart OBS manually to load the script"
+            $obsRunning = $false
+        }
+
+        # Check if WebSocket auth is configured for scene/source creation
+        if ($obsRunning) {
+            $wsConfig = Enable-OBSWebSocket -OBSPath $obsPath -IsPortable $isPortable
+            if ($wsConfig.AuthRequired) {
+                Write-Warning "WebSocket authentication is enabled"
+                Write-Host ""
+                $script:wsPassword = Read-Host "Enter your OBS WebSocket password (or press Enter to skip auto-config)"
+                if ([string]::IsNullOrEmpty($script:wsPassword)) {
+                    Write-Info "Skipping auto-configuration"
+                    $obsRunning = $false
+                }
             }
         }
     }
@@ -1689,20 +1803,22 @@ function Install-OBSYouTubePlayer {
                         Write-Warning "Some sources could not be created automatically"
                     }
 
-                    # Register the script in OBS config
-                    Write-Step "Registering script in OBS..."
-                    $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
-                    if ($sceneCollection) {
-                        $scriptFilePath = Join-Path $installedPath "$instName.py"
-                        Write-Info "Saving settings to scene collection '$sceneCollection'..."
-                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
-                            Write-Success "Script settings saved"
-                            $scriptRegistered = $true
+                    # Script was pre-registered before OBS started, just verify settings
+                    if (-not $scriptRegistered) {
+                        Write-Step "Registering script in OBS..."
+                        $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                        if ($sceneCollection) {
+                            $scriptFilePath = Join-Path $installedPath "$instName.py"
+                            Write-Info "Saving settings to scene collection '$sceneCollection'..."
+                            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+                                Write-Success "Script settings saved"
+                                $scriptRegistered = $true
+                            } else {
+                                Write-Warning "Failed to save script settings"
+                            }
                         } else {
-                            Write-Warning "Failed to save script settings"
+                            Write-Warning "Could not get current scene collection"
                         }
-                    } else {
-                        Write-Warning "Could not get current scene collection"
                     }
                 } else {
                     Write-Warning "Could not create scene - OBS may need more time to initialize"
@@ -1813,21 +1929,23 @@ function Install-OBSYouTubePlayer {
                                         if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryDelay }
                                     }
 
-                                    # Register the script in OBS
-                                    Write-Step "Registering script in OBS..."
-                                    $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
-                                    Write-Debug "Scene collection: $sceneCollection"
-                                    if ($sceneCollection) {
-                                        $scriptFilePath = Join-Path $installedPath "$instName.py"
-                                        Write-Info "Saving settings to scene collection '$sceneCollection'..."
-                                        if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
-                                            Write-Success "Script settings saved"
-                                            $scriptRegistered = $true
+                                    # Script was pre-registered, just verify if needed
+                                    if (-not $scriptRegistered) {
+                                        Write-Step "Registering script in OBS..."
+                                        $sceneCollection = Get-OBSCurrentSceneCollection -WebSocket $ws
+                                        Write-Debug "Scene collection: $sceneCollection"
+                                        if ($sceneCollection) {
+                                            $scriptFilePath = Join-Path $installedPath "$instName.py"
+                                            Write-Info "Saving settings to scene collection '$sceneCollection'..."
+                                            if (Register-OBSScript -OBSPath $obsPath -IsPortable $isPortable -ScriptPath $scriptFilePath -SceneCollectionName $sceneCollection -PlaylistURL $playlistURL) {
+                                                Write-Success "Script settings saved"
+                                                $scriptRegistered = $true
+                                            } else {
+                                                Write-Warning "Failed to save script settings"
+                                            }
                                         } else {
-                                            Write-Warning "Failed to save script settings"
+                                            Write-Warning "Could not get current scene collection"
                                         }
-                                    } else {
-                                        Write-Warning "Could not get current scene collection"
                                     }
 
                                     $autoConfigured = $true
