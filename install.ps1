@@ -110,41 +110,56 @@ function Write-Warning {
 
 #region Python Installation Functions
 
-function Find-Python311 {
-    # Look for Python 3.11 in common locations (OBS requires 3.11 specifically)
-    $searchPaths = @(
-        "C:\Python311",
-        "C:\Python\Python311",
-        "$env:LOCALAPPDATA\Programs\Python\Python311",
-        "${env:ProgramFiles}\Python311",
-        "${env:ProgramFiles(x86)}\Python311"
-    )
+function Find-CompatiblePython {
+    # Look for Python 3.11 or 3.12 in common locations (OBS supports both)
+    # Check 3.12 first as it's newer
+    $versions = @("312", "311")
 
-    foreach ($path in $searchPaths) {
-        $pythonExe = Join-Path $path "python.exe"
-        $pythonDll = Join-Path $path "python311.dll"
-        if ((Test-Path $pythonExe) -and (Test-Path $pythonDll)) {
-            Write-Debug "Found Python 3.11 at: $path"
-            return $path
+    foreach ($ver in $versions) {
+        $searchPaths = @(
+            "C:\Python$ver",
+            "C:\Python\Python$ver",
+            "$env:LOCALAPPDATA\Programs\Python\Python$ver",
+            "${env:ProgramFiles}\Python$ver",
+            "${env:ProgramFiles(x86)}\Python$ver"
+        )
+
+        foreach ($path in $searchPaths) {
+            $pythonExe = Join-Path $path "python.exe"
+            $pythonDll = Join-Path $path "python$ver.dll"
+            if ((Test-Path $pythonExe) -and (Test-Path $pythonDll)) {
+                Write-Debug "Found Python 3.$($ver.Substring(1)) at: $path"
+                return @{ Path = $path; Version = "3.$($ver.Substring(1))" }
+            }
         }
     }
 
-    # Also check PATH for python 3.11
+    # Also check PATH for python 3.11 or 3.12
     try {
         $pythonPath = (Get-Command python -ErrorAction SilentlyContinue).Source
         if ($pythonPath) {
             $version = & python --version 2>&1
-            if ($version -match "Python 3\.11") {
+            if ($version -match "Python 3\.(11|12)") {
                 $pythonDir = Split-Path -Parent $pythonPath
-                $pythonDll = Join-Path $pythonDir "python311.dll"
+                $verNum = $Matches[1]
+                $pythonDll = Join-Path $pythonDir "python3$verNum.dll"
                 if (Test-Path $pythonDll) {
-                    Write-Debug "Found Python 3.11 in PATH: $pythonDir"
-                    return $pythonDir
+                    Write-Debug "Found Python 3.$verNum in PATH: $pythonDir"
+                    return @{ Path = $pythonDir; Version = "3.$verNum" }
                 }
             }
         }
     } catch {}
 
+    return $null
+}
+
+function Find-Python311 {
+    # Legacy wrapper for backward compatibility
+    $result = Find-CompatiblePython
+    if ($result) {
+        return $result.Path
+    }
     return $null
 }
 
@@ -259,20 +274,48 @@ function Ensure-Python311 {
         [bool]$IsPortable
     )
 
-    Write-Step "Checking Python 3.11 installation..."
+    Write-Step "Checking Python installation..."
 
-    # First check if Python 3.11 is installed
-    $pythonPath = Find-Python311
+    # First, check if OBS already has Python configured
+    $existingPythonPath = $null
+    if ($IsPortable) {
+        $userIni = Join-Path $OBSPath "config\obs-studio\user.ini"
+    } else {
+        $userIni = Join-Path $env:APPDATA "obs-studio\user.ini"
+    }
 
-    if (-not $pythonPath) {
-        Write-Warning "Python 3.11 not found"
+    if (Test-Path $userIni) {
+        $content = Get-Content $userIni -Raw -ErrorAction SilentlyContinue
+        if ($content -match '\[Python\][\r\n]+Path64bit=([^\r\n]+)') {
+            $configuredPath = $Matches[1].Trim()
+            # Normalize path (OBS uses forward slashes)
+            $configuredPath = $configuredPath.Replace('/', '\')
+            $pythonExe = Join-Path $configuredPath "python.exe"
+            if (Test-Path $pythonExe) {
+                # Verify it's a compatible version
+                try {
+                    $version = & $pythonExe --version 2>&1
+                    if ($version -match "Python 3\.(11|12)") {
+                        Write-Success "OBS already configured with Python $($Matches[0]) at: $configuredPath"
+                        return $configuredPath
+                    }
+                } catch {}
+            }
+        }
+    }
+
+    # Check for Python 3.11 or 3.12 on the system
+    $pythonResult = Find-CompatiblePython
+
+    if (-not $pythonResult) {
+        Write-Warning "Python 3.11/3.12 not found"
 
         if ($script:NonInteractive) {
             Write-Info "Installing Python 3.11 (non-interactive mode)"
             $pythonPath = Install-Python311
         } else {
             Write-Host ""
-            Write-Host "OBS requires Python 3.11 for scripts to work." -ForegroundColor White
+            Write-Host "OBS requires Python 3.11 or 3.12 for scripts to work." -ForegroundColor White
             Write-Host "Would you like to install Python 3.11 now?" -ForegroundColor White
             Write-Host ""
             $install = Read-Host "Install Python 3.11? (Y/n)"
@@ -280,17 +323,19 @@ function Ensure-Python311 {
                 $pythonPath = Install-Python311
             } else {
                 Write-Info "Skipping Python installation"
-                Write-Warning "Scripts will not work until Python 3.11 is installed and configured"
+                Write-Warning "Scripts will not work until Python 3.11 or 3.12 is installed and configured"
                 return $null
             }
         }
     } else {
-        Write-Success "Python 3.11 found at: $pythonPath"
+        $pythonPath = $pythonResult.Path
+        $pythonVersion = $pythonResult.Version
+        Write-Success "Python $pythonVersion found at: $pythonPath"
     }
 
     if ($pythonPath) {
         # Configure OBS to use this Python installation
-        Write-Step "Configuring OBS to use Python 3.11..."
+        Write-Step "Configuring OBS to use Python..."
         if (Configure-OBSPython -OBSPath $OBSPath -IsPortable $IsPortable -PythonPath $pythonPath) {
             return $pythonPath
         }
@@ -1483,10 +1528,13 @@ function Register-OBSScript {
         }
         Write-Info "Saving settings: playlist=$(-not [string]::IsNullOrEmpty($PlaylistURL)), gemini=$(-not [string]::IsNullOrEmpty($script:GeminiApiKey))"
 
-        # Check if script already registered (normalize paths for comparison)
+        # Check if script already registered (by path or by script filename)
         $scripts = @($sceneData.modules.'scripts-tool')
         $existingIndex = -1
         $normalizedScriptPath = $ScriptPath.Replace('\', '/')
+        $scriptFileName = Split-Path -Leaf $ScriptPath
+
+        # First, look for exact path match
         for ($i = 0; $i -lt $scripts.Count; $i++) {
             $existingPath = $scripts[$i].path.Replace('\', '/')
             if ($existingPath -eq $normalizedScriptPath) {
@@ -1495,9 +1543,25 @@ function Register-OBSScript {
             }
         }
 
+        # If no exact match, look for same script filename at different location
+        # This handles upgrades where the install location changes
+        if ($existingIndex -lt 0) {
+            for ($i = 0; $i -lt $scripts.Count; $i++) {
+                $existingPath = $scripts[$i].path.Replace('\', '/')
+                $existingFileName = Split-Path -Leaf $existingPath
+                if ($existingFileName -eq $scriptFileName) {
+                    Write-Info "Found existing script '$scriptFileName' at different location"
+                    Write-Info "  Old: $existingPath"
+                    Write-Info "  New: $normalizedScriptPath"
+                    $existingIndex = $i
+                    break
+                }
+            }
+        }
+
         if ($existingIndex -ge 0) {
-            # Update existing script entry (normalize path and update settings)
-            Write-Info "Updating script settings..."
+            # Update existing script entry (update path and settings)
+            Write-Info "Updating script entry..."
             $scripts[$existingIndex].path = $normalizedScriptPath
             $scripts[$existingIndex].settings = $scriptSettings
         } else {
