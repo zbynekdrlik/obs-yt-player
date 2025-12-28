@@ -72,3 +72,4 @@ tmp/
 yt-player-*/
 !yt-player-main/
 .coverage
+TARGETS.md
