@@ -59,10 +59,25 @@ update_all_instances.bat
 - **NEVER merge PRs** - only the user can merge PRs, Claude must wait for user approval
 - Always work on `dev` branch and create PRs for user review
 
-**Before creating PR to main:**
-- `install.ps1` line 22: `$RepoBranch = "main"` (not "dev")
-- `yt-player-main/VERSION`: Must NOT contain "-dev" suffix (e.g., use "4.3.3" not "4.3.3-dev.1")
-- CI will reject PRs that violate these rules
+## Version Management
+
+**Dev branch must always have development versions** so users testing `irm .../dev/install.ps1` know they're running unreleased code.
+
+| Branch | VERSION format | install.ps1 $RepoBranch | Example |
+|--------|---------------|------------------------|---------|
+| `dev` | `X.Y.Z-dev.N` | `"dev"` | `4.3.4-dev.1` |
+| `main` | `X.Y.Z` | `"main"` | `4.3.4` |
+
+**Workflow:**
+1. Start work on `dev` with VERSION like `4.3.4-dev.1`
+2. Make changes, push to dev - CI verifies dev format
+3. Before PR merge: change VERSION to `4.3.4` and RepoBranch to `"main"`
+4. CI blocks PRs with wrong format
+5. After merge: delete dev, recreate with `4.3.5-dev.1` for next task
+
+**CI enforces:**
+- Dev branch pushes: VERSION must contain `-dev`, RepoBranch must be `"dev"`
+- PRs to main: VERSION must NOT contain `-dev`, RepoBranch must be `"main"`
 
 This project has one developer using Claude as a tool - not a multi-developer workflow.
 

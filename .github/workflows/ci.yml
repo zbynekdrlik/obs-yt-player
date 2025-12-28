@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
     branches: [main]
 
@@ -83,36 +83,69 @@ jobs:
       - name: Verify installer branch configuration
         shell: pwsh
         run: |
-          # On main branch or PRs to main, $RepoBranch must be "main"
+          $gitRef = "${{ github.ref }}"
+          $eventName = "${{ github.event_name }}"
+          $isMainContext = ($gitRef -eq "refs/heads/main") -or ($eventName -eq "pull_request")
+
           $content = Get-Content -Path "install.ps1" -Raw
           if ($content -match '\$RepoBranch\s*=\s*"(\w+)"') {
             $branch = $Matches[1]
             Write-Host "Installer RepoBranch is set to: $branch"
-            if ($branch -ne "main") {
-              Write-Error "ERROR: install.ps1 has RepoBranch='$branch' but must be 'main' for main branch/PRs"
-              Write-Error "Change line 22 to: `$RepoBranch = `"main`""
-              exit 1
+            Write-Host "Git ref: $gitRef, Event: $eventName, IsMainContext: $isMainContext"
+
+            if ($isMainContext) {
+              # PRs to main or pushes to main: must use "main"
+              if ($branch -ne "main") {
+                Write-Error "ERROR: install.ps1 has RepoBranch='$branch' but must be 'main' for main branch/PRs"
+                Write-Error "Change line 22 to: `$RepoBranch = `"main`""
+                exit 1
+              }
+              Write-Host "Branch configuration is correct for main branch"
+            } else {
+              # Pushes to dev: must use "dev"
+              if ($branch -ne "dev") {
+                Write-Error "ERROR: install.ps1 has RepoBranch='$branch' but must be 'dev' on dev branch"
+                Write-Error "Change line 22 to: `$RepoBranch = `"dev`""
+                exit 1
+              }
+              Write-Host "Branch configuration is correct for dev branch"
             }
-            Write-Host "Branch configuration is correct for main branch"
           } else {
             Write-Error "Could not find RepoBranch variable in install.ps1"
             exit 1
           }
 
-      - name: Verify VERSION is release-ready
+      - name: Verify VERSION format
         shell: pwsh
         run: |
-          # On main branch or PRs to main, VERSION must not contain "-dev"
+          $gitRef = "${{ github.ref }}"
+          $eventName = "${{ github.event_name }}"
+          $isMainContext = ($gitRef -eq "refs/heads/main") -or ($eventName -eq "pull_request")
+
           $version = Get-Content -Path "yt-player-main/VERSION" -Raw
           $version = $version.Trim()
           Write-Host "VERSION file contains: $version"
-          if ($version -match "-dev") {
-            Write-Error "ERROR: VERSION '$version' contains '-dev' suffix"
-            Write-Error "Development versions cannot be merged to main branch"
-            Write-Error "Update yt-player-main/VERSION to a release version (e.g., '4.3.3')"
-            exit 1
+          Write-Host "Git ref: $gitRef, Event: $eventName, IsMainContext: $isMainContext"
+
+          if ($isMainContext) {
+            # PRs to main or pushes to main: VERSION must NOT contain "-dev"
+            if ($version -match "-dev") {
+              Write-Error "ERROR: VERSION '$version' contains '-dev' suffix"
+              Write-Error "Development versions cannot be merged to main branch"
+              Write-Error "Update yt-player-main/VERSION to a release version (e.g., '4.3.4')"
+              exit 1
+            }
+            Write-Host "VERSION is release-ready: $version"
+          } else {
+            # Pushes to dev: VERSION must contain "-dev"
+            if ($version -notmatch "-dev") {
+              Write-Error "ERROR: VERSION '$version' does not contain '-dev' suffix"
+              Write-Error "Dev branch must have development version (e.g., '4.3.4-dev.1')"
+              Write-Error "This prevents confusion between dev and release installations"
+              exit 1
+            }
+            Write-Host "VERSION is correctly marked as development: $version"
           }
-          Write-Host "VERSION is release-ready: $version"
 
   security:
     name: Security Scan
