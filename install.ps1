@@ -31,7 +31,8 @@ try {
 $ScriptFolder = "yt-player-main"
 $DefaultInstanceName = "ytplay"
 $script:InstanceName = "ytplay"  # Will be set by user
-$OBSWebSocketPort = 4455
+$OBSWebSocketPort = 4455  # Default, will be updated from OBS config
+$script:DetectedWSPort = $null  # Stores detected port from OBS config
 $DefaultInstallDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "OBS-YouTube-Player"
 
 # Global WebSocket state
@@ -661,6 +662,40 @@ function Show-ExistingInstances {
 
 #region OBS WebSocket Functions
 
+function Get-OBSWebSocketPort {
+    <#
+    .SYNOPSIS
+        Detects the WebSocket port from OBS configuration.
+    .DESCRIPTION
+        Reads the obs-websocket plugin config to get the actual port.
+        Falls back to default port 4455 if config not found.
+    .PARAMETER OBSConfigPath
+        Path to OBS config directory (e.g., AppData\Roaming\obs-studio or portable config folder)
+    #>
+    param([string]$OBSConfigPath)
+
+    $defaultPort = 4455
+
+    if (-not $OBSConfigPath -or -not (Test-Path $OBSConfigPath)) {
+        return $defaultPort
+    }
+
+    $wsConfigPath = Join-Path $OBSConfigPath "plugin_config\obs-websocket\config.json"
+    if (Test-Path $wsConfigPath) {
+        try {
+            $wsConfig = Get-Content $wsConfigPath -Raw | ConvertFrom-Json
+            if ($wsConfig.server_port) {
+                Write-Debug "Detected WebSocket port from config: $($wsConfig.server_port)"
+                return [int]$wsConfig.server_port
+            }
+        } catch {
+            Write-Debug "Failed to parse WebSocket config: $_"
+        }
+    }
+
+    return $defaultPort
+}
+
 function Test-OBSRunning {
     # Use detected process name if available (for renamed OBS like cg.exe)
     if ($script:OBSProcessName) {
@@ -679,7 +714,10 @@ function Connect-OBSWebSocket {
     )
 
     try {
-        $uri = "ws://127.0.0.1:$OBSWebSocketPort"
+        # Use detected port if available, otherwise use default
+        $port = if ($script:DetectedWSPort) { $script:DetectedWSPort } else { $OBSWebSocketPort }
+        $uri = "ws://127.0.0.1:$port"
+        Write-Debug "Connecting to WebSocket at $uri"
 
         $clientWebSocket = New-Object System.Net.WebSockets.ClientWebSocket
         $cts = New-Object System.Threading.CancellationTokenSource
@@ -1992,6 +2030,13 @@ function Install-OBSYouTubePlayer {
     # - Portable OBS: Inside OBS folder (scripts\OBS-YouTube-Player)
     # - System OBS: Documents\OBS-YouTube-Player
     $installDir = Get-InstallDirectory -OBSPath $obsPath -IsPortable $isPortable
+
+    # Detect WebSocket port from OBS config
+    $obsConfigDir = Get-OBSConfigDirectory -OBSPath $obsPath -IsPortable $isPortable
+    $script:DetectedWSPort = Get-OBSWebSocketPort -OBSConfigPath $obsConfigDir
+    if ($script:DetectedWSPort -ne $OBSWebSocketPort) {
+        Write-Debug "Using WebSocket port $($script:DetectedWSPort) from OBS config"
+    }
 
     Write-Step "Install location:"
     if ($isPortable) {
