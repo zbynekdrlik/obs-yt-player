@@ -19,7 +19,7 @@ $ProgressPreference = "SilentlyContinue"  # Faster downloads
 # Configuration
 $RepoOwner = "zbynekdrlik"
 $RepoName = "obs-yt-player"
-$RepoBranch = "main"  # Branch to download from (use "dev" on dev branch)
+$RepoBranch = "dev"  # Branch to download from (use "dev" on dev branch)
 
 # Fetch version from VERSION file in repo
 try {
@@ -2313,6 +2313,20 @@ function Install-OBSYouTubePlayer {
     if (-not (Test-Path $installDir)) {
         Write-Step "Creating install directory..."
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+    }
+
+    # Ensure the install directory has proper permissions for all users
+    # This is needed when installer runs via SSH as Administrator, but OBS runs as regular user
+    try {
+        $acl = Get-Acl $installDir
+        $usersRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+            "BUILTIN\Users", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow"
+        )
+        $acl.AddAccessRule($usersRule)
+        Set-Acl $installDir $acl
+    } catch {
+        # Non-fatal: permissions may already be correct or we don't have rights
+        Write-Debug "Could not set directory permissions: $_"
     }
 
     # Step 5c: Ensure Python 3.11 is installed and configured for OBS
