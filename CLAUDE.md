@@ -299,6 +299,31 @@ Start-ScheduledTask -TaskName \"StartOBS\"
 | Logs | `{OBS_PATH}\config\obs-studio\logs\` |
 | WebSocket config | `{OBS_PATH}\config\obs-studio\plugin_config\obs-websocket\config.json` |
 
+### Renamed OBS Executables
+When OBS is renamed (e.g., `obs64.exe` → `cg.exe`) for task manager clarity, updates break it because OBS downloads a new `obs64.exe` but the renamed exe stays outdated.
+
+**Solution:** The installer automatically creates a launcher batch file (e.g., `cg.bat`) that:
+1. Checks if `obs64.exe` exists (OBS auto-updated)
+2. Replaces the renamed exe with the updated `obs64.exe`
+3. Starts the renamed OBS in portable mode
+
+**Manual setup** (if installer didn't run or for existing installations):
+```batch
+REM Create {name}.bat in OBS root folder with this content:
+@echo off
+setlocal
+set "CUSTOM_EXE=%~n0"
+cd /d "%~dp0bin\64bit"
+if exist "obs64.exe" (
+    if exist "%CUSTOM_EXE%.exe" del /f "%CUSTOM_EXE%.exe"
+    move "obs64.exe" "%CUSTOM_EXE%.exe"
+)
+start "" "%CUSTOM_EXE%.exe" -p
+```
+The batch filename determines the exe name: `cg.bat` → runs `cg.exe`
+
+See `scripts/obs_launcher_template.bat` for documented template.
+
 ### Non-Interactive Installer Testing
 Set environment variables before running installer:
 ```powershell

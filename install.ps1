@@ -1910,6 +1910,91 @@ function Show-ManualInstructions {
     Write-Host ""
 }
 
+function Install-OBSLauncher {
+    <#
+    .SYNOPSIS
+        Creates an OBS launcher batch file for portable installations with renamed executables.
+    .DESCRIPTION
+        When OBS is renamed (e.g., obs64.exe -> cg.exe), OBS updates download a new obs64.exe,
+        leaving the renamed exe outdated. This launcher handles that by:
+        1. Checking if obs64.exe exists (OBS auto-updated)
+        2. If so, replacing the custom-named exe with the updated obs64.exe
+        3. Starting the custom-named OBS in portable mode
+    .PARAMETER OBSPath
+        The root path of the portable OBS installation.
+    .PARAMETER ProcessName
+        The name of the renamed OBS executable (without .exe extension).
+    #>
+    param(
+        [string]$OBSPath,
+        [string]$ProcessName
+    )
+
+    # Only create launcher if OBS is renamed (not obs64)
+    if ($ProcessName -ieq "obs64" -or $ProcessName -ieq "obs32") {
+        return
+    }
+
+    Write-Step "Creating OBS launcher for renamed executable..."
+
+    $launcherContent = @"
+@echo off
+REM OBS Portable Launcher - Handles updates for renamed OBS executables
+REM This file was created by OBS YouTube Player installer
+setlocal
+
+REM Get custom exe name from this batch file's name
+set "CUSTOM_EXE=%~n0"
+
+cd /d "%~dp0bin\64bit"
+
+REM Skip update logic if using default obs64 name
+if /i "%CUSTOM_EXE%"=="obs64" goto :start
+
+REM Check if obs64.exe exists (new update downloaded)
+if exist "obs64.exe" (
+    echo OBS update detected, updating %CUSTOM_EXE%.exe...
+    if exist "%CUSTOM_EXE%.exe" del /f "%CUSTOM_EXE%.exe"
+    move "obs64.exe" "%CUSTOM_EXE%.exe"
+    echo Update complete.
+)
+
+:start
+REM Start OBS in portable mode
+start "" "%CUSTOM_EXE%.exe" -p
+"@
+
+    $launcherPath = Join-Path $OBSPath "$ProcessName.bat"
+    try {
+        Set-Content -Path $launcherPath -Value $launcherContent -Encoding ASCII
+        Write-Success "Created launcher: $launcherPath"
+
+        # Update or create shortcut if one exists with matching name
+        $shortcutPath = Join-Path $OBSPath "$ProcessName.lnk"
+        if (Test-Path $shortcutPath) {
+            try {
+                $WshShell = New-Object -ComObject WScript.Shell
+                $Shortcut = $WshShell.CreateShortcut($shortcutPath)
+                $oldTarget = $Shortcut.TargetPath
+                $Shortcut.TargetPath = $launcherPath
+                $Shortcut.WorkingDirectory = $OBSPath
+                # Keep the exe icon
+                $exePath = Join-Path $OBSPath "bin\64bit\$ProcessName.exe"
+                if (Test-Path $exePath) {
+                    $Shortcut.IconLocation = "$exePath,0"
+                }
+                $Shortcut.Save()
+                Write-Success "Updated shortcut to use launcher"
+                Write-Debug "Shortcut target changed: $oldTarget -> $launcherPath"
+            } catch {
+                Write-Debug "Failed to update shortcut: $_"
+            }
+        }
+    } catch {
+        Write-Warning "Failed to create launcher: $_"
+    }
+}
+
 function Show-SuccessMessage {
     param(
         [string]$ScriptPath,
@@ -2682,7 +2767,12 @@ function Install-OBSYouTubePlayer {
         Write-Info "OBS is not running - skipping auto-configuration"
     }
 
-    # Step 9: Show completion message
+    # Step 9: Create OBS launcher for renamed executables (portable only)
+    if ($isPortable -and $script:OBSProcessName) {
+        Install-OBSLauncher -OBSPath $obsPath -ProcessName $script:OBSProcessName
+    }
+
+    # Step 10: Show completion message
     Show-SuccessMessage -ScriptPath $installedPath -AutoConfigured $autoConfigured -ScriptRegistered $scriptRegistered -PlaylistURL $playlistURL
 }
 
