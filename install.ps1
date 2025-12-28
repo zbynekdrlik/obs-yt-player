@@ -31,7 +31,8 @@ try {
 $ScriptFolder = "yt-player-main"
 $DefaultInstanceName = "ytplay"
 $script:InstanceName = "ytplay"  # Will be set by user
-$OBSWebSocketPort = 4455
+$OBSWebSocketPort = 4455  # Default, will be updated from OBS config
+$script:DetectedWSPort = $null  # Stores detected port from OBS config
 $DefaultInstallDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "OBS-YouTube-Player"
 
 # Global WebSocket state
@@ -39,6 +40,10 @@ $script:wsConnection = $null
 $script:wsMessageId = 0
 $script:wsPassword = ""
 $script:DebugMode = $env:YTPLAY_DEBUG -eq "1"
+
+# Portable OBS state - stores detected OBS executable info
+$script:OBSProcessName = $null  # Process name for renamed OBS exe (e.g., "cg" for cg.exe)
+$script:OBSExePath = $null      # Full path to detected OBS executable
 
 # Non-interactive mode via environment variables
 # Set these to bypass Read-Host prompts:
@@ -321,7 +326,8 @@ function Test-IsSSHSession {
 
 function Start-OBSViaScheduler {
     param(
-        [string]$OBSExePath
+        [string]$OBSExePath,
+        [bool]$IsPortable = $false
     )
 
     # Create a scheduled task to start OBS in the user's desktop session
@@ -336,7 +342,9 @@ function Start-OBSViaScheduler {
 
         # Create task to run OBS from its directory
         # Use cmd /c with proper escaping for paths with spaces
-        $action = "cmd /c cd /d `"$obsDir`" && start `"`" `"$OBSExePath`""
+        # Add -p flag for portable mode so OBS uses the portable config folder
+        $portableArg = if ($IsPortable) { " -p" } else { "" }
+        $action = "cmd /c cd /d `"$obsDir`" && start `"`" `"$OBSExePath`"$portableArg"
 
         # Create the task with /IT flag for interactive session
         $result = schtasks /Create /TN $taskName /TR $action /SC ONCE /ST 00:00 /RU $env:USERNAME /IT /F 2>&1
@@ -367,16 +375,18 @@ function Start-OBSViaScheduler {
 
 function Start-OBSProcess {
     param(
-        [string]$OBSPath
+        [string]$OBSPath,
+        [bool]$IsPortable = $false
     )
 
-    # Find OBS executable
-    $obsExe = Join-Path $OBSPath "bin\64bit\obs64.exe"
-    if (-not (Test-Path $obsExe)) {
-        $obsExe = Join-Path $OBSPath "bin\32bit\obs32.exe"
+    # Use previously detected OBS executable if available
+    $obsExe = $script:OBSExePath
+    if (-not $obsExe -or -not (Test-Path $obsExe)) {
+        # Fall back to finding OBS executable (handles renamed exe like cg.exe)
+        $obsExe = Find-OBSExecutable -Path $OBSPath
     }
 
-    if (-not (Test-Path $obsExe)) {
+    if (-not $obsExe) {
         Write-Warning "Could not find OBS executable at: $OBSPath"
         return $false
     }
@@ -386,7 +396,7 @@ function Start-OBSProcess {
     # Check if we need to use Task Scheduler (SSH/remote session)
     if ($script:NonInteractive -and (Test-IsSSHSession)) {
         Write-Debug "Detected SSH session, using Task Scheduler to start OBS"
-        if (Start-OBSViaScheduler -OBSExePath $obsExe) {
+        if (Start-OBSViaScheduler -OBSExePath $obsExe -IsPortable $IsPortable) {
             return $true
         } else {
             Write-Warning "Task Scheduler method failed, trying direct start"
@@ -394,7 +404,12 @@ function Start-OBSProcess {
     }
 
     # Direct start (normal case)
-    Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+    # Add -p flag for portable mode so OBS uses the portable config folder
+    if ($IsPortable) {
+        Start-Process -FilePath $obsExe -ArgumentList "-p" -WorkingDirectory $obsDir
+    } else {
+        Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+    }
     return $true
 }
 
@@ -402,23 +417,87 @@ function Start-OBSProcess {
 
 #region OBS Detection Functions
 
-function Test-PortableOBS {
+function Find-OBSExecutable {
+    <#
+    .SYNOPSIS
+        Finds the OBS executable in a given path, including renamed executables.
+    .DESCRIPTION
+        Searches for OBS executables in standard locations (bin\64bit, bin\32bit).
+        Detects renamed executables (e.g., cg.exe instead of obs64.exe) by checking
+        for companion files like obs-frontend-api.dll or obs.dll.
+    .PARAMETER Path
+        The OBS installation root path to search in.
+    .OUTPUTS
+        Returns the full path to the OBS executable, or $null if not found.
+    #>
     param([string]$Path)
 
-    $obsExePaths = @(
+    # First try standard OBS executable names
+    $standardPaths = @(
         (Join-Path $Path "bin\64bit\obs64.exe"),
         (Join-Path $Path "bin\32bit\obs32.exe"),
         (Join-Path $Path "obs64.exe")
     )
 
-    foreach ($exePath in $obsExePaths) {
+    foreach ($exePath in $standardPaths) {
         if (Test-Path $exePath) {
-            $dataPath = Join-Path $Path "data"
-            if (Test-Path $dataPath) {
-                return $true
+            return $exePath
+        }
+    }
+
+    # Check for renamed OBS executable in portable installations
+    # Look for any .exe in bin\64bit or bin\32bit that has obs-frontend-api.dll nearby
+    $binPaths = @(
+        (Join-Path $Path "bin\64bit"),
+        (Join-Path $Path "bin\32bit")
+    )
+
+    foreach ($binPath in $binPaths) {
+        if (Test-Path $binPath) {
+            # Check for OBS signature files (obs-frontend-api.dll or obs.dll)
+            $frontendApi = Join-Path $binPath "obs-frontend-api.dll"
+            $obsDll = Join-Path $binPath "obs.dll"
+
+            if ((Test-Path $frontendApi) -or (Test-Path $obsDll)) {
+                # Find exe files in this folder (excluding known non-OBS executables)
+                $excludeNames = @("obs-amf-test.exe", "obs-ffmpeg-mux.exe", "obs-nvenc-test.exe", "obs-qsv-test.exe")
+                $exeFiles = Get-ChildItem -Path $binPath -Filter "*.exe" -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -notin $excludeNames }
+
+                # Look for an exe that's likely the main OBS executable
+                # It should be relatively large (> 1MB) - the main OBS exe is typically 5MB+
+                foreach ($exe in $exeFiles) {
+                    if ($exe.Length -gt 1MB) {
+                        Write-Debug "Found potential OBS executable: $($exe.FullName)"
+                        return $exe.FullName
+                    }
+                }
             }
         }
     }
+
+    return $null
+}
+
+function Test-PortableOBS {
+    param([string]$Path)
+
+    # Check for data folder first (required for portable OBS)
+    $dataPath = Join-Path $Path "data"
+    if (-not (Test-Path $dataPath)) {
+        return $false
+    }
+
+    # Find OBS executable (including renamed ones)
+    $obsExe = Find-OBSExecutable -Path $Path
+    if ($obsExe) {
+        # Store the detected executable info for later use
+        $script:OBSExePath = $obsExe
+        $script:OBSProcessName = [System.IO.Path]::GetFileNameWithoutExtension($obsExe)
+        Write-Debug "Detected portable OBS executable: $obsExe (process: $($script:OBSProcessName))"
+        return $true
+    }
+
     return $false
 }
 
@@ -433,6 +512,9 @@ function Find-SystemOBS {
         if (Test-Path $path) {
             $obsExe = Join-Path $path "bin\64bit\obs64.exe"
             if (Test-Path $obsExe) {
+                # Store the detected executable info for system OBS
+                $script:OBSExePath = $obsExe
+                $script:OBSProcessName = "obs64"
                 return $path
             }
         }
@@ -580,7 +662,48 @@ function Show-ExistingInstances {
 
 #region OBS WebSocket Functions
 
+function Get-OBSWebSocketPort {
+    <#
+    .SYNOPSIS
+        Detects the WebSocket port from OBS configuration.
+    .DESCRIPTION
+        Reads the obs-websocket plugin config to get the actual port.
+        Falls back to default port 4455 if config not found.
+    .PARAMETER OBSConfigPath
+        Path to OBS config directory (e.g., AppData\Roaming\obs-studio or portable config folder)
+    #>
+    param([string]$OBSConfigPath)
+
+    $defaultPort = 4455
+
+    if (-not $OBSConfigPath -or -not (Test-Path $OBSConfigPath)) {
+        return $defaultPort
+    }
+
+    $wsConfigPath = Join-Path $OBSConfigPath "plugin_config\obs-websocket\config.json"
+    if (Test-Path $wsConfigPath) {
+        try {
+            $wsConfig = Get-Content $wsConfigPath -Raw | ConvertFrom-Json
+            if ($wsConfig.server_port) {
+                Write-Debug "Detected WebSocket port from config: $($wsConfig.server_port)"
+                return [int]$wsConfig.server_port
+            }
+        } catch {
+            Write-Debug "Failed to parse WebSocket config: $_"
+        }
+    }
+
+    return $defaultPort
+}
+
 function Test-OBSRunning {
+    # Use detected process name if available (for renamed OBS like cg.exe)
+    if ($script:OBSProcessName) {
+        $obsProcess = Get-Process -Name $script:OBSProcessName -ErrorAction SilentlyContinue
+        if ($obsProcess) { return $true }
+    }
+
+    # Fall back to standard OBS process names
     $obsProcess = Get-Process -Name "obs64", "obs32" -ErrorAction SilentlyContinue
     return $null -ne $obsProcess
 }
@@ -591,7 +714,10 @@ function Connect-OBSWebSocket {
     )
 
     try {
-        $uri = "ws://127.0.0.1:$OBSWebSocketPort"
+        # Use detected port if available, otherwise use default
+        $port = if ($script:DetectedWSPort) { $script:DetectedWSPort } else { $OBSWebSocketPort }
+        $uri = "ws://127.0.0.1:$port"
+        Write-Debug "Connecting to WebSocket at $uri"
 
         $clientWebSocket = New-Object System.Net.WebSockets.ClientWebSocket
         $cts = New-Object System.Threading.CancellationTokenSource
@@ -1577,6 +1703,23 @@ function Confirm-Installation {
 }
 
 function Request-CustomPath {
+    # Check for env var in non-interactive mode first
+    if ($script:NonInteractive -and $script:EnvOBSPath) {
+        $customPath = $script:EnvOBSPath
+        Write-Info "Using OBS path from environment: $customPath"
+        if (Test-Path $customPath) {
+            return $customPath
+        }
+        Write-ErrorMsg "Environment OBS path does not exist: $customPath"
+        return $null
+    }
+
+    # In non-interactive mode without env var, can't continue
+    if ($script:NonInteractive) {
+        Write-ErrorMsg "No OBS path provided in non-interactive mode (set YTPLAY_OBS_PATH)"
+        return $null
+    }
+
     Write-Host ""
     Write-ErrorMsg "Could not detect OBS installation automatically."
     Write-Host ""
@@ -1888,6 +2031,13 @@ function Install-OBSYouTubePlayer {
     # - System OBS: Documents\OBS-YouTube-Player
     $installDir = Get-InstallDirectory -OBSPath $obsPath -IsPortable $isPortable
 
+    # Detect WebSocket port from OBS config
+    $obsConfigDir = Get-OBSConfigDirectory -OBSPath $obsPath -IsPortable $isPortable
+    $script:DetectedWSPort = Get-OBSWebSocketPort -OBSConfigPath $obsConfigDir
+    if ($script:DetectedWSPort -ne $OBSWebSocketPort) {
+        Write-Debug "Using WebSocket port $($script:DetectedWSPort) from OBS config"
+    }
+
     Write-Step "Install location:"
     if ($isPortable) {
         Write-Info "$installDir (inside portable OBS)"
@@ -1980,7 +2130,8 @@ function Install-OBSYouTubePlayer {
                 }
                 if (Test-OBSRunning) {
                     Write-Info "Trying CloseMainWindow..."
-                    $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
+                    $procName = if ($script:OBSProcessName) { $script:OBSProcessName } else { "obs64" }
+                    $obs = Get-Process -Name $procName -ErrorAction SilentlyContinue
                     if ($obs) {
                         $obs.CloseMainWindow() | Out-Null
                         Start-Sleep -Seconds 5
@@ -1988,7 +2139,8 @@ function Install-OBSYouTubePlayer {
                 }
                 if (Test-OBSRunning) {
                     Write-Info "Forcing OBS close..."
-                    Stop-Process -Name "obs64" -Force -ErrorAction SilentlyContinue
+                    $procName = if ($script:OBSProcessName) { $script:OBSProcessName } else { "obs64" }
+                    Stop-Process -Name $procName -Force -ErrorAction SilentlyContinue
                     Start-Sleep -Seconds 2
                 }
                 if (Test-OBSRunning) {
@@ -2103,7 +2255,7 @@ function Install-OBSYouTubePlayer {
 
             Write-Step "Starting OBS Studio..."
 
-            if (Start-OBSProcess -OBSPath $obsPath) {
+            if (Start-OBSProcess -OBSPath $obsPath -IsPortable $isPortable) {
                 Write-Info "Waiting for OBS to start (up to 30 seconds)..."
 
                 # Wait for OBS to start (up to 30 seconds)
@@ -2175,7 +2327,8 @@ function Install-OBSYouTubePlayer {
             # Method 2: CloseMainWindow (graceful WM_CLOSE)
             if (Test-OBSRunning) {
                 Write-Info "Trying CloseMainWindow..."
-                $obs = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
+                $procName = if ($script:OBSProcessName) { $script:OBSProcessName } else { "obs64" }
+                $obs = Get-Process -Name $procName -ErrorAction SilentlyContinue
                 if ($obs) {
                     $obs.CloseMainWindow() | Out-Null
                     Start-Sleep -Seconds 5
@@ -2188,7 +2341,8 @@ function Install-OBSYouTubePlayer {
             # Method 3: Stop-Process (force kill as last resort)
             if (Test-OBSRunning) {
                 Write-Info "Forcing OBS close..."
-                Stop-Process -Name "obs64" -Force -ErrorAction SilentlyContinue
+                $procName = if ($script:OBSProcessName) { $script:OBSProcessName } else { "obs64" }
+                Stop-Process -Name $procName -Force -ErrorAction SilentlyContinue
                 Start-Sleep -Seconds 2
                 if (-not (Test-OBSRunning)) {
                     $closeMethod = "Stop-Process"
@@ -2212,7 +2366,7 @@ function Install-OBSYouTubePlayer {
 
                 # STEP 3: Start OBS again
                 Write-Step "Starting OBS..."
-                Start-OBSProcess -OBSPath $obsPath | Out-Null
+                Start-OBSProcess -OBSPath $obsPath -IsPortable $isPortable | Out-Null
 
                 # Wait for OBS to start
                 $waitTime = 0
