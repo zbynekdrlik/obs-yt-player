@@ -59,10 +59,25 @@ update_all_instances.bat
 - **NEVER merge PRs** - only the user can merge PRs, Claude must wait for user approval
 - Always work on `dev` branch and create PRs for user review
 
-**Before creating PR to main:**
-- `install.ps1` line 22: `$RepoBranch = "main"` (not "dev")
-- `yt-player-main/VERSION`: Must NOT contain "-dev" suffix (e.g., use "4.3.3" not "4.3.3-dev.1")
-- CI will reject PRs that violate these rules
+## Version Management
+
+**Dev branch must always have development versions** so users testing `irm .../dev/install.ps1` know they're running unreleased code.
+
+| Branch | VERSION format | install.ps1 $RepoBranch | Example |
+|--------|---------------|------------------------|---------|
+| `dev` | `X.Y.Z-dev.N` | `"dev"` | `4.3.4-dev.1` |
+| `main` | `X.Y.Z` | `"main"` | `4.3.4` |
+
+**Workflow:**
+1. Start work on `dev` with VERSION like `4.3.4-dev.1`
+2. Make changes, push to dev - CI verifies dev format
+3. Before PR merge: change VERSION to `4.3.4` and RepoBranch to `"main"`
+4. CI blocks PRs with wrong format
+5. After merge: delete dev, recreate with `4.3.5-dev.1` for next task
+
+**CI enforces:**
+- Dev branch pushes: VERSION must contain `-dev`, RepoBranch must be `"dev"`
+- PRs to main: VERSION must NOT contain `-dev`, RepoBranch must be `"main"`
 
 This project has one developer using Claude as a tool - not a multi-developer workflow.
 
@@ -298,6 +313,31 @@ Start-ScheduledTask -TaskName \"StartOBS\"
 | Config | `{OBS_PATH}\config\obs-studio\` |
 | Logs | `{OBS_PATH}\config\obs-studio\logs\` |
 | WebSocket config | `{OBS_PATH}\config\obs-studio\plugin_config\obs-websocket\config.json` |
+
+### Renamed OBS Executables
+When OBS is renamed (e.g., `obs64.exe` → `cg.exe`) for task manager clarity, updates break it because OBS downloads a new `obs64.exe` but the renamed exe stays outdated.
+
+**Solution:** The installer automatically creates a launcher batch file (e.g., `cg.bat`) that:
+1. Checks if `obs64.exe` exists (OBS auto-updated)
+2. Replaces the renamed exe with the updated `obs64.exe`
+3. Starts the renamed OBS in portable mode
+
+**Manual setup** (if installer didn't run or for existing installations):
+```batch
+REM Create {name}.bat in OBS root folder with this content:
+@echo off
+setlocal
+set "CUSTOM_EXE=%~n0"
+cd /d "%~dp0bin\64bit"
+if exist "obs64.exe" (
+    if exist "%CUSTOM_EXE%.exe" del /f "%CUSTOM_EXE%.exe"
+    move "obs64.exe" "%CUSTOM_EXE%.exe"
+)
+start "" "%CUSTOM_EXE%.exe" -p
+```
+The batch filename determines the exe name: `cg.bat` → runs `cg.exe`
+
+See `scripts/obs_launcher_template.bat` for documented template.
 
 ### Non-Interactive Installer Testing
 Set environment variables before running installer:

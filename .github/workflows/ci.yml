@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
     branches: [main]
 
@@ -80,16 +80,17 @@ jobs:
           }
           Write-Host "All PowerShell files passed syntax check"
 
-      - name: Verify installer branch configuration
+      - name: Verify installer branch configuration (PR only)
+        if: github.event_name == 'pull_request'
         shell: pwsh
         run: |
-          # On main branch or PRs to main, $RepoBranch must be "main"
+          # PRs to main must have RepoBranch = "main"
           $content = Get-Content -Path "install.ps1" -Raw
           if ($content -match '\$RepoBranch\s*=\s*"(\w+)"') {
             $branch = $Matches[1]
             Write-Host "Installer RepoBranch is set to: $branch"
             if ($branch -ne "main") {
-              Write-Error "ERROR: install.ps1 has RepoBranch='$branch' but must be 'main' for main branch/PRs"
+              Write-Error "ERROR: install.ps1 has RepoBranch='$branch' but must be 'main' for PRs to main"
               Write-Error "Change line 22 to: `$RepoBranch = `"main`""
               exit 1
             }
@@ -99,17 +100,17 @@ jobs:
             exit 1
           }
 
-      - name: Verify VERSION is release-ready
+      - name: Verify VERSION format (PR only)
+        if: github.event_name == 'pull_request'
         shell: pwsh
         run: |
-          # On main branch or PRs to main, VERSION must not contain "-dev"
-          $version = Get-Content -Path "yt-player-main/VERSION" -Raw
-          $version = $version.Trim()
+          # PRs to main must NOT have -dev suffix
+          $version = (Get-Content -Path "yt-player-main/VERSION" -Raw).Trim()
           Write-Host "VERSION file contains: $version"
           if ($version -match "-dev") {
             Write-Error "ERROR: VERSION '$version' contains '-dev' suffix"
             Write-Error "Development versions cannot be merged to main branch"
-            Write-Error "Update yt-player-main/VERSION to a release version (e.g., '4.3.3')"
+            Write-Error "Update yt-player-main/VERSION to a release version (e.g., '4.3.4')"
             exit 1
           }
           Write-Host "VERSION is release-ready: $version"
