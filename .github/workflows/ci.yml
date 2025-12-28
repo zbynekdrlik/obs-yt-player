@@ -99,6 +99,21 @@ jobs:
             exit 1
           }
 
+      - name: Verify VERSION is release-ready
+        shell: pwsh
+        run: |
+          # On main branch or PRs to main, VERSION must not contain "-dev"
+          $version = Get-Content -Path "yt-player-main/VERSION" -Raw
+          $version = $version.Trim()
+          Write-Host "VERSION file contains: $version"
+          if ($version -match "-dev") {
+            Write-Error "ERROR: VERSION '$version' contains '-dev' suffix"
+            Write-Error "Development versions cannot be merged to main branch"
+            Write-Error "Update yt-player-main/VERSION to a release version (e.g., '4.3.3')"
+            exit 1
+          }
+          Write-Host "VERSION is release-ready: $version"
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest

@@ -59,6 +59,11 @@ update_all_instances.bat
 - **NEVER merge PRs** - only the user can merge PRs, Claude must wait for user approval
 - Always work on `dev` branch and create PRs for user review
 
+**Before creating PR to main:**
+- `install.ps1` line 22: `$RepoBranch = "main"` (not "dev")
+- `yt-player-main/VERSION`: Must NOT contain "-dev" suffix (e.g., use "4.3.3" not "4.3.3-dev.1")
+- CI will reject PRs that violate these rules
+
 This project has one developer using Claude as a tool - not a multi-developer workflow.
 
 ## CI Verification Requirements
