@@ -325,7 +325,8 @@ function Test-IsSSHSession {
 
 function Start-OBSViaScheduler {
     param(
-        [string]$OBSExePath
+        [string]$OBSExePath,
+        [bool]$IsPortable = $false
     )
 
     # Create a scheduled task to start OBS in the user's desktop session
@@ -340,7 +341,9 @@ function Start-OBSViaScheduler {
 
         # Create task to run OBS from its directory
         # Use cmd /c with proper escaping for paths with spaces
-        $action = "cmd /c cd /d `"$obsDir`" && start `"`" `"$OBSExePath`""
+        # Add -p flag for portable mode so OBS uses the portable config folder
+        $portableArg = if ($IsPortable) { " -p" } else { "" }
+        $action = "cmd /c cd /d `"$obsDir`" && start `"`" `"$OBSExePath`"$portableArg"
 
         # Create the task with /IT flag for interactive session
         $result = schtasks /Create /TN $taskName /TR $action /SC ONCE /ST 00:00 /RU $env:USERNAME /IT /F 2>&1
@@ -371,7 +374,8 @@ function Start-OBSViaScheduler {
 
 function Start-OBSProcess {
     param(
-        [string]$OBSPath
+        [string]$OBSPath,
+        [bool]$IsPortable = $false
     )
 
     # Use previously detected OBS executable if available
@@ -391,7 +395,7 @@ function Start-OBSProcess {
     # Check if we need to use Task Scheduler (SSH/remote session)
     if ($script:NonInteractive -and (Test-IsSSHSession)) {
         Write-Debug "Detected SSH session, using Task Scheduler to start OBS"
-        if (Start-OBSViaScheduler -OBSExePath $obsExe) {
+        if (Start-OBSViaScheduler -OBSExePath $obsExe -IsPortable $IsPortable) {
             return $true
         } else {
             Write-Warning "Task Scheduler method failed, trying direct start"
@@ -399,7 +403,12 @@ function Start-OBSProcess {
     }
 
     # Direct start (normal case)
-    Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+    # Add -p flag for portable mode so OBS uses the portable config folder
+    if ($IsPortable) {
+        Start-Process -FilePath $obsExe -ArgumentList "-p" -WorkingDirectory $obsDir
+    } else {
+        Start-Process -FilePath $obsExe -WorkingDirectory $obsDir
+    }
     return $true
 }
 
@@ -2201,7 +2210,7 @@ function Install-OBSYouTubePlayer {
 
             Write-Step "Starting OBS Studio..."
 
-            if (Start-OBSProcess -OBSPath $obsPath) {
+            if (Start-OBSProcess -OBSPath $obsPath -IsPortable $isPortable) {
                 Write-Info "Waiting for OBS to start (up to 30 seconds)..."
 
                 # Wait for OBS to start (up to 30 seconds)
@@ -2312,7 +2321,7 @@ function Install-OBSYouTubePlayer {
 
                 # STEP 3: Start OBS again
                 Write-Step "Starting OBS..."
-                Start-OBSProcess -OBSPath $obsPath | Out-Null
+                Start-OBSProcess -OBSPath $obsPath -IsPortable $isPortable | Out-Null
 
                 # Wait for OBS to start
                 $waitTime = 0
