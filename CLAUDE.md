@@ -250,21 +250,75 @@ def add_cached_video(video_id, info):
 
 ## Remote Testing via SSH
 
-When testing installer or OBS functionality via SSH, GUI applications must be started using Windows Task Scheduler to run in the logged-in user's desktop session.
+See `docs/WINDOWS_TESTING.md` for comprehensive testing guide. Key patterns below.
 
-**Starting OBS via Task Scheduler:**
-```cmd
-schtasks /Create /TN StartOBS /TR "cmd /c cd /d \"C:\Program Files\obs-studio\bin\64bit\" && start \"\" obs64.exe" /SC ONCE /ST 00:00 /RU <username> /IT /F
-schtasks /Run /TN StartOBS
-schtasks /Delete /TN StartOBS /F
+### SSH Connection
+```bash
+# Use sshpass for non-interactive SSH (credentials in TARGETS.md)
+sshpass -p 'PASSWORD' ssh -o StrictHostKeyChecking=no USER@IP "command"
+
+# Copy files
+sshpass -p 'PASSWORD' scp -o StrictHostKeyChecking=no file USER@IP:"c:/path/dest"
 ```
 
-**CRITICAL: OBS must be started from its directory** (`C:\Program Files\obs-studio\bin\64bit`). Starting OBS from a different working directory causes it to fail silently without creating a log file.
-
-**Running PowerShell scripts via scheduler:**
-```cmd
-schtasks /Create /TN TaskName /TR "powershell -ExecutionPolicy Bypass -File C:\path\to\script.ps1" /SC ONCE /ST 00:00 /RU <username> /IT /F
-schtasks /Run /TN TaskName
+### Complex PowerShell Commands
+**Escaping is problematic over SSH.** For complex scripts, write to file and execute:
+```bash
+# Write script locally, copy to Windows, execute
+cat > /tmp/script.ps1 << 'EOF'
+# PowerShell code here
+EOF
+sshpass -p 'PASSWORD' scp /tmp/script.ps1 USER@IP:"c:/Users/USER/script.ps1"
+sshpass -p 'PASSWORD' ssh USER@IP 'powershell -ExecutionPolicy Bypass -File c:\Users\USER\script.ps1'
 ```
 
-The `/IT` flag is required to run the task interactively in the user's desktop session.
+### Starting GUI Apps (OBS) via SSH
+GUI apps started via SSH run in session 0 (invisible). Use PowerShell Task Scheduler:
+```bash
+sshpass -p 'PASSWORD' ssh USER@IP 'powershell -Command "
+$action = New-ScheduledTaskAction -Execute \"c:\\path\\to\\obs.exe\" -Argument \"-p\"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(5)
+$principal = New-ScheduledTaskPrincipal -UserId \"USERNAME\" -LogonType Interactive
+Register-ScheduledTask -TaskName \"StartOBS\" -Action $action -Trigger $trigger -Principal $principal -Force
+Start-ScheduledTask -TaskName \"StartOBS\"
+"'
+```
+
+**CRITICAL for portable OBS:** Always use `-p` flag: `obs64.exe -p`
+
+### Portable OBS Paths
+| Component | Path |
+|-----------|------|
+| Executable | `{OBS_PATH}\bin\64bit\obs64.exe` |
+| Config | `{OBS_PATH}\config\obs-studio\` |
+| Logs | `{OBS_PATH}\config\obs-studio\logs\` |
+| WebSocket config | `{OBS_PATH}\config\obs-studio\plugin_config\obs-websocket\config.json` |
+
+### Non-Interactive Installer Testing
+Set environment variables before running installer:
+```powershell
+[Environment]::SetEnvironmentVariable("YTPLAY_AUTO_CONFIRM", "1", "Process")
+[Environment]::SetEnvironmentVariable("YTPLAY_OBS_PATH", "c:\path\to\obs", "Process")
+[Environment]::SetEnvironmentVariable("YTPLAY_PLAYLIST_URL", "1", "Process")
+$env:YTPLAY_AUTO_CONFIRM = "1"
+$env:YTPLAY_OBS_PATH = "c:\path\to\obs"
+& c:\path\to\install.ps1
+```
+
+### WebSocket Testing
+Use `scripts/test_websocket.ps1` or quick check:
+```bash
+sshpass -p 'PASSWORD' ssh USER@IP 'powershell -Command "Test-NetConnection localhost -Port 4459 | Select TcpTestSucceeded"'
+```
+
+### Common Operations
+```bash
+# Check if OBS running (may be renamed, e.g., cg.exe)
+sshpass -p 'P' ssh U@IP 'powershell -Command "Get-Process obs64,cg -EA SilentlyContinue"'
+
+# Kill OBS
+sshpass -p 'P' ssh U@IP 'powershell -Command "Stop-Process -Name obs64,cg -Force -EA SilentlyContinue"'
+
+# Read OBS logs (portable)
+sshpass -p 'P' ssh U@IP "powershell -Command \"Get-ChildItem 'c:\\path\\logs' | Sort LastWriteTime -Desc | Select -First 1 | % { Get-Content \$_.FullName -Tail 50 }\""
+```
