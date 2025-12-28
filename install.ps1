@@ -1656,6 +1656,23 @@ function Confirm-Installation {
 }
 
 function Request-CustomPath {
+    # Check for env var in non-interactive mode first
+    if ($script:NonInteractive -and $script:EnvOBSPath) {
+        $customPath = $script:EnvOBSPath
+        Write-Info "Using OBS path from environment: $customPath"
+        if (Test-Path $customPath) {
+            return $customPath
+        }
+        Write-ErrorMsg "Environment OBS path does not exist: $customPath"
+        return $null
+    }
+
+    # In non-interactive mode without env var, can't continue
+    if ($script:NonInteractive) {
+        Write-ErrorMsg "No OBS path provided in non-interactive mode (set YTPLAY_OBS_PATH)"
+        return $null
+    }
+
     Write-Host ""
     Write-ErrorMsg "Could not detect OBS installation automatically."
     Write-Host ""
